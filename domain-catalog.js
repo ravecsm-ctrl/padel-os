@@ -1,0 +1,129 @@
+// Exercise catalog. Every exercise has a stable id so history survives renames.
+// fields: what gets logged per set. 'w' = load (kg, canonical), 'reps', 'sec', 'm'.
+// The last field is the "target" field that the rep/time/distance range applies to.
+// inc: smallest sensible load jump in kg. quality: power work — never chase reps.
+
+const x = (id, name, fields, o) => ({
+  id, name, fields,
+  perSide: false, quality: false, inc: 2.5, loadNote: '', equipment: 'Gym equipment',
+  muscles: '', pattern: '', subs: [],
+  why: '', setup: '', execute: '', avoid: '',
+  breathe: 'Brace before the rep; exhale through the effort without losing position.',
+  ...o,
+});
+
+const LIST = [
+  // ── Routine A — Lower force & deceleration
+  x('trap-bar-deadlift', 'Trap-bar deadlift', ['w', 'reps'], { inc: 5, equipment: 'Trap bar', pattern: 'hinge', muscles: 'Quads · glutes · hamstrings · back', subs: ['romanian-deadlift', 'leg-press', 'goblet-squat'],
+    why: 'Stronger first step and braking base.', setup: 'Stand centered in the bar, feet hip-width, brace, then grip.', execute: 'Push the floor away; finish tall without leaning back.', avoid: 'Rounding the back; hips shooting up; bouncing the plates.' }),
+  x('rfess', 'Rear-foot-elevated split squat', ['w', 'reps'], { perSide: true, inc: 2, loadNote: 'per hand', equipment: 'Bench + dumbbells', pattern: 'single-leg', muscles: 'Quads · glutes · adductors', subs: ['reverse-lunge', 'step-up-knee-drive'],
+    why: 'Single-leg force for lunges and recovery steps.', setup: 'Rear foot supported; front foot far enough to keep balance.', execute: 'Lower straight down; drive through the whole front foot.', avoid: 'Front knee collapsing inward; pushing off the rear leg.' }),
+  x('lateral-lunge', 'Lateral lunge', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Dumbbell optional', pattern: 'lateral', muscles: 'Adductors · glute med · quads', subs: ['cossack-squat'],
+    why: 'Strengthens wide defensive positions.', setup: 'Take a wide stance with toes mostly forward.', execute: 'Sit into one hip while the other leg stays long; push back.', avoid: 'Heel lifting; knee caving; torso collapsing.' }),
+  x('sl-rdl', 'Single-leg Romanian deadlift', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Dumbbell or kettlebell', pattern: 'hinge', muscles: 'Hamstrings · glutes · foot', subs: ['kickstand-rdl', 'romanian-deadlift'],
+    why: 'Posterior-chain control and balance.', setup: 'Soft knee, tripod foot, weight close to the body.', execute: 'Reach the free leg back while hinging; keep hips square.', avoid: 'Opening the hip; rounding; reaching weight away.' }),
+  x('copenhagen-short', 'Copenhagen plank (short lever)', ['sec'], { perSide: true, equipment: 'Bench', pattern: 'adductor', muscles: 'Adductors · obliques', subs: ['side-plank', 'cable-adduction'],
+    why: 'Adductor capacity for lateral pushes.', setup: 'Top knee on bench, elbow under shoulder.', execute: 'Lift hips into a straight line and hold steadily.', avoid: 'Shoulder shrugging; hips sagging; progressing too fast.' }),
+  x('pallof-press', 'Pallof press', ['w', 'reps'], { perSide: true, equipment: 'Cable or band', pattern: 'anti-rotation', muscles: 'Obliques · deep trunk', subs: ['side-plank', 'dead-bug'],
+    why: 'Resists unwanted rotation during strokes.', setup: 'Stand side-on to cable, feet stable, handle at sternum.', execute: 'Press straight out without letting torso rotate.', avoid: 'Leaning; flared ribs; rushing.' }),
+  x('standing-calf-raise', 'Standing calf raise', ['w', 'reps'], { inc: 5, equipment: 'Machine or step', pattern: 'calf', muscles: 'Gastrocnemius · soleus', subs: ['sl-calf-raise', 'seated-soleus-raise'],
+    why: 'Ankle stiffness and repeated court movement.', setup: 'Balls of feet secure, knees softly unlocked.', execute: 'Rise fully, pause, lower under control.', avoid: 'Bouncing; rolling ankles outward; partial range.' }),
+  x('tibialis-raise', 'Tibialis raise', ['reps'], { equipment: 'Wall', pattern: 'calf', muscles: 'Tibialis anterior',
+    why: 'Supports braking and shin/ankle capacity.', setup: 'Back against wall, heels down, feet forward.', execute: 'Lift toes toward shins; pause; lower slowly.', avoid: 'Heels lifting; rocking; rushing.' }),
+
+  // ── Routine B — Upper strength & rotation
+  x('landmine-press', 'Half-kneeling landmine press', ['w', 'reps'], { perSide: true, equipment: 'Landmine', pattern: 'press', muscles: 'Deltoid · serratus · triceps', subs: ['hk-db-press', 'incline-db-press'],
+    why: 'Overhead strength with scapular upward rotation.', setup: 'Inside knee down; ribs stacked; bar at shoulder.', execute: 'Press up and forward, letting shoulder blade rotate.', avoid: 'Arching low back; shrugging; twisting.' }),
+  x('chest-supported-row', 'Chest-supported row', ['w', 'reps'], { inc: 2, loadNote: 'per hand', equipment: 'Bench + dumbbells', pattern: 'pull', muscles: 'Lats · mid-back · rear delts', subs: ['seated-cable-row', 'inverted-row'],
+    why: 'Scapular control and stroke balance.', setup: 'Chest on inclined bench, arms long.', execute: 'Pull elbows toward hips; pause without shrugging.', avoid: 'Lifting chest; jerking; shoulders to ears.' }),
+  x('incline-db-press', 'Incline dumbbell press, neutral grip', ['w', 'reps'], { inc: 2, loadNote: 'per hand', equipment: 'Bench + dumbbells', pattern: 'press', muscles: 'Chest · triceps · front delts', subs: ['push-up', 'landmine-press'],
+    why: 'Pressing strength in a shoulder-friendly path.', setup: 'Low incline, palms facing, shoulder blades comfortable.', execute: 'Lower with control to a pain-free depth; press evenly.', avoid: 'Elbows flared; bouncing; excessive arch.' }),
+  x('cable-row-rotation', 'Single-arm cable row with rotation', ['w', 'reps'], { perSide: true, equipment: 'Cable', pattern: 'pull', muscles: 'Back · obliques', subs: ['sa-db-row'],
+    why: 'Coordinates upper-back rotation with pulling.', setup: 'Athletic stance facing cable, arm long.', execute: 'Row while rotating through the upper back; return slowly.', avoid: 'Twisting lumbar spine; yanking; shoulder shrug.' }),
+  x('cable-er', 'Cable external rotation at side', ['w', 'reps'], { perSide: true, inc: 1.25, equipment: 'Cable or band', pattern: 'cuff', muscles: 'Rotator cuff', subs: ['side-lying-er'],
+    why: 'Improves shoulder capacity for repeated shots.', setup: 'Elbow pinned to side at 90°, very light load.', execute: 'Rotate forearm outward without moving elbow.', avoid: 'Too much load; wrist bending; torso turning.' }),
+  x('face-pull', 'Face pull', ['w', 'reps'], { equipment: 'Cable rope', pattern: 'pull', muscles: 'Rear delts · mid-back · external rotators', subs: ['band-pull-apart'],
+    why: 'Balances pressing and supports shoulder position.', setup: 'Rope at eye height; stand tall.', execute: 'Pull toward face and separate rope ends.', avoid: 'Lumbar lean; shrugging; elbows dropping.' }),
+  x('wrist-rotation', 'Wrist pronation / supination', ['w', 'reps'], { perSide: true, inc: 1, equipment: 'Light dumbbell', pattern: 'forearm', muscles: 'Forearm rotators',
+    why: 'Racket control and forearm endurance.', setup: 'Support forearm; hold one end of a light dumbbell.', execute: 'Rotate palm down then up through controlled range.', avoid: 'Heavy load; moving elbow; fast drops.' }),
+  x('farmer-carry', 'Farmer carry', ['w', 'm'], { inc: 2, loadNote: 'per hand', equipment: 'Heavy dumbbells', pattern: 'carry', muscles: 'Grip · trunk · scapular stabilizers', subs: ['suitcase-carry'],
+    why: 'Grip endurance and whole-body stiffness.', setup: 'Pick up evenly, shoulders relaxed, stand tall.', execute: 'Walk with short controlled steps and quiet trunk.', avoid: 'Leaning; rushing; holding breath.' }),
+
+  // ── Routine C — Power & athletic resilience
+  x('cmj', 'Countermovement jump', ['reps'], { quality: true, equipment: 'Bodyweight', pattern: 'power', muscles: 'Quads · glutes · calves', subs: ['box-jump'],
+    why: 'High-quality lower-body power.', setup: 'Stand tall with clear landing space.', execute: 'Dip quickly, jump hard, land softly and reset fully.', avoid: 'Fatigue reps; knees caving; stiff landings.' }),
+  x('lateral-bound', 'Lateral bound to stick', ['reps'], { perSide: true, quality: true, equipment: 'Bodyweight', pattern: 'power', muscles: 'Glutes · quads · ankle', subs: ['skater-hop'],
+    why: 'Lateral power plus deceleration control.', setup: 'Balance on one leg with space to the side.', execute: 'Bound laterally; land on opposite foot and hold 2 seconds.', avoid: 'Chasing distance; unstable knee; immediate rebound.' }),
+  x('mb-scoop-toss', 'Medicine-ball rotational scoop toss', ['w', 'reps'], { perSide: true, quality: true, inc: 1, equipment: 'Medicine ball', pattern: 'power', muscles: 'Hips · trunk · shoulder', subs: ['cable-woodchop'],
+    why: 'Ground-up rotational power for strokes.', setup: 'Stand side-on to solid wall, ball near back hip.', execute: 'Drive from ground and hips; release fast; reset.', avoid: 'Arming the throw; lumbar twisting; unsafe wall.' }),
+  x('goblet-squat', 'Goblet squat', ['w', 'reps'], { inc: 2, equipment: 'Dumbbell or kettlebell', pattern: 'squat', muscles: 'Quads · glutes · trunk', subs: ['leg-press', 'rfess'],
+    why: 'Robust squat pattern and leg capacity.', setup: 'Hold weight at chest; stable shoulder-width stance.', execute: 'Sit between hips, keep full foot down, stand tall.', avoid: 'Heels lifting; knees caving; losing brace.' }),
+  x('step-up-knee-drive', 'Step-up with knee drive', ['w', 'reps'], { perSide: true, inc: 2, loadNote: 'per hand', equipment: 'Box', pattern: 'single-leg', muscles: 'Quads · glutes · hip flexors', subs: ['rfess', 'reverse-lunge'],
+    why: 'Single-leg drive and balance.', setup: 'Whole working foot on a stable box.', execute: 'Drive through box leg and finish with opposite knee up.', avoid: 'Pushing off floor foot; uncontrolled descent.' }),
+  x('slider-curl', 'Hamstring slider curl', ['reps'], { equipment: 'Sliders or towels', pattern: 'hamstring', muscles: 'Hamstrings · glutes', subs: ['nordic-assisted', 'leg-curl'],
+    why: 'Hamstring resilience for acceleration and braking.', setup: 'Lie down, heels on sliders, hips lifted.', execute: 'Extend legs slowly, then curl heels in while hips stay up.', avoid: 'Hips dropping; arching back; moving too fast.' }),
+  x('seated-soleus-raise', 'Seated soleus raise', ['w', 'reps'], { inc: 5, equipment: 'Machine or plate', pattern: 'calf', muscles: 'Soleus', subs: ['standing-calf-raise'],
+    why: 'Repeated movement and ankle endurance.', setup: 'Sit with knees bent, forefeet supported, load over knees.', execute: 'Raise heels, pause at top, lower fully.', avoid: 'Bouncing; short range; feet rolling.' }),
+  x('band-ankle', 'Band ankle inversion / eversion', ['reps'], { perSide: true, equipment: 'Resistance band', pattern: 'ankle', muscles: 'Ankle stabilizers', subs: ['sl-balance'],
+    why: 'Builds controlled ankle strength in both directions.', setup: 'Sit with lower leg still and band anchored safely.', execute: 'Move forefoot inward/outward through a small clean range.', avoid: 'Moving knee; snapping band; excessive range.' }),
+
+  // ── Substitutes
+  x('romanian-deadlift', 'Romanian deadlift', ['w', 'reps'], { inc: 5, equipment: 'Barbell', pattern: 'hinge', muscles: 'Hamstrings · glutes · back', subs: ['trap-bar-deadlift'],
+    why: 'Hinge strength when no trap bar is free.', setup: 'Bar at hips, soft knees, lats tight.', execute: 'Push hips back until hamstrings load; stand by driving hips forward.', avoid: 'Rounding; bar drifting from legs; squatting it down.' }),
+  x('leg-press', 'Leg press', ['w', 'reps'], { inc: 10, equipment: 'Leg press machine', pattern: 'squat', muscles: 'Quads · glutes', subs: ['goblet-squat'],
+    why: 'Heavy leg force with low technical demand.', setup: 'Feet shoulder-width mid-platform, low back flat on pad.', execute: 'Lower until hips start to tuck, press through whole foot.', avoid: 'Butt lifting off pad; locking knees hard; knees caving.' }),
+  x('reverse-lunge', 'Reverse lunge', ['w', 'reps'], { perSide: true, inc: 2, loadNote: 'per hand', equipment: 'Dumbbells', pattern: 'single-leg', muscles: 'Quads · glutes', subs: ['rfess'],
+    why: 'Knee-friendly single-leg strength.', setup: 'Stand tall, dumbbells at sides.', execute: 'Step back, lower rear knee softly, drive up through front foot.', avoid: 'Short step; front heel lifting; torso folding.' }),
+  x('cossack-squat', 'Cossack squat', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Bodyweight or kettlebell', pattern: 'lateral', muscles: 'Adductors · glutes', subs: ['lateral-lunge'],
+    why: 'Deep lateral range for low defensive shots.', setup: 'Very wide stance, toes slightly out.', execute: 'Shift into one hip while the other leg straightens, toes up.', avoid: 'Forcing depth; heel lifting; rounding.' }),
+  x('kickstand-rdl', 'Kickstand RDL', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Dumbbells', pattern: 'hinge', muscles: 'Hamstrings · glutes', subs: ['sl-rdl'],
+    why: 'Single-leg hinge with less balance demand.', setup: 'Back foot toes lightly down beside front heel.', execute: 'Hinge over the front leg, keep 80% weight there.', avoid: 'Pushing off the back foot; rounding.' }),
+  x('side-plank', 'Side plank', ['sec'], { perSide: true, equipment: 'Bodyweight', pattern: 'anti-rotation', muscles: 'Obliques · glute med',
+    why: 'Lateral trunk stiffness.', setup: 'Elbow under shoulder, feet stacked or staggered.', execute: 'Lift hips into a straight line and breathe steadily.', avoid: 'Hips sagging or piking; shrugging.' }),
+  x('cable-adduction', 'Cable hip adduction', ['w', 'reps'], { perSide: true, inc: 2.5, equipment: 'Cable ankle strap', pattern: 'adductor', muscles: 'Adductors',
+    why: 'Loadable adductor work.', setup: 'Stand side-on, strap on inside ankle, hold support.', execute: 'Sweep the leg across the body under control.', avoid: 'Leaning; swinging; rotating hips.' }),
+  x('dead-bug', 'Dead bug', ['reps'], { perSide: true, equipment: 'Bodyweight', pattern: 'anti-rotation', muscles: 'Deep trunk',
+    why: 'Trunk control with limbs moving.', setup: 'On back, knees and hips 90°, low back gently down.', execute: 'Extend opposite arm and leg slowly, return, switch.', avoid: 'Low back arching; rushing.' }),
+  x('sl-calf-raise', 'Single-leg calf raise', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Step + dumbbell', pattern: 'calf', muscles: 'Gastrocnemius · soleus',
+    why: 'Unilateral ankle capacity.', setup: 'Ball of foot on step edge, hold support.', execute: 'Full rise, pause, slow lower below step level.', avoid: 'Bouncing; ankle rolling out.' }),
+  x('hk-db-press', 'Half-kneeling dumbbell press', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Dumbbell', pattern: 'press', muscles: 'Deltoid · triceps',
+    why: 'Overhead press with trunk control.', setup: 'Down-knee same side as weight, glute squeezed.', execute: 'Press straight up, biceps by ear, lower slowly.', avoid: 'Leaning away; arching.' }),
+  x('seated-cable-row', 'Seated cable row', ['w', 'reps'], { inc: 2.5, equipment: 'Cable', pattern: 'pull', muscles: 'Lats · mid-back',
+    why: 'Stable horizontal pull.', setup: 'Sit tall, slight knee bend, arms long.', execute: 'Pull to lower ribs, pause, return slowly.', avoid: 'Rocking torso; shrugging.' }),
+  x('inverted-row', 'Inverted row', ['reps'], { equipment: 'Smith bar or rings', pattern: 'pull', muscles: 'Lats · mid-back · biceps',
+    why: 'Bodyweight pull with scapular control.', setup: 'Body straight under bar, heels down.', execute: 'Pull chest to bar, pause, lower slowly.', avoid: 'Hips sagging; chin poking.' }),
+  x('push-up', 'Push-up', ['reps'], { equipment: 'Bodyweight', pattern: 'press', muscles: 'Chest · triceps · serratus',
+    why: 'Shoulder-friendly press, anywhere.', setup: 'Hands under shoulders, body in a plank.', execute: 'Lower chest between hands, push the floor away.', avoid: 'Hips sagging; elbows flared wide.' }),
+  x('sa-db-row', 'Single-arm dumbbell row', ['w', 'reps'], { perSide: true, inc: 2, equipment: 'Bench + dumbbell', pattern: 'pull', muscles: 'Lats · mid-back',
+    why: 'Unilateral pulling strength.', setup: 'Hand and knee on bench, back flat.', execute: 'Row elbow toward hip, pause, lower fully.', avoid: 'Twisting open; jerking.' }),
+  x('side-lying-er', 'Side-lying external rotation', ['w', 'reps'], { perSide: true, inc: 1, equipment: 'Light dumbbell', pattern: 'cuff', muscles: 'Rotator cuff',
+    why: 'Cuff strength with no cable.', setup: 'Lie on side, towel under elbow, elbow at 90°.', execute: 'Rotate forearm up slowly, lower over 3 seconds.', avoid: 'Rolling back; too much load.' }),
+  x('band-pull-apart', 'Band pull-apart', ['reps'], { equipment: 'Band', pattern: 'pull', muscles: 'Rear delts · mid-back',
+    why: 'Upper-back endurance and posture.', setup: 'Arms straight at shoulder height, band taut.', execute: 'Pull band to chest by squeezing shoulder blades.', avoid: 'Shrugging; bending elbows.' }),
+  x('suitcase-carry', 'Suitcase carry', ['w', 'm'], { perSide: true, inc: 2, equipment: 'Dumbbell or kettlebell', pattern: 'carry', muscles: 'Obliques · grip',
+    why: 'Anti-lateral-flexion and grip.', setup: 'One weight at side, stand tall.', execute: 'Walk without leaning toward or away from the weight.', avoid: 'Leaning; shrugging.' }),
+  x('box-jump', 'Box jump', ['reps'], { quality: true, equipment: 'Box', pattern: 'power', muscles: 'Quads · glutes · calves',
+    why: 'Power with reduced landing impact.', setup: 'Stand close to a box of modest height.', execute: 'Swing, jump, land softly on box, step down.', avoid: 'Box too high; jumping down.' }),
+  x('skater-hop', 'Skater hop', ['reps'], { perSide: true, quality: true, equipment: 'Bodyweight', pattern: 'power', muscles: 'Glutes · ankle',
+    why: 'Lateral elastic power.', setup: 'Athletic stance, space to both sides.', execute: 'Hop sideways, land and stick briefly, hop back.', avoid: 'Knee caving; sloppy landings.' }),
+  x('cable-woodchop', 'Cable woodchop', ['w', 'reps'], { perSide: true, inc: 2.5, equipment: 'Cable', pattern: 'power', muscles: 'Obliques · hips',
+    why: 'Rotation when no throwing wall.', setup: 'Side-on to cable set high or low, arms long.', execute: 'Rotate through hips and upper back, arms stay long.', avoid: 'Bending elbows; lumbar twisting.' }),
+  x('nordic-assisted', 'Assisted Nordic curl', ['reps'], { equipment: 'Partner / band / pad', pattern: 'hamstring', muscles: 'Hamstrings',
+    why: 'Eccentric hamstring strength.', setup: 'Kneel with heels anchored, hips extended.', execute: 'Lower as slowly as possible, push back up with hands.', avoid: 'Hips bending; dropping fast.' }),
+  x('leg-curl', 'Leg curl machine', ['w', 'reps'], { inc: 2.5, equipment: 'Machine', pattern: 'hamstring', muscles: 'Hamstrings',
+    why: 'Loadable knee-flexion strength.', setup: 'Knee aligned with machine axis.', execute: 'Curl fully, pause, lower over 2–3 seconds.', avoid: 'Hips lifting; swinging.' }),
+  x('sl-balance', 'Single-leg balance', ['sec'], { perSide: true, equipment: 'Bodyweight', pattern: 'ankle', muscles: 'Ankle & foot stabilizers',
+    why: 'Ankle proprioception.', setup: 'Stand on one leg near support.', execute: 'Hold steady; progress to eyes closed or soft surface.', avoid: 'Locking knee; gripping toes hard.' }),
+];
+
+export const CATALOG = Object.fromEntries(LIST.map(e => [e.id, e]));
+export const EXERCISES = LIST;
+
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const BY_NAME = Object.fromEntries(LIST.map(e => [norm(e.name), e.id]));
+
+export function getExercise(id) { return CATALOG[id] || null; }
+export function idForName(name) { return BY_NAME[norm(name)] || null; }
+export const hasLoad = ex => ex.fields.includes('w');
+export const targetField = ex => ex.fields[ex.fields.length - 1];
+export const FIELD_UNIT = { reps: 'reps', sec: 's', m: 'm' };
