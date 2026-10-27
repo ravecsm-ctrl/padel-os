@@ -1,7 +1,8 @@
 // Application state, persistence wiring, hash router, toasts and sheets.
 // Views import `app` and `S`; main.js registers views and boots.
 import * as db from './core-db.js';
-import { DEFAULT_SCHEDULE } from './domain-program.js';
+import { DEFAULT_SCHEDULE, resolveRoutine } from './domain-program.js';
+import { DEFAULT_PROFILE } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition } from './domain-calendar.js';
 
 export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, programStart: isoDate(mondayOf()) };
@@ -10,6 +11,7 @@ export const S = {
   route: 'today', params: [],
   settings: { ...DEFAULT_SETTINGS },
   schedule: { ...DEFAULT_SCHEDULE },
+  profile: { ...DEFAULT_PROFILE },  // equipment, time, level, padel days, injuries, simple mode
   overrides: {},      // routine block customisations
   exNotes: {},        // persistent per-exercise notes ("seat 4")
   lastBackup: 0,
@@ -28,6 +30,7 @@ export const app = {
   view: () => views[S.route] || views.today,
   get strength() { return S.sessions.filter(s => s.kind === 'strength'); },
   position: () => programPosition(S.settings.programStart),
+  routine: id => resolveRoutine(id, S.overrides, S.profile),
 
   async save(key) { try { await db.setMeta(key, S[key]); } catch { S.storageOk = false; app.toast('Could not save — storage unavailable'); } },
   // Active workout is saved on every change, debounced, and immediately when the app is hidden.

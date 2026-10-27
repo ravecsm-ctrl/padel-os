@@ -42,7 +42,7 @@ const LIST = [
     why: 'Coordinates upper-back rotation with pulling.', setup: 'Athletic stance facing cable, arm long.', execute: 'Row while rotating through the upper back; return slowly.', avoid: 'Twisting lumbar spine; yanking; shoulder shrug.' }),
   x('cable-er', 'Cable external rotation at side', ['w', 'reps'], { perSide: true, inc: 1.25, equipment: 'Cable or band', pattern: 'cuff', muscles: 'Rotator cuff', subs: ['side-lying-er'],
     why: 'Improves shoulder capacity for repeated shots.', setup: 'Elbow pinned to side at 90°, very light load.', execute: 'Rotate forearm outward without moving elbow.', avoid: 'Too much load; wrist bending; torso turning.' }),
-  x('face-pull', 'Face pull', ['w', 'reps'], { equipment: 'Cable rope', pattern: 'pull', muscles: 'Rear delts · mid-back · external rotators', subs: ['band-pull-apart'],
+  x('face-pull', 'Face pull', ['w', 'reps'], { equipment: 'Cable rope', pattern: 'pull', muscles: 'Rear delts · mid-back · external rotators', subs: ['band-face-pull', 'band-pull-apart'],
     why: 'Balances pressing and supports shoulder position.', setup: 'Rope at eye height; stand tall.', execute: 'Pull toward face and separate rope ends.', avoid: 'Lumbar lean; shrugging; elbows dropping.' }),
   x('wrist-rotation', 'Wrist pronation / supination', ['w', 'reps'], { perSide: true, inc: 1, equipment: 'Light dumbbell', pattern: 'forearm', muscles: 'Forearm rotators',
     why: 'Racket control and forearm endurance.', setup: 'Support forearm; hold one end of a light dumbbell.', execute: 'Rotate palm down then up through controlled range.', avoid: 'Heavy load; moving elbow; fast drops.' }),
@@ -114,7 +114,48 @@ const LIST = [
     why: 'Loadable knee-flexion strength.', setup: 'Knee aligned with machine axis.', execute: 'Curl fully, pause, lower over 2–3 seconds.', avoid: 'Hips lifting; swinging.' }),
   x('sl-balance', 'Single-leg balance', ['sec'], { perSide: true, equipment: 'Bodyweight', pattern: 'ankle', muscles: 'Ankle & foot stabilizers',
     why: 'Ankle proprioception.', setup: 'Stand on one leg near support.', execute: 'Hold steady; progress to eyes closed or soft surface.', avoid: 'Locking knee; gripping toes hard.' }),
+
+  // ── Home / no-equipment options
+  x('glute-bridge', 'Single-leg glute bridge', ['reps'], { perSide: true, equipment: 'Bodyweight', pattern: 'hinge', muscles: 'Glutes · hamstrings',
+    why: 'Hip extension strength with no equipment.', setup: 'On your back, one foot planted near your hips, other knee hugged or leg straight.', execute: 'Drive through the heel to lift hips level, pause 2 s, lower slowly.', avoid: 'Arching the low back; hips tilting.' }),
+  x('bw-squat', 'Tempo bodyweight squat', ['reps'], { equipment: 'Bodyweight', pattern: 'squat', muscles: 'Quads · glutes',
+    why: 'Squat strength and control without load.', setup: 'Feet shoulder-width, arms forward for balance.', execute: 'Lower over 3 seconds, pause at the bottom, stand up fast.', avoid: 'Heels lifting; knees caving.' }),
+  x('pike-push-up', 'Pike push-up', ['reps'], { equipment: 'Bodyweight', pattern: 'press', muscles: 'Shoulders · triceps',
+    why: 'Overhead pressing strength at home.', setup: 'Hips high in an inverted V, hands shoulder-width.', execute: 'Lower head toward the floor between hands, press back up.', avoid: 'Flaring elbows; collapsing hips.' }),
+  x('band-row', 'Band row', ['reps'], { equipment: 'Resistance band', pattern: 'pull', muscles: 'Lats · mid-back',
+    why: 'Horizontal pulling with a band.', setup: 'Band anchored at chest height, step back until taut.', execute: 'Row elbows back, squeeze shoulder blades, return slowly.', avoid: 'Shrugging; leaning back.' }),
+  x('band-woodchop', 'Band woodchop', ['reps'], { perSide: true, quality: true, equipment: 'Resistance band', pattern: 'power', muscles: 'Obliques · hips',
+    why: 'Fast rotation from the ground up, like a stroke.', setup: 'Band anchored high, side-on, arms long.', execute: 'Rotate hips and chest together, pulling diagonally down fast; return slowly.', avoid: 'Bending elbows; twisting from the low back.' }),
+  x('band-face-pull', 'Band face pull', ['reps'], { equipment: 'Resistance band', pattern: 'pull', muscles: 'Rear delts · rotator cuff',
+    why: 'Shoulder balance for overhead shots, with a band.', setup: 'Band anchored at eye height, arms long.', execute: 'Pull toward your face, elbows high, thumbs finishing back.', avoid: 'Shrugging; leaning back.' }),
+  x('plank-shoulder-tap', 'Plank shoulder tap', ['reps'], { equipment: 'Bodyweight', pattern: 'carry', muscles: 'Trunk · shoulders',
+    why: 'Whole-body stiffness when there is nothing to carry.', setup: 'High plank, feet wider than hips.', execute: 'Tap opposite shoulder without the hips rocking.', avoid: 'Hips swaying; rushing.' }),
 ];
+
+// Minimum kit needed: 'bw' = bodyweight, band, step or chair; 'db' = dumbbells/kettlebell/bench; 'gym' = machines, cables, bars.
+const KIT = {
+  'trap-bar-deadlift': 'gym', 'landmine-press': 'gym', 'cable-row-rotation': 'gym', 'face-pull': 'gym', 'mb-scoop-toss': 'gym',
+  'seated-soleus-raise': 'gym', 'romanian-deadlift': 'gym', 'leg-press': 'gym', 'cable-adduction': 'gym', 'seated-cable-row': 'gym',
+  'cable-woodchop': 'gym', 'leg-curl': 'gym', 'inverted-row': 'gym',
+  'chest-supported-row': 'db', 'incline-db-press': 'db', 'farmer-carry': 'db', 'goblet-squat': 'db', 'hk-db-press': 'db',
+  'sa-db-row': 'db', 'suitcase-carry': 'db',
+};
+// Exercises that still work with no added load (the load column is hidden at home).
+const LOAD_OPTIONAL = new Set(['rfess', 'lateral-lunge', 'sl-rdl', 'pallof-press', 'standing-calf-raise', 'cable-er', 'wrist-rotation',
+  'step-up-knee-drive', 'reverse-lunge', 'cossack-squat', 'kickstand-rdl', 'sl-calf-raise', 'side-lying-er']);
+// Default ranges, used when a substitute logs a different unit than the slot it fills.
+const RANGE = { 'plank-shoulder-tap': [16, 24], 'glute-bridge': [10, 15], 'bw-squat': [10, 15], 'pike-push-up': [6, 10], 'band-row': [12, 15],
+  'band-woodchop': [6, 8], 'band-face-pull': [15, 20], 'push-up': [8, 15], 'side-plank': [20, 40], 'dead-bug': [8, 10], 'sl-balance': [30, 45], 'band-pull-apart': [15, 20] };
+for (const e of LIST) { e.kit = KIT[e.id] || 'bw'; e.loadOptional = LOAD_OPTIONAL.has(e.id); e.range = RANGE[e.id] || null; }
+
+// Equipment-free fallbacks per movement pattern, in preference order.
+export const PATTERN_FALLBACK = {
+  hinge: ['kickstand-rdl', 'glute-bridge', 'sl-rdl'], squat: ['bw-squat', 'reverse-lunge'], 'single-leg': ['reverse-lunge', 'step-up-knee-drive', 'rfess'],
+  press: ['push-up', 'pike-push-up'], pull: ['band-row', 'band-face-pull', 'band-pull-apart'], cuff: ['cable-er', 'side-lying-er'], carry: ['plank-shoulder-tap', 'side-plank'],
+  power: ['band-woodchop', 'skater-hop', 'cmj'], calf: ['sl-calf-raise', 'standing-calf-raise'], hamstring: ['slider-curl', 'nordic-assisted'],
+  adductor: ['copenhagen-short', 'side-plank'], 'anti-rotation': ['pallof-press', 'dead-bug', 'side-plank'], forearm: ['wrist-rotation'],
+  lateral: ['lateral-lunge', 'cossack-squat'], ankle: ['band-ankle', 'sl-balance'],
+};
 
 export const CATALOG = Object.fromEntries(LIST.map(e => [e.id, e]));
 export const EXERCISES = LIST;

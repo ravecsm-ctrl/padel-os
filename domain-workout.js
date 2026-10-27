@@ -8,17 +8,18 @@ const uid = () => (globalThis.crypto?.randomUUID?.() || `s-${Date.now()}-${Math.
 export function buildEntry(block, week, history, unit, light) {
   const ex = getExercise(block.ex);
   const rx = prescribe(block, week, { light });
-  const sug = suggest({ exId: ex.id, rx, history, unit });
+  const fields = block.noLoad ? ex.fields.filter(f => f !== 'w') : ex.fields;
+  const sug = suggest({ exId: ex.id, rx, history, unit, fields });
   return {
-    exId: ex.id, name: ex.name, fields: ex.fields, perSide: ex.perSide,
+    exId: ex.id, name: ex.name, fields, perSide: ex.perSide, adaptedFrom: block.adaptedFrom,
     target: { sets: rx.sets, min: rx.min, max: rx.max, rest: rx.rest, rpe: rx.rpe },
     suggestion: sug, skipped: false,
     sets: Array.from({ length: rx.sets }, () => ({ w: null, reps: null, sec: null, m: null, rpe: null, done: false })),
   };
 }
 
-export function createWorkout({ routineId, week, history, overrides, unit, readiness = null, light = false }) {
-  const r = resolveRoutine(routineId, overrides);
+export function createWorkout({ routineId, week, history, overrides, unit, readiness = null, light = false, profile = null }) {
+  const r = resolveRoutine(routineId, overrides, profile);
   return {
     id: uid(), kind: 'strength', routineId, title: r.title, week, startedAt: Date.now(), index: 0,
     readiness, light, exercises: r.blocks.map(blk => buildEntry(blk, week, history, unit, light)),
@@ -27,7 +28,8 @@ export function createWorkout({ routineId, week, history, overrides, unit, readi
 
 export function swapExercise(w, i, newExId, history, unit) {
   const old = w.exercises[i];
-  const entry = buildEntry({ ex: newExId, sets: old.target.sets, min: old.target.min, max: old.target.max, rest: old.target.rest }, w.week, history, unit, false);
+  const noLoad = !old.fields.includes('w') && getExercise(old.exId).fields.includes('w');
+  const entry = buildEntry({ ex: newExId, sets: old.target.sets, min: old.target.min, max: old.target.max, rest: old.target.rest, noLoad: noLoad && getExercise(newExId).loadOptional }, w.week, history, unit, false);
   entry.target = { ...old.target };
   entry.sets = entry.sets.slice(0, old.target.sets);
   entry.swappedFrom = old.exId;
@@ -38,7 +40,7 @@ export function swapExercise(w, i, newExId, history, unit) {
 // Fill blanks on a set from the suggestion/previous set so one tap logs it.
 export function autofill(entry, i) {
   const s = entry.sets[i], prev = entry.sets.slice(0, i).reverse().find(x => x.done);
-  const tf = targetField(getExercise(entry.exId));
+  const tf = entry.fields[entry.fields.length - 1];
   if (entry.fields.includes('w') && s.w == null) s.w = prev?.w ?? entry.suggestion?.w ?? null;
   if (s[tf] == null) s[tf] = prev?.[tf] ?? entry.suggestion?.target ?? entry.target.min;
   return s;

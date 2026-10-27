@@ -2,11 +2,12 @@ import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
 import { esc, chips } from './ui-kit.js';
-import { getExercise, targetField, hasLoad, FIELD_UNIT } from './domain-catalog.js';
+import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { rangeLabel } from './domain-program.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs } from './domain-progression.js';
 import { relDay } from './domain-calendar.js';
+import { simple, effortTarget, setEffortChips, sessionEffortChips } from './ui-words.js';
 import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
 
 const W = () => S.active;
@@ -35,7 +36,7 @@ function suggestionBox(e) {
   const sug = e.suggestion, ex = getExercise(e.exId), tf = targetField(ex);
   const last = lastPerformance(app.strength, e.exId);
   const tgt = `${sug.target}${tf === 'reps' ? ' reps' : FIELD_UNIT[tf]}`;
-  const head = sug.w != null ? `${fmtW(sug.w, unit())} × ${tgt}` : hasLoad(ex) && sug.kind === 'first' ? `Find your weight · ${tgt}` : tgt;
+  const head = sug.w != null ? `${fmtW(sug.w, unit())} × ${tgt}` : e.fields.includes('w') && sug.kind === 'first' ? `Find your weight · ${tgt}` : tgt;
   return `<div class="suggest ${sug.kind}"><div><span class="eyebrow">${sug.kind === 'up' ? '▲ PROGRESS' : sug.kind === 'down' ? '▼ BACK OFF' : sug.kind === 'deload' ? 'DELOAD' : 'TODAY'}</span><b>${head}</b></div><p>${esc(sug.reason)}</p>
     ${last ? `<p class="last">Last · ${esc(relDay(last.session.startedAt))}: ${doneSets(last.entry).map(s => fmtSet(s, e.fields)).join(', ')}</p>` : ''}</div>`;
 }
@@ -61,7 +62,7 @@ function setRows(e) {
         <button class="check" data-action="set-done" data-set="${i}" aria-pressed="${s.done}" aria-label="${s.done ? 'Undo' : 'Complete'} set ${i + 1}">✓</button>
       </div>`;
     }).join('')}
-    ${lastDoneIdx >= 0 ? `<div class="rpe-row"><span>Set ${lastDoneIdx + 1} effort</span>${chips('set-rpe', [6, 7, 8, 9, 10], e.sets[lastDoneIdx].rpe ?? '', v => `RPE ${v}`)}</div><p class="hint">RPE 8 ≈ 2 reps left · 9 ≈ 1 left · 10 = nothing left. Today's target: RPE ${fmtNum(e.target.rpe)}.</p>` : ''}
+    ${lastDoneIdx >= 0 ? `<div class="rpe-row"><span>How did set ${lastDoneIdx + 1} feel?</span>${setEffortChips('set-rpe', e.sets[lastDoneIdx].rpe ?? '')}</div>${simple() ? '' : `<p class="hint">RPE 8 ≈ 2 reps left · 9 ≈ 1 left · 10 = nothing left. Today's target: RPE ${fmtNum(e.target.rpe)}.</p>`}` : ''}
   </div>`;
 }
 
@@ -83,9 +84,9 @@ function runner() {
     <div class="ex-nav" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="pill ${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="${esc(x.name)}">${i + 1}</button>`).join('')}</div>
     <article class="card ex-card ${e.skipped ? 'skipped' : ''}">
       <span class="eyebrow">EXERCISE ${w.index + 1} OF ${n} · REST ${e.target.rest}s</span>
-      <h2>${esc(ex.name)}${e.swappedFrom ? ' <small class="tag">swapped</small>' : ''}</h2>
-      <p class="target">${e.target.sets} × ${esc(rangeLabel({ ex: e.exId, min: e.target.min, max: e.target.max }))} · RPE ${fmtNum(e.target.rpe)}</p>
-      <div class="tags"><span>${esc(ex.equipment)}</span><span>${esc(ex.muscles)}</span></div>
+      <h2>${esc(ex.name)}${e.swappedFrom ? ' <small class="tag">swapped</small>' : e.adaptedFrom ? ' <small class="tag">fits your setup</small>' : ''}</h2>
+      <p class="target">${e.target.sets} × ${esc(rangeLabel({ ex: e.exId, min: e.target.min, max: e.target.max }))} · ${esc(effortTarget(e.target.rpe))}</p>
+      <div class="tags"><span>${esc(!e.fields.includes('w') && ex.fields.includes('w') ? 'Bodyweight · weights optional' : ex.equipment)}</span><span>${esc(ex.muscles)}</span></div>
       ${e.skipped ? `<p class="meta">Skipped. <button class="link" data-action="skip">Undo skip</button></p>` : `${suggestionBox(e)}${setRows(e)}`}
       <div class="ex-tools">
         <button class="tool" data-action="add-set">＋ Set</button>
@@ -115,7 +116,7 @@ function finishView() {
       ${skippedOrEmpty ? `<p class="meta">${skippedOrEmpty} exercise(s) have no completed sets — they’ll be saved as not done.</p>` : ''}
     </section>
     <section class="card">
-      <label class="lbl">How hard was the whole session? (RPE)</label>${chips('rpe', [5, 6, 7, 8, 9, 10], S.form.rpe)}
+      <label class="lbl">How hard was the whole session?</label>${sessionEffortChips('rpe', S.form.rpe)}
       <label class="lbl">Any pain?</label>${chips('pain', ['no', 'yes'], S.form.pain, v => v === 'no' ? 'No pain' : 'Yes, I felt pain')}
       ${S.form.pain === 'yes' ? `<input class="input" id="painLoc" placeholder="Where? e.g. left knee, lateral elbow" value="${esc(S.form.painLoc || '')}"><p class="warn">Don’t train through sharp or worsening pain. If it persists, see a qualified professional.</p>` : ''}
       <label class="lbl" for="notesIn">Notes</label><textarea class="input" id="notesIn" rows="3" placeholder="What went well, what to change next time…">${esc(S.form.notes || '')}</textarea>

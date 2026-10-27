@@ -3,16 +3,19 @@ import { esc, title } from './ui-kit.js';
 import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { startForWeek, dayKey } from './domain-calendar.js';
+import { EQUIPMENT, LEVELS, AREAS } from './domain-personalize.js';
+import { effortTarget } from './ui-words.js';
 
 function routineCard(id) {
-  const r = resolveRoutine(id, S.overrides), wk = app.position().week;
+  const r = app.routine(id), wk = app.position().week;
   const custom = Object.keys(S.overrides[id] || {}).length;
-  return `<section class="card"><div class="row between"><span class="eyebrow">ROUTINE ${id} · ~${r.minutes} MIN${custom ? ' · CUSTOMISED' : ''}</span>${custom ? `<button class="link" data-action="reset-routine" data-r="${id}">Reset</button>` : ''}</div>
+  return `<section class="card"><div class="row between"><span class="eyebrow">ROUTINE ${id} · ~${r.minutes} MIN${custom ? ' · EDITED' : ''}</span>${custom ? `<button class="link" data-action="reset-routine" data-r="${id}">Reset</button>` : ''}</div>
     <h3>${esc(r.title)}</h3><p class="meta">${esc(r.focus)}</p>
     <div class="list">${r.blocks.map(blk => {
       const ex = getExercise(blk.ex), rx = prescribe(blk, wk), changed = S.overrides[id]?.[blk.index];
-      return `<button class="list-item block" data-action="edit-block" data-r="${id}" data-i="${blk.index}"><span><b>${esc(ex.name)}${changed ? ' <small class="tag">edited</small>' : ''}</b><small>${rx.sets} × ${esc(rangeLabel(blk))} · rest ${blk.rest}s</small></span><span aria-hidden="true">✎</span></button>`;
+      return `<button class="list-item block" data-action="edit-block" data-r="${id}" data-i="${blk.index}"><span><b>${esc(ex.name)}${changed ? ' <small class="tag">edited</small>' : blk.adaptedFrom ? ' <small class="tag">fits your setup</small>' : ''}</b><small>${rx.sets} × ${esc(rangeLabel(blk))} · rest ${blk.rest}s</small></span><span aria-hidden="true">✎</span></button>`;
     }).join('')}</div>
+    ${r.dropped.length ? `<p class="meta">Left out to fit ${S.profile.minutes} min: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}.</p>` : ''}
     <button class="btn primary" data-action="start" data-routine="${id}" ${S.active ? 'disabled' : ''}>Start Routine ${id}</button></section>`;
 }
 
@@ -22,8 +25,10 @@ export const plan = {
     return `${title('Program', `CYCLE ${pos.cycle} · PROGRAM WEEK ${pos.weeksIn + 1}`)}
       <section class="card"><span class="eyebrow">4-WEEK WAVE · AUTO-ADVANCES EVERY MONDAY</span>
         <div class="seg four">${PHASES.map(p => `<button aria-selected="${p.week === pos.week}" data-action="set-week" data-w="${p.week}"><b>W${p.week}</b><small>${p.name}</small></button>`).join('')}</div>
-        <h3>Week ${pos.week} · ${ph.name}</h3><p>Target RPE ${ph.rpe} (~${ph.rir} reps in reserve). ${esc(ph.note)}</p>
+        <h3>Week ${pos.week} · ${ph.name}</h3><p>Effort: ${esc(effortTarget(ph.rpe))}. ${esc(ph.note)}</p>
         <p class="meta">Tap a week if you need to shift the cycle (e.g. after illness or travel). Suggested loads and set counts update automatically.</p></section>
+      <section class="card"><div class="row between"><h3>Your setup</h3><button class="link" data-action="go" data-to="welcome">Change</button></div>
+        <p class="meta">${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week · ${esc(S.profile.level)}${S.profile.injuries.length ? ` · watching: ${S.profile.injuries.map(a => esc(AREAS[a].toLowerCase())).join(', ')}` : ''}</p></section>
       ${title('Weekly schedule', 'TAP TO CHANGE')}
       <section class="card schedule">${DAYS.map(d => `<label for="day-${d}" class="${d === today ? 'today' : ''}">${d}</label><select id="day-${d}" class="input" data-day="${d}">${DAY_OPTIONS.map(v => `<option value="${v}" ${S.schedule[d] === v ? 'selected' : ''}>${ROUTINES[v] ? `${v} · ${ROUTINES[v].title}` : v}</option>`).join('')}</select>`).join('')}
         <p class="meta">Keep the heaviest lower-body day away from the day before an important match, and keep at least one true rest day.</p></section>
@@ -46,7 +51,7 @@ export const plan = {
     },
     'edit-block'(el) {
       const rid = el.dataset.r, i = +el.dataset.i, base = ROUTINES[rid].blocks[i];
-      const blk = resolveRoutine(rid, S.overrides).blocks[i];
+      const blk = resolveRoutine(rid, S.overrides).blocks[i]; // the slot as edited, before adapting to the profile
       const baseEx = getExercise(base.ex);
       const options = [base.ex, ...baseEx.subs].filter(getExercise);
       const tf = baseEx.fields[baseEx.fields.length - 1];

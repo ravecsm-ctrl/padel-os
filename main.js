@@ -7,12 +7,17 @@ import { workout, clock } from './ui-workout.js';
 import { history } from './ui-history.js';
 import { plan } from './ui-plan.js';
 import { settings } from './ui-settings.js';
+import { court } from './ui-court.js';
+import { welcome } from './ui-welcome.js';
+import { DEFAULT_PROFILE } from './domain-personalize.js';
 
 app.register('today', today);
 app.register('workout', workout);
 app.register('history', history);
 app.register('plan', plan);
 app.register('settings', settings);
+app.register('court', court);
+app.register('welcome', welcome);
 
 const GLOBAL = {
   ...today.actions,
@@ -55,6 +60,7 @@ async function boot() {
     S.settings = { ...DEFAULT_SETTINGS, ...(meta.settings || {}) };
     if (!meta.settings) await db.setMeta('settings', S.settings); // pin the program start date on first run
     S.schedule = { ...DEFAULT_SCHEDULE, ...(meta.schedule || {}) };
+    S.profile = { ...DEFAULT_PROFILE, ...(meta.profile || {}) };
     S.overrides = meta.overrides || {};
     S.exNotes = meta.exNotes || {};
     S.lastBackup = meta.lastBackup || 0;
@@ -68,6 +74,8 @@ async function boot() {
   document.querySelector('#weekBtn').onclick = () => app.go('plan');
   document.querySelector('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') app.closeSheet(); });
   parseHash();
+  // First run: onboarding. Existing users keep their data and get a prompt on Today instead.
+  if (!S.profile.onboarded && !S.sessions.length && !S.active && S.route === 'today') S.route = 'welcome';
   app.render();
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
   else if (S.active && S.route !== 'workout') app.toast('You have a workout in progress');

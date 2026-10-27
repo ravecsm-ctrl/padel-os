@@ -32,15 +32,17 @@ function topLoadSets(entry) {
 }
 
 // Returns { w, target, reason, kind } where kind ∈ up|hold|down|first|quality|cap.
-export function suggest({ exId, rx, history, unit = 'kg' }) {
+// fields: the fields actually logged (home workouts may drop the load column).
+export function suggest({ exId, rx, history, unit = 'kg', fields = null }) {
   const ex = getExercise(exId);
   const tf = targetField(ex);
+  const loaded = (fields || ex.fields).includes('w');
   const [last, prev] = performances(history, exId, 2);
   const deload = rx.loadMult < 1;
   const scale = w => w == null ? null : deload ? roundLoad(w * rx.loadMult, ex.inc, unit) : w;
 
   if (!last) {
-    const reason = hasLoad(ex)
+    const reason = loaded
       ? tf === 'reps' ? `First time: choose a load you could lift for about ${rx.min + rx.rir} reps.` : `First time: choose a load you can comfortably ${tf === 'm' ? 'carry' : 'hold'} for ${rx.min}${tf === 'm' ? 'm' : 's'}.`
       : `First time: aim for ${rx.min}${tf === 'sec' ? 's' : tf === 'm' ? 'm' : ' reps'} with clean form.`;
     return { w: null, target: rx.min, reason, kind: 'first' };
@@ -54,7 +56,7 @@ export function suggest({ exId, rx, history, unit = 'kg' }) {
     return { w: scale(top), target: rx.max, reason: 'Power work: match last time and keep every rep fast and crisp.', kind: 'quality' };
   }
 
-  if (!hasLoad(ex)) {
+  if (!loaded) {
     const allTop = vals.length && vals.every(v => v >= rx.max);
     if (allTop) return { w: null, target: rx.max, reason: 'Top of the range last time — make it harder (slower tempo, pause, or a harder variation).', kind: 'cap' };
     const step = tf === 'sec' ? 5 : tf === 'm' ? 5 : 1;

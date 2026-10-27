@@ -30,7 +30,7 @@ p { line-height: 1.5; }
 .week-pill b { color: var(--lime); }
 main { max-width: 720px; margin: auto; padding: 16px 16px calc(var(--nav-h) + 24px); outline: none; }
 body.resting main { padding-bottom: calc(var(--nav-h) + 100px); }
-.tabbar { position: fixed; z-index: 9; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 8px calc(6px + var(--safe-b)); background: rgba(7,17,15,.96); border-top: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.tabbar { position: fixed; z-index: 9; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px calc(6px + var(--safe-b)); background: rgba(7,17,15,.96); border-top: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .tabbar a { min-height: 52px; display: grid; place-items: center; align-content: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--muted); text-decoration: none; border-radius: 12px; }
 .tabbar a span { font-size: 19px; line-height: 1; }
 .tabbar a[aria-current="page"] { color: var(--lime); }
@@ -253,3 +253,44 @@ body[data-route="workout"].resting .toast { bottom: calc(176px + var(--safe-b));
   .set-row { grid-template-columns: 30px repeat(var(--cols), 1fr) 48px; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+/* Onboarding */
+body[data-route="welcome"] .tabbar, body[data-route="welcome"] .topbar { display: none; }
+body[data-route="welcome"] main { padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: calc(150px + var(--safe-b)); }
+.wiz-top { display: grid; grid-template-columns: 44px 1fr 60px; align-items: center; gap: 10px; min-height: 44px; }
+.dots { display: flex; gap: 6px; justify-content: center; }
+.dots i { width: 22px; height: 4px; border-radius: 4px; background: var(--panel3); }
+.dots i.on { background: var(--lime); }
+.wiz-body { margin-top: 18px; }
+.wiz-body h2 { font-size: 26px; }
+.wiz-bottom { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(12px + var(--safe-b)); background: rgba(7,17,15,.96); border-top: 1px solid var(--line); z-index: 6; }
+.wiz-bottom .btn.big { margin-top: 0; }
+.welcome-hero { padding: 28px 4px 8px; }
+.welcome-hero h2 { font-size: 34px; line-height: 1.1; }
+.welcome-hero p { color: var(--muted); font-size: 16px; }
+.ticks { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 10px; }
+.ticks li { padding-left: 28px; position: relative; font-weight: 700; }
+.ticks li::before { content: '✓'; position: absolute; left: 0; color: var(--lime); }
+.opts { display: grid; gap: 8px; margin: 10px 0; }
+.opts.row3 { grid-template-columns: repeat(3, 1fr); }
+.opt { text-align: left; background: var(--panel); border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 16px; min-height: 60px; display: grid; gap: 3px; }
+.opt small { color: var(--muted); font-size: 13px; }
+.opt.on { border-color: var(--lime); background: #17301f; }
+.opts.row3 .opt { text-align: center; justify-items: center; padding: 12px 6px; }
+.badge.sm { width: 26px; height: 26px; font-size: 13px; border-radius: 8px; vertical-align: middle; margin-right: 4px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.chip-btn.warn-on { background: #f5a67a; border-color: #f5a67a; color: #2a1208; }
+
+/* Court player */
+.steps { padding-left: 20px; margin: 14px 0; display: grid; gap: 10px; }
+.steps li b { display: block; }
+.steps li small { color: var(--muted); font-size: 13px; line-height: 1.4; }
+.cplayer { text-align: center; padding: 10px 0 24px; }
+.cplayer h2 { font-size: 28px; margin: 10px 0 6px; }
+.cp-cue { color: var(--muted); font-size: 16px; line-height: 1.5; min-height: 72px; }
+.cp-time { font-size: 84px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; margin: 18px 0 14px; }
+.cp-bar { height: 8px; background: var(--panel3); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+.cp-fill { display: block; height: 100%; background: var(--lime); transform-origin: left; transform: scaleX(0); transition: transform .25s linear; }
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; }
+dl.kv dt { color: var(--muted); font-weight: 700; font-size: 13.5px; }
+dl.kv dd { margin: 0; }

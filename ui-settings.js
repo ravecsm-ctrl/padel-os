@@ -4,6 +4,7 @@ import * as timer from './core-timer.js';
 import { esc, title, chips } from './ui-kit.js';
 import { buildBackup, validateBackup, normalizeBackup, toCSV } from './domain-backup.js';
 import { isoDate } from './domain-calendar.js';
+import { EQUIPMENT } from './domain-personalize.js';
 
 let persist = '…';
 const toggle = (key, label, sub) => `<label class="toggle row between"><span>${label}<small>${sub}</small></span><input type="checkbox" data-setting="${key}" ${S.settings[key] ? 'checked' : ''}></label>`;
@@ -23,6 +24,9 @@ export const settings = {
       <section class="card"><label class="lbl" for="nameIn">Name</label><input class="input" id="nameIn" value="${esc(S.settings.name)}" placeholder="Optional">
         <label class="lbl">Weight unit</label>${chips('unit', ['kg', 'lb'], S.settings.unit)}
         <p class="meta">Loads are stored in kg and converted for display, so switching never corrupts history.</p></section>
+      <section class="card"><div class="row between"><h3>Your plan</h3><button class="btn small secondary" data-action="go" data-to="welcome">Change</button></div>
+        <p class="meta">${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min sessions · ${S.profile.days}× a week · plays ${S.profile.padelDays.join(', ') || '—'}</p>
+        <label class="toggle row between"><span>Simple mode<small>Plain words instead of RPE, AU and e1RM. Your data is the same either way.</small></span><input type="checkbox" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''}></label></section>
       <section class="card"><h3>Workout</h3>
         ${toggle('autoRest', 'Auto-start rest timer', 'Starts when you tick a set')}
         ${toggle('sound', 'Timer sound', 'Beep when rest is over')}
@@ -44,6 +48,7 @@ export const settings = {
     const n = document.querySelector('#nameIn');
     n.onchange = async () => { S.settings.name = n.value.trim(); await app.save('settings'); app.toast('Saved'); };
     document.querySelectorAll('[data-setting]').forEach(c => c.onchange = async () => { S.settings[c.dataset.setting] = c.checked; timer.configure(S.settings); await app.save('settings'); });
+    document.querySelector('#simpleIn').onchange = async e => { S.profile.simple = e.target.checked; await app.save('profile'); app.toast(e.target.checked ? 'Simple mode on' : 'Detailed mode on'); };
     document.querySelector('#importIn').onchange = e => importFile(e.target.files[0]);
     const p = await db.persistenceStatus();
     if (p !== persist) { persist = p; if (S.route === 'settings') app.render({ keepScroll: true }); }
@@ -83,7 +88,7 @@ async function importFile(file) {
       if (b.dataset.mode === 'replace') { await db.clearAll(); }
       const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
       await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
-      for (const k of ['settings', 'schedule', 'overrides', 'exNotes']) {
+      for (const k of ['settings', 'schedule', 'overrides', 'exNotes', 'profile']) {
         if (norm.meta[k] == null) continue;
         if (b.dataset.mode === 'merge' && k !== 'exNotes') continue; // keep current preferences on merge
         S[k] = k === 'settings' ? { ...DEFAULT_SETTINGS, ...S.settings, ...norm.meta[k] } : k === 'exNotes' ? { ...norm.meta[k], ...S.exNotes } : norm.meta[k];
