@@ -7,6 +7,7 @@ import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { getExercise } from './domain-catalog.js';
 import { startForWeek, dayKey } from './domain-calendar.js';
 import { EQUIPMENT, AREAS } from './domain-personalize.js';
+import { bodySummary } from './ui-body.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const optLabel = v => getRoutine(v) ? getRoutine(v).title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
@@ -18,6 +19,7 @@ function overview() {
     ${group(row({ title: `Week ${pos.week}: ${esc(ph.name)}`, sub: esc(ph.note), icon: 'target', color: 'indigo', action: 'week-sheet' }),
       { header: 'This cycle', footer: 'Each cycle is 4 weeks. Weeks move forward on their own every Monday.' })}
     ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(optLabel(S.schedule[d])), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
+    ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'teal', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
     ${group(allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id);
       return row({ title: esc(r.title), sub: `${r.blocks.length} exercises · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')

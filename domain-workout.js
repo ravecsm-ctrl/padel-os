@@ -75,3 +75,28 @@ export function createActivity({ activity, startedAt, durationMin, rpe, notes })
   return { id: uid(), kind: 'activity', activity, title: activity === 'padel' ? 'Padel' : activity[0].toUpperCase() + activity.slice(1), startedAt, endedAt: startedAt + durationMin * 60000, durationMin, rpe, notes: notes || '' };
 }
 
+
+// ── Supersets: two exercises done back to back, resting only after each pair.
+export const partnerIndex = (w, i) => { const id = w.exercises[i]?.pair; return id ? w.exercises.findIndex((x, j) => j !== i && x.pair === id) : -1; };
+export function pairExercises(w, i, j) { const id = `ss-${i}-${j}`; w.exercises[i].pair = id; w.exercises[j].pair = id; }
+export function unpairExercise(w, i) { const j = partnerIndex(w, i); delete w.exercises[i].pair; if (j >= 0) delete w.exercises[j].pair; }
+export const supersetPairs = w => [...new Set(w.exercises.map(x => x.pair).filter(Boolean))].map(id => w.exercises.filter(x => x.pair === id).map(x => x.exId));
+
+// After logging a set on exercise i: where to go next and whether to rest.
+export function afterSet(w, i) {
+  const j = partnerIndex(w, i), e = w.exercises[i];
+  const open = x => !x.skipped && x.sets.some(s => !s.done), n = x => x.sets.filter(s => s.done).length;
+  if (j < 0 || !open(w.exercises[j])) return { index: i, rest: true, superset: false };
+  if (n(w.exercises[j]) < n(e) || !open(e)) return { index: j, rest: !open(e) && n(w.exercises[j]) >= n(e), superset: true };
+  const first = Math.min(i, j), second = Math.max(i, j);
+  return { index: open(w.exercises[first]) ? first : second, rest: true, superset: true };
+}
+
+// Re-apply pairs you made last time for this workout (matched by exercise).
+export function applySupersets(w, pairs = []) {
+  for (const [a, b] of pairs) {
+    const i = w.exercises.findIndex(x => x.exId === a), j = w.exercises.findIndex(x => x.exId === b);
+    if (i >= 0 && j >= 0 && !w.exercises[i].pair && !w.exercises[j].pair) pairExercises(w, i, j);
+  }
+  return w;
+}

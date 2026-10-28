@@ -4,7 +4,7 @@ import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } 
 import { readinessScore, isRoutine, allRoutineIds } from './domain-program.js';
 import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf } from './domain-calendar.js';
 import { weeklySeries, loadTrend, trainingDays } from './domain-analytics.js';
-import { createWorkout, createActivity, workoutStats } from './domain-workout.js';
+import { createWorkout, createActivity, workoutStats, applySupersets } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { prehabFor, PADEL_TYPES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
@@ -160,6 +160,7 @@ async function begin(routineId, readiness, light, sore = [], asked = []) {
     adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: S.schedule[tomorrow] === 'Padel', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
       deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit });
   }
+  applySupersets(w, S.supersets[routineId]);
   S.active = w;
   await app.saveActive(true);
   db.requestPersistence();
@@ -178,6 +179,7 @@ export function pastWorkoutSheet(iso) {
 export async function startPast(routineId, iso) {
   const d = parseISO(iso); d.setHours(18, 0, 0, 0);
   const w = createWorkout({ routineId, week: app.position().week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, startedAt: d.getTime(), profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
+  applySupersets(w, S.supersets[routineId]);
   S.active = w; app.closeSheet();
   await app.saveActive(true);
   app.go('workout');

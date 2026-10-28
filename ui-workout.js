@@ -8,7 +8,7 @@ import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-unit
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
-import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
+import { autofill, swapExercise, workoutStats, finalizeWorkout, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { bodyMap } from './ui-bodymap.js';
@@ -89,6 +89,10 @@ function coach(e) {
     ${missingHere(ex)}${painNote(e)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
 }
 
+// ── Supersets: pair with the next unpaired exercise; remembered per workout.
+const nextFree = () => { const w = W(), j = w.index + 1; return j < w.exercises.length && !w.exercises[j].pair && !w.exercises[w.index].pair ? j : -1; };
+async function rememberPairs() { const w = W(); if (!w.routineId) return; S.supersets = { ...S.supersets, [w.routineId]: supersetPairs(w) }; await app.save('supersets'); }
+
 // ── Warm-ups and plates
 const barKind = e => barFor(getExercise(e.exId));
 const barD = kind => barWeight(kind, unit(), S.settings.bars);
@@ -156,7 +160,7 @@ function setArea(e) {
     ? `<section class="card all-done"><div class="big-tick">${icon('check')}</div><p class="t-title2">All sets done</p><p class="t-sub" style="margin:4px 0 16px">${lastDone >= 0 && e.sets[lastDone].rpe == null ? 'How did the last set feel?' : 'Great work.'}</p>
         ${lastDone >= 0 && e.sets[lastDone].rpe == null ? `<div style="margin-bottom:16px">${setEffortSeg('set-rpe', '')}</div>` : ''}
         <button class="btn filled" data-action="${isLast ? 'to-finish' : 'next'}">${isLast ? 'Finish Workout' : 'Next Exercise'}</button></section>`
-    : `<section class="card setcard">${feel}<div class="setcard-h"><b>Set ${next + 1} of ${e.sets.length}</b><span class="t-foot">${restLabel(e.target.rest)} rest after</span></div>
+    : `<section class="card setcard">${feel}<div class="setcard-h"><b>Set ${next + 1} of ${e.sets.length}</b><span class="t-foot">${partnerIndex(w, w.index) >= 0 ? 'Rest after the pair' : `${restLabel(e.target.rest)} rest after`}</span></div>
         ${lastSet ? `<p class="t-foot bl-set">Last time, set ${next + 1}: ${esc(fmtSet(lastSet, e.fields))}</p>` : ''}
         <div class="steppers">${e.fields.map(f => stepper(e, next, f)).join('')}</div>
         ${barKind(e) ? `<button class="plates" data-action="plates" id="platesLine">${esc(plateText(e, e.sets[next].w ?? defaultVal(e, next, 'w')))}</button>` : ''}
@@ -171,8 +175,8 @@ function runner() {
   return `${navBar({ back: 'Back', backAction: 'leave', title: w.title, sub: w.past ? `Past workout · ${esc(dayLabel(w.startedAt))}` : `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
     ${w.past && w.index === 0 ? `<div class="banner" style="margin-bottom:14px">${tile('today', 'blue')}<span><b>Logging ${esc(dayLabel(w.startedAt))}</b><small>Enter what you did that day. Suggestions use only your workouts before it.</small></span></div>` : ''}
     ${w.index === 0 || w.adapt?.applied === false ? adaptBanner(w) : ''}
-    <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
-    <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p><h1>${esc(ex.name)}</h1></div>
+    <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''} ${x.pair ? 'ss' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
+    <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p>${partnerIndex(w, w.index) >= 0 ? `<p class="ss-tag">Superset with ${esc(w.exercises[partnerIndex(w, w.index)].name)}</p>` : ''}<h1>${esc(ex.name)}</h1></div>
       <button class="icon-circle" data-action="more" aria-label="More options">${icon('more')}</button></div>
     ${e.skipped ? `<section class="card setcard" style="text-align:center"><p class="t-head">Skipped</p><p class="t-sub" style="margin:4px 0 14px">This exercise won’t be counted.</p><button class="btn tinted" data-action="skip">Do It After All</button></section>` : `${coach(e)}${setArea(e)}`}
     <div class="wk-bottom"><button class="btn gray square" data-action="prev" ${w.index === 0 ? 'disabled' : ''} aria-label="Previous exercise">${icon('chevL')}</button>
@@ -272,6 +276,15 @@ export const workout = {
       const best = heaviest(before(), e.exId);
       if (looksOff(s.w, best) && !(await app.confirm(`${esc(fmtW(s.w, unit()))} is much heavier than your best on this exercise (${esc(fmtW(best, unit()))}). Is that right?`, { ok: 'Yes, Log It' }))) return;
       s.done = true; s.ts = Date.now();
+      const nx = afterSet(w, w.index);
+      if (nx.superset) {
+        // Superset: straight to the partner, rest only after both, then the next round.
+        const to = w.exercises[nx.index], p = w.exercises[partnerIndex(w, w.index)];
+        if (nx.rest && S.settings.autoRest && !w.past) timer.start(Math.max(e.target.rest, p.target.rest), `${getExercise(to.exId).name} · set ${to.sets.findIndex(x => !x.done) + 1}`);
+        if (nx.index !== w.index) { w.index = nx.index; if (!nx.rest) app.toast(`Superset: now ${esc(to.name)}`); }
+        navigator.vibrate?.(20);
+        return touch(false);
+      }
       const moreHere = e.sets.some(x => !x.done);
       if (S.settings.autoRest && !w.past) {
         const nextEx = w.exercises.slice(w.index + 1).find(x => !x.skipped);
@@ -297,12 +310,16 @@ export const workout = {
       const e = cur(), note = S.exNotes[e.exId] || '';
       app.sheet(`<h2 class="sheet-title">${esc(getExercise(e.exId).name)}</h2><div style="height:12px"></div>
         ${group(row({ title: 'Add a set', icon: 'plus', action: 'add-set' }) + row({ title: 'Remove a set', icon: 'minus', color: 'gray', action: 'remove-set' })
+          + (partnerIndex(W(), W().index) >= 0 ? row({ title: 'Unpair superset', sub: `Do ${esc(W().exercises[partnerIndex(W(), W().index)].name)} on its own`, icon: 'swap', color: 'gray', action: 'unpair' })
+            : nextFree() >= 0 ? row({ title: `Superset with ${esc(W().exercises[nextFree()].name)}`, sub: 'Alternate sets, rest after each pair', icon: 'bolt', color: 'orange', action: 'pair' }) : '')
           + row({ title: 'Replace exercise', sub: 'Busy equipment or something feels off', icon: 'swap', color: 'indigo', action: 'swap' })
           + row({ title: e.skipped ? 'Don’t skip' : 'Skip exercise', icon: 'skip', color: 'orange', action: 'skip' })
           + row({ title: 'My notes', sub: note ? esc(note.slice(0, 40)) : 'Seat height, grip, reminders', icon: 'note', color: 'gray', action: 'notes' }))}
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
     },
     'close-sheet'() { app.closeSheet(); },
+    async pair() { const w = W(), j = nextFree(); pairExercises(w, w.index, j); await rememberPairs(); app.closeSheet(); touch(); app.toast(`Paired with ${esc(w.exercises[j].name)}. Remembered for next time.`); },
+    async unpair() { unpairExercise(W(), W().index); await rememberPairs(); app.closeSheet(); touch(); app.toast('Superset removed'); },
     notes() {
       const e = cur();
       app.sheet(`<h2 class="sheet-title">My notes</h2><p class="sheet-sub">Saved with ${esc(getExercise(e.exId).name)} and shown next time.</p>

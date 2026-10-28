@@ -83,8 +83,8 @@ export function barChart(series, { height = 120, unitLabel = '' } = {}) {
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly chart ${esc(unitLabel)}">${bars}</svg>`;
 }
 
-export function lineChart(pts, { height = 150, fmt = v => v } = {}) {
-  if (pts.length < 2) return `<div class="chart-empty">Do this exercise twice to see your trend.</div>`;
+export function lineChart(pts, { height = 150, fmt = v => v, empty = 'Do this exercise twice to see your trend.' } = {}) {
+  if (pts.length < 2) return `<div class="chart-empty">${esc(empty)}</div>`;
   const W = 320, H = height, L = 34, R = 10, T = 12, B = 20;
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   let lo = Math.min(...ys), hi = Math.max(...ys);

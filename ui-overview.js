@@ -15,6 +15,7 @@ import { fmtW, fmtNum, toDisplay } from './domain-units.js';
 import { currentRecovery, recoveryMapSvg } from './ui-recovery.js';
 import { currentStats, radar } from './ui-stats.js';
 import { banners, activitySheet, pastWorkoutSheet } from './ui-today.js';
+import { bodySummary } from './ui-body.js';
 
 let monthOffset = 0;
 const MONTH = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -108,6 +109,7 @@ export const overview = {
       ${S.sessions.length ? group(row({ title: 'History', sub: 'Every session, weekly load, padel stats', icon: 'note', color: 'gray', to: 'history' })
         + row({ title: 'Exercises', sub: 'Progress per exercise', icon: 'dumbbell', color: 'indigo', to: 'history/progress' })
         + row({ title: 'Muscles', sub: 'Sets per muscle this week', icon: 'target', color: 'blue', to: 'history/muscles' })
+        + row({ title: 'Body', sub: esc(bodySummary()), icon: 'person', color: 'teal', to: 'body/o' })
         + row({ title: 'Your profile', sub: 'Scores, level and milestones', icon: 'trophy', color: 'orange', to: 'stats' }), { header: 'Details' }) : ''}`;
   },
   actions: {
