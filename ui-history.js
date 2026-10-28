@@ -91,7 +91,8 @@ function musclesCard(map, header) {
   const list = ranked(map);
   if (!list.length) return '';
   return `<section class="grp"><h2 class="grp-h">${esc(header)}</h2><div class="card">${bodyMap(map)}
-    <div class="mchips">${list.map(m => `<span class="${m.sets < 1 ? 'sec' : ''}">${esc(mname(m.id))} · ${fmtSets(m.sets)}</span>`).join('')}</div></div>
+    <div class="mchips">${(() => { const chip = m => `<span class="${m.sets < 1 ? 'sec' : ''}">${esc(mname(m.id))} · ${fmtSets(m.sets)}</span>`;
+      return list.slice(0, 5).map(chip).join('') + (list.length > 5 ? `<details><summary>+${list.length - 5} more</summary>${list.slice(5).map(chip).join('')}</details>` : ''); })()}</div></div>
     <p class="grp-f">Sets per muscle. Secondary muscles count as half a set.</p></section>`;
 }
 
@@ -194,7 +195,7 @@ function sessionView(id) {
     <div class="tiles three">${stat(s.durationMin, 'Minutes')}${stat(setCount(s), 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
     ${Date.now() - (s.endedAt || s.startedAt) < 3 * 3600000 ? (() => { const r = COURT_ROUTINES[stretchFor(s.exercises.map(e => e.exId))]; return group(row({ title: `Stretch now: ${esc(r.title)}`, sub: `${rMin(r)} min, guided · gentle holds to wind down`, icon: 'wave', color: 'teal', to: `court/${r.id}` })); })() : ''}
     ${musclesCard(sessionMuscles(s), 'Muscles worked')}
-    ${s.prs?.length ? group(s.prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? fmtEst(p.value, unit()) : p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
+    ${s.prs?.length ? group(s.prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? fmtEst(p.value, unit()) : p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'green' })).join(''), { header: 'Personal records' }) : ''}
     ${group(s.exercises.map(e => { const sets = doneSets(e), ex = getExercise(e.exId);
       return row({ title: esc(e.name), sub: e.skipped ? 'Skipped' : sets.length ? sets.map(x => fmtSet(x, e.fields)).join(' · ') : 'Not done', to: ex ? `history/ex/${e.exId}` : '' }); }).join(''), { header: 'Exercises' })}
     ${s.pain?.flag || s.rpe || s.notes ? group((s.rpe ? row({ title: 'Effort', value: esc(effortWord(s.rpe)) }) : '') + (s.pain?.flag ? row({ title: 'Pain', value: esc([painAreasOf(s).map(x => AREAS[x]).join(', '), s.pain.location].filter(Boolean).join(' · ') || 'Yes'), cls: 'red' }) : '') + (s.notes ? row({ title: esc(s.notes) }) : ''), { header: 'Notes' }) : ''}

@@ -119,12 +119,10 @@ function libraryView() {
   return `${navBar({ back: 'Plan', backTo: 'plan', title: 'Exercises' })}
     <h1 class="t-large" style="padding:8px 4px 2px">Exercises</h1>
     <p class="t-sub" style="padding:0 4px 16px">${allExercises().length} exercises · training at <button class="link" data-action="loc-sheet">${esc(loc?.name || 'anywhere')}</button></p>
-    <input class="input" id="libSearch" type="search" placeholder="Search by name or muscle" value="${esc(query)}" aria-label="Search exercises" style="margin-bottom:12px">
+    <div class="lib-tools"><input class="input" id="libSearch" type="search" placeholder="Search by name or muscle" value="${esc(query)}" aria-label="Search exercises">
+      <button class="icon-circle" data-action="nx-start" aria-label="Add your own exercise">${icon('plus')}</button><button class="icon-circle" data-action="lib-tools" aria-label="Import or export">${icon('more')}</button></div>
     ${seg('lib-filter', [['here', `Can do here`], ['all', `Show all (${hiddenTotal} more)`]], showAll ? 'all' : 'here')}
     <div style="height:20px"></div>
-    ${group(row({ title: 'Add Your Own Exercise', sub: 'Name it, say what it works and how you log it', icon: 'plus', color: 'green', action: 'nx-start' })
-      + row({ title: 'Import exercises', sub: 'From a CSV file or a pasted list', icon: 'download', color: 'blue', to: 'library/import' })
-      + row({ title: 'Export library as CSV', sub: 'Give it to ChatGPT so it reuses your exercise names', icon: 'share', color: 'teal', action: 'lib-export' }))}
     ${groups || '<p class="t-sub" style="text-align:center;padding:24px">No exercises match.</p>'}`;
 }
 
@@ -153,7 +151,7 @@ function exerciseSheet(id) {
 function importView() {
   return `${navBar({ back: 'Exercises', backTo: 'library', title: 'Import' })}
     <h1 class="t-large" style="padding:8px 4px 2px">Import</h1><p class="t-sub" style="padding:0 4px 20px">Add exercises from a plan, with sets, reps, starting weights, muscles and video links.</p>
-    ${group(row({ title: 'Download my exercise library', sub: 'Attach it in ChatGPT so it reuses your names: no duplicates', icon: 'share', color: 'teal', action: 'lib-export' })
+    ${group(row({ title: 'Download my exercise library', sub: 'Attach it in ChatGPT so it reuses your names: no duplicates', icon: 'share', color: 'gray', action: 'lib-export' })
       + row({ title: 'Copy prompt for ChatGPT', sub: 'Paste it with your plan; ChatGPT replies in the right format', icon: 'note', color: 'green', action: 'copy-prompt' })
       + row({ title: 'Download CSV template', sub: 'Open in Numbers, Excel or Google Sheets', icon: 'download', color: 'blue', action: 'dl-template' })
       + row({ title: 'Allowed values', sub: 'Muscles, movements, categories, equipment', icon: 'info', color: 'gray', action: 'allowed-sheet' }), { header: '1 · Get the format' })}
@@ -291,7 +289,14 @@ export const library = {
   },
   onPick(name, value) { if (name === 'lib-filter') { showAll = value === 'all'; app.render({ keepScroll: true }); } if (name === 'measure') app.render({ keepScroll: true }); },
   actions: {
-    'nx-start'() { S.form = { nx: true, name: '', measure: 'wreps', weightType: 'total', perSide: false, primary: [], secondary: [], category: 'lower-strength', movement: null, needs: [], url: '', cues: '' }; app.go('library/new'); },
+    'lib-tools'() {
+      app.sheet(`<h2 class="sheet-title">Your library</h2><div style="height:12px"></div>
+        ${group(row({ title: 'Add Your Own Exercise', sub: 'Name it, say what it works and how you log it', icon: 'plus', color: 'green', action: 'nx-start' })
+          + row({ title: 'Import exercises', sub: 'From a CSV file or a pasted list', icon: 'download', color: 'gray', to: 'library/import' })
+          + row({ title: 'Export library as CSV', sub: 'Give it to ChatGPT so it reuses your exercise names', icon: 'share', color: 'gray', action: 'lib-export' }))}
+        <button class="btn gray" data-action="close-sheet">Cancel</button>`);
+    },
+    'nx-start'() { app.closeSheet(); S.form = { nx: true, name: '', measure: 'wreps', weightType: 'total', perSide: false, primary: [], secondary: [], category: 'lower-strength', movement: null, needs: [], url: '', cues: '' }; app.go('library/new'); },
     'ex-edit'(el) { startEdit(el.dataset.id); },
     async 'ex-reset'(el) {
       if (!(await app.confirm('Reset this exercise to the original?', { ok: 'Reset' }))) return;

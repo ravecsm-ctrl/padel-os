@@ -41,13 +41,14 @@ export function banners({ resumeOnly = false } = {}) {
   if (tp && !tp.noGym) {
     const sum = tp.phase === 'recover' ? tournamentSummary(S.sessions, S.settings.tournament) : null;
     const res = sum?.matches ? `${plural(sum.matches, 'match')}${sum.won + sum.lost ? `, ${sum.won}–${sum.lost}` : ''}. ` : '';
-    out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'orange')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`;
+    out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'teal')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`;
   }
   // Everything lives on this phone, so nudge a backup from the first saved session, then weekly.
   if (S.sessions.length) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
     const snoozed = Date.now() - (S.settings.backupSnooze || 0) < 7 * 86400000;
-    if ((days == null || days >= 7) && !snoozed) out += `<div class="banner">${tile('download', 'blue')}<span><b>${days == null ? 'Back up your workouts' : 'Time for a backup'}</b><small>${days == null ? 'They’re saved only on this phone. Keep a copy in Files or iCloud Drive in case the phone or Safari data is lost.' : `Your workouts are only on this phone. Last backup ${days} days ago.`}</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="quick-backup" style="font-size:15px;white-space:nowrap">Back Up</button><button class="link" data-action="backup-later" style="font-size:13px;white-space:nowrap">Not now</button></span></div>`;
+    // A slim strip, not a card: it matters, but it shouldn't compete with today's workout.
+    if ((days == null || days >= 7) && !snoozed) out += `<div class="strip">${icon('download')}<span>${days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`;
   }
   return out;
 }
@@ -84,21 +85,29 @@ function recoveringHint(routineId) {
   return tired[0][1] >= 0.6 ? `Lighter today: ${names} still recovering` : `${names[0].toUpperCase() + names.slice(1)} still recovering`;
 }
 
+// The next scheduled workout after today: { id, when: 'Tomorrow' | 'Wednesday' }.
+function nextPlanned() {
+  const names = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+  for (let i = 1; i <= 7; i++) { const d = DAYS[(DAYS.indexOf(dayKey()) + i) % 7]; if (isRoutine(S.schedule[d])) return { id: S.schedule[d], when: i === 1 ? 'Tomorrow' : names[d] }; }
+  return null;
+}
+
 function hero() {
   const plan = S.schedule[dayKey()];
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
   const tp = taperFor(S.settings.tournament);
   // On tournament day the tournament card stays up after each match (that's when you need it most).
+  // Done: a compact line (the work is behind you), then what's coming next.
   if (doneToday.length && !S.active && tp?.phase !== 'day') {
-    return `<section class="card hero"><div class="hero-top">${tile('check', 'green', true)}<div><h2>Done for today</h2><p class="t-sub">${doneToday.map(s => esc(s.title)).join(' and ')}</p></div></div>
-      <p class="hero-note">Nice work. Rest and sleep are when your body gets stronger.</p>
-      <button class="btn tinted" data-action="go" data-to="history/session/${esc(doneToday[0].id)}">See Summary</button></section>`;
+    const next = nextPlanned();
+    return `<section class="card"><button class="done-card" data-action="go" data-to="history/session/${esc(doneToday[0].id)}" style="width:100%;text-align:left">${tile('check', 'green')}<span class="row-main"><b>Done today</b><small>${esc(doneToday.map(s => s.title).join(' + '))} · see summary</small></span>${chev}</button>
+      ${next ? `<button class="done-next" data-action="go" data-to="plan/routine/${esc(next.id)}">${tile(routineLook(next.id).icon, 'gray')}<span class="row-main"><span class="row-title">Next: ${esc(app.routine(next.id).title)}</span><small>${esc(next.when)}</small></span>${chev}</button>` : ''}</section>`;
   }
   if (tp?.noGym) {
     const day = tp.phase === 'day', sum = day ? tournamentSummary(S.sessions, S.settings.tournament) : null, played = sum?.matches || 0;
     const sore = sum ? Object.keys(sum.sore).map(a => AREAS[a].split(' ')[0].toLowerCase()) : [];
     const so = played ? `<div class="tiles three" style="margin:4px 0 16px">${['Matches', 'Won–lost', 'Minutes'].map((l, i) => `<div class="tile-stat"><b class="num">${[played, `${sum.won}–${sum.lost}`, sum.minutes][i]}</b><small>${l}</small></div>`).join('')}</div>${sore.length ? `<p class="hero-note orange">Sore so far: ${esc(sore.join(', '))}. Ease off where you can.</p>` : ''}` : '';
-    return `<section class="card hero"><div class="hero-top">${tile('trophy', 'orange', true)}<div><p class="t-foot">${day ? 'Today' : tp.days === 1 ? 'Tomorrow' : 'In 2 days'}</p><h2>${esc(tp.name)}</h2><p class="t-sub">${day ? 'Tournament day' : 'Rest up before you play'}</p></div></div>
+    return `<section class="card hero"><div class="hero-top">${tile('trophy', 'teal', true)}<div><p class="t-foot">${day ? 'Today' : tp.days === 1 ? 'Tomorrow' : 'In 2 days'}</p><h2>${esc(tp.name)}</h2><p class="t-sub">${day ? 'Tournament day' : 'Rest up before you play'}</p></div></div>
       ${played ? so : `<p class="hero-note">${esc(taperText(tp))}</p>`}
       <div class="btns">${day ? (played
         ? `<button class="btn filled" data-action="log-activity" data-kind="padel">Log Another Match</button><button class="btn tinted" data-action="go" data-to="court/between">${icon('play')}Between Matches · ${routineMinutes(COURT_ROUTINES.between)} min</button>`
@@ -127,14 +136,14 @@ function weekCard() {
   const days = trainingDays(S.sessions), today = isoDate();
   const planned = Object.values(S.schedule).filter(isRoutine).length;
   const mon = mondayOf().getTime();
-  const done = app.strength.filter(s => s.startedAt >= mon).length;
+  const done = app.strength.filter(s => s.startedAt >= mon).length, matches = S.sessions.filter(s => s.activity === 'padel' && s.startedAt >= mon).length;
   return `<section class="grp"><h2 class="grp-h big">This week</h2><div class="card"><div class="week">${weekDates().map(d => {
     const did = days.get(d.iso) || [], plan = S.schedule[d.key];
-    const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : isRoutine(plan) ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : '';
+    const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : isRoutine(plan) ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : 'rest';
     return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(plan)}">${did.length ? icon('check') : ''}</span></div>`;
   }).join('')}</div>
-  <p class="week-foot">${planned ? `${done} of ${plural(planned, 'workout')} done` : `${plural(done, 'workout')} done`}</p></div>
-  <p class="grp-f"><span class="blue">●</span> Workout day &nbsp; <span style="color:var(--teal)">●</span> Padel day</p></section>`;
+  <p class="week-foot"><b>${done}</b> of ${plural(planned || done, 'workout')}${matches ? ` · <b>${matches}</b> ${matches === 1 ? 'match' : 'matches'}` : ''}</p>
+  <div class="week-key"><span><i style="background:var(--blue)"></i>Gym</span><span><i style="background:var(--teal)"></i>Padel</span><span><i class="ring"></i>Planned</span></div></div></section>`;
 }
 
 function stayHealthy() {

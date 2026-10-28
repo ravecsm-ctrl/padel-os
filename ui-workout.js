@@ -105,7 +105,8 @@ function coach(e) {
   const why = e.adjusted ? '' : (sug.reason || '').replace(/([\d.]+)kg/g, (_, n) => fmtW(+n, unit()));
   const tip = e.adjusted ? '' : sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
-    ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
+    ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">${(() => { const what = e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter';
+      const why = e.adjusted.reason; return why.toLowerCase().includes(what) ? `Adjusted: ${esc(why[0].toLowerCase() + why.slice(1))}.` : `Adjusted: ${what}. ${esc(why)}.`; })()}</p>` : ''}
     ${missingHere(ex)}${painNote(e)}
     ${(() => {
       // One short line; last time, warm-up and tips open with More (and stay open between sets).
@@ -115,7 +116,7 @@ function coach(e) {
       const peek = tipText || (!last && !e.suggestion?.painHold ? why : '');
       return `${peek ? `<p class="coach-peek ${tipText ? 'blue' : ''}"><span>${esc(peek)}</span></p>` : ''}
         ${COACH_OPEN ? `<div class="coach-more">${baseline(e, last)}${wu}<p class="t-foot">${why && why !== peek ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p></div>` : ''}
-    <div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a><button class="how more-btn" data-action="coach-more" aria-expanded="${COACH_OPEN}">${COACH_OPEN ? 'Less' : wu ? 'More · warm-up' : 'More'}</button></div>`;
+    <div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a><button class="how more-btn" data-action="coach-more" aria-expanded="${COACH_OPEN}">${COACH_OPEN ? 'Less' : wu ? 'Warm-up' : 'More'}</button></div>`;
     })()}</div>`;
 }
 
@@ -264,7 +265,7 @@ function finishView() {
       return `<div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">${doneN >= all ? 'Workout complete' : 'Nice work'}</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}${doneN < all ? ` · ${doneN} of ${all} exercises done` : ''}</p></div>`; })()}
     <div class="tiles three" style="margin-top:20px">${stat(`<span class="num">${S.form.duration || st.minutes}</span>`, 'Minutes')}${stat(`${st.sets}`, 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
     ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => mname(m.id)).join(' · '))}</p></div></section>` : ''; })()}
-    ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? fmtEst(p.value, unit()) : p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
+    ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? fmtEst(p.value, unit()) : p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'green' })).join(''), { header: 'Personal records' }) : ''}
     ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
     ${unused.length ? `<p class="fine" style="margin-bottom:20px">${esc(unused.map(e => e.name).join(', '))} ${unused.length > 1 ? 'have' : 'has'} no sets logged and won’t be saved.</p>` : ''}
     ${keepGroup(w)}

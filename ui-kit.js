@@ -35,12 +35,16 @@ const P = {
 };
 export const icon = (name, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[name] || ''}</svg>`;
 export const chev = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg>';
-export const routineLook = id => ({ A: { icon: 'legs', color: 'blue' }, B: { icon: 'dumbbell', color: 'indigo' }, C: { icon: 'bolt', color: 'orange' } }[id] || { icon: 'note', color: 'teal' });
-export const tile = (name, color = 'blue', lg = false) => `<span class="tile ${color} ${lg ? 'lg' : ''}">${icon(name)}</span>`;
+// Colour means something: blue = gym, teal = padel, orange = health and prevention,
+// green = done and progress, grey = everything else (red only for warnings and deleting).
+// Older colour names fold into those four so every screen follows the same rule.
+const TONE = { indigo: 'blue', purple: 'blue', pink: 'orange', yellow: 'orange' };
+export const routineLook = id => ({ A: { icon: 'legs', color: 'blue' }, B: { icon: 'dumbbell', color: 'blue' }, C: { icon: 'bolt', color: 'blue' } }[id] || { icon: 'dumbbell', color: 'blue' });
+export const tile = (name, color = 'blue', lg = false) => `<span class="tile ${TONE[color] || color} ${lg ? 'lg' : ''}">${icon(name)}</span>`;
 
 // Large title header (top-level tabs).
 export const pageHead = (title, { eyebrow = '', sub = '', right = '' } = {}) =>
-  `<header class="lt"><div>${eyebrow ? `<p class="lt-eyebrow">${esc(eyebrow)}</p>` : ''}<h1 class="t-large">${esc(title)}</h1>${sub ? `<p class="t-sub lt-sub">${sub}</p>` : ''}</div>${right}</header>`;
+  `<header class="lt"><div>${eyebrow ? `<p class="lt-eyebrow brand"><span class="brand-ball" aria-hidden="true"></span>${esc(eyebrow)}</p>` : ''}<h1 class="t-large">${esc(title)}</h1>${sub ? `<p class="t-sub lt-sub">${sub}</p>` : ''}</div>${right}</header>`;
 
 // Inline nav bar (pushed screens): back button, centred title, optional right action.
 export const navBar = ({ back = '', backTo = '', backAction = '', title = '', sub = '', right = '' } = {}) =>
@@ -62,7 +66,11 @@ export function row({ title, sub = '', value = '', icon: ic = '', color = 'blue'
     ${value ? `<span class="row-value">${value}</span>` : ''}${right}${(chevron ?? !!tappable) ? chev : ''}</${tag}>`;
 }
 
-export const stat = (value, label, unit = '') => `<div class="stat"><small>${esc(label)}</small><strong>${value}${unit ? `<span class="u">${esc(unit)}</span>` : ''}</strong></div>`;
+export const stat = (value, label, unit = '') => {
+  // Long numbers (4,500 kg) get a smaller size rather than being cut off with "…".
+  const len = String(value).replace(/<[^>]+>/g, '').length + (unit ? unit.length * 0.6 : 0);
+  return `<div class="stat"><small>${esc(label)}</small><strong class="${len > 7 ? 'xs' : len > 5 ? 'sm' : ''}">${value}${unit ? `<span class="u">${esc(unit)}</span>` : ''}</strong></div>`;
+};
 export const empty = (ic, title, msg, cta = '') => `<div class="empty">${icon(ic)}<b>${esc(title)}</b><p>${esc(msg)}</p>${cta}</div>`;
 export const seg = (name, items, current) => `<div class="seg" role="tablist">${items.map(([v, l]) => `<button role="tab" aria-selected="${String(v) === String(current)}" data-action="pick" data-name="${esc(name)}" data-value="${esc(v)}">${esc(l)}</button>`).join('')}</div>`;
 export const chips = (name, values, current, fmt = v => v) =>
@@ -77,10 +85,14 @@ export function barChart(series, { height = 120, unitLabel = '' } = {}) {
   const bars = series.map((s, i) => {
     let y = H - pad;
     const rects = s.parts.map(p => { const h = (p.v / max) * (H - pad - 14); y -= h; return h > 0 ? `<rect class="${p.cls}" x="${i * bw + 7}" y="${y}" width="${bw - 14}" height="${h}" rx="4"/>` : ''; }).join('');
-    const total = s.parts.reduce((n, p) => n + p.v, 0);
-    return `${rects}<text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${s.label}</text>${total ? `<text class="val" x="${i * bw + bw / 2}" y="${y - 3}" text-anchor="middle">${total}</text>` : ''}`;
+    const total = s.parts.reduce((n, p) => n + p.v, 0), last = i === series.length - 1;
+    // Only this week's bar gets a number; the dashed line is your average, so bars read as above or below it.
+    return `${rects}<text x="${i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${s.label}</text>${total && last ? `<text class="val" x="${i * bw + bw / 2}" y="${y - 3}" text-anchor="middle">${total}</text>` : ''}`;
   }).join('');
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly chart ${esc(unitLabel)}">${bars}</svg>`;
+  const done = series.slice(0, -1).map(s => s.parts.reduce((n, p) => n + p.v, 0)).filter(v => v > 0);
+  const avg = done.length ? done.reduce((a, b) => a + b, 0) / done.length : 0, ay = H - pad - (avg / max) * (H - pad - 14);
+  const avgLine = avg ? `<line class="avg" x1="4" x2="${W - 4}" y1="${ay.toFixed(1)}" y2="${ay.toFixed(1)}"/><text class="avg-l" x="4" y="${(ay - 4).toFixed(1)}">your average</text>` : '';
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly chart ${esc(unitLabel)}">${avgLine}${bars}</svg>`;
 }
 
 export function lineChart(pts, { height = 150, fmt = v => v, empty = 'Do this exercise twice to see your trend.' } = {}) {

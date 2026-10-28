@@ -1,6 +1,6 @@
 // Progress tab (route 'overview'): what happened, then how you're going. Today is the home screen.
 import { app, S } from './core-app.js';
-import { esc, icon, pageHead, group, row } from './ui-kit.js';
+import { esc, icon, pageHead, group, row, tile } from './ui-kit.js';
 import { isRoutine, getRoutine } from './domain-program.js';
 import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
@@ -41,10 +41,10 @@ function goals() {
   const tRow = t?.date ? (() => {
     const d = daysUntil(t.date), when = parseISO(t.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
     const sub = d > 0 ? `${when} · in ${plural(d, 'day')}` : d === 0 ? `${when} · today` : `${when} · done`;
-    return row({ title: esc(t.name || 'Tournament'), sub: `${esc(sub)}${taperFor(t) ? `<br><span class="orange">${esc(taperText(taperFor(t)))}</span>` : ''}`, icon: 'trophy', color: 'orange', action: 'goal-tour' });
-  })() : row({ title: 'Add a tournament', sub: 'Workouts ease off in the week before so you play fresh', icon: 'trophy', color: 'orange', action: 'goal-tour' });
+    return row({ title: esc(t.name || 'Tournament'), sub: `${esc(sub)}${taperFor(t) ? `<br><span class="orange">${esc(taperText(taperFor(t)))}</span>` : ''}`, icon: 'trophy', color: 'teal', action: 'goal-tour' });
+  })() : row({ title: 'Add a tournament', sub: 'Workouts ease off in the week before so you play fresh', icon: 'trophy', color: 'teal', action: 'goal-tour' });
   const lRows = lifts.map((g, i) => { const ex = getExercise(g.exId); if (!ex) return ''; const p = liftProgress(g, app.strength);
-    return row({ title: esc(ex.name), sub: `<span class="mbar" style="margin:6px 0 4px"><b style="width:${Math.round(p.pct * 100)}%"></b></span>${p.done ? `Reached ${esc(fmtW(g.kg, u))}!` : p.best ? `Best ${esc(fmtW(p.best, u))} of ${esc(fmtW(g.kg, u))}` : `Goal ${esc(fmtW(g.kg, u))} · not lifted yet`}`, icon: p.done ? 'check' : 'dumbbell', color: p.done ? 'green' : 'indigo', action: 'goal-lift', data: { i } }); }).join('');
+    return row({ title: esc(ex.name), sub: `<span class="mbar" style="margin:6px 0 4px"><b style="width:${Math.round(p.pct * 100)}%"></b></span>${p.done ? `Reached ${esc(fmtW(g.kg, u))}!` : p.best ? `Best ${esc(fmtW(p.best, u))} of ${esc(fmtW(g.kg, u))}` : `Goal ${esc(fmtW(g.kg, u))} · not lifted yet`}`, icon: p.done ? 'check' : 'dumbbell', color: p.done ? 'green' : 'blue', action: 'goal-lift', data: { i } }); }).join('');
   return group(tRow + lRows + row({ title: 'Add a lift goal', icon: 'plus', color: 'green', action: 'goal-lift-add', chevron: false, cls: 'action' }), { header: 'Goals', big: true });
 }
 
@@ -111,7 +111,7 @@ function headed() {
     row({ title: `Level ${level.level} · ${esc(level.name)}`, sub: `<span class="mbar" style="margin:6px 0 4px"><b style="width:${Math.round(level.progress * 100)}%"></b></span>${eta.weeks ? `Level ${level.level + 1} in ~${plural(eta.weeks, 'week')} at your current pace` : 'Train this week to start levelling up'}`, to: 'stats' }),
     ...proj.map(p => row({ title: esc(p.name), sub: p.steady ? `Holding steady around ${val(p, Math.round(p.current))}${p.metric.load ? ' ' + unit : ''}. Consistent sessions will get it moving.` : `Now ${val(p, Math.round(p.current))} → <b>~${val(p, p.low)}–${val(p, p.high)}${p.metric.load ? ' ' + unit : ''}</b> by ${by(p.by)}${p.metric.key === 'e1rm' ? ' (est. max)' : ''}`, to: `history/ex/${p.exId}` })),
   ];
-  if (wi && (wi.levelSooner || wi.liftWeeksSooner)) rows.push(row({ title: `Train ${wi.to}× instead of ${wi.from}× a week`, sub: [wi.levelSooner ? `next level ~${plural(wi.levelSooner, 'week')} sooner` : '', wi.liftWeeksSooner ? `lifts reach those numbers ~${plural(wi.liftWeeksSooner, 'week')} sooner` : ''].filter(Boolean).join(' · '), icon: 'bolt', color: 'orange' }));
+  if (wi && (wi.levelSooner || wi.liftWeeksSooner)) rows.push(row({ title: `Train ${wi.to}× instead of ${wi.from}× a week`, sub: [wi.levelSooner ? `next level ~${plural(wi.levelSooner, 'week')} sooner` : '', wi.liftWeeksSooner ? `lifts reach those numbers ~${plural(wi.liftWeeksSooner, 'week')} sooner` : ''].filter(Boolean).join(' · '), icon: 'bolt', color: 'blue' }));
   return `<section class="grp"><h2 class="grp-h big">Where you’re headed</h2>
     <button class="card" data-action="go" data-to="stats" style="display:block;width:100%;margin-bottom:12px"><div style="max-width:250px;margin:0 auto">${radar(axes, before)}</div></button>
     <div class="grp-b">${rows.join('')}</div>
@@ -126,13 +126,12 @@ export const overview = {
     const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your progress fills in as you train</b><small>Finish a workout or log a match to see your calendar, scores and history here.</small></span></div>` : '';
     return `${pageHead('Progress', { right: avatar })}${empty}
       <div style="height:${empty ? 24 : 8}px"></div>${calendar()}${goals()}${headed()}
-      ${S.sessions.length ? group(row({ title: 'History', sub: 'Every session, weekly load, padel stats', icon: 'note', color: 'gray', to: 'history' })
-        + row({ title: 'Recovery', sub: 'How ready each muscle is', icon: 'heart', color: 'pink', to: 'recovery' })
-        + row({ title: 'Exercises', sub: 'Progress per exercise', icon: 'dumbbell', color: 'indigo', to: 'history/progress' })
-        + row({ title: 'Muscles', sub: 'Sets per muscle this week', icon: 'target', color: 'blue', to: 'history/muscles' })
-        + row({ title: 'Weekly review', sub: 'Your week vs the last, and next week’s focus', icon: 'chart', color: 'indigo', to: 'review' })
-        + row({ title: 'Body', sub: esc(bodySummary()), icon: 'person', color: 'teal', to: 'body/o' })
-        + row({ title: 'Your profile', sub: 'Scores, level and milestones', icon: 'trophy', color: 'orange', to: 'stats' }), { header: 'Details' }) : ''}`;
+      ${S.sessions.length ? `<section class="grp"><h2 class="grp-h">Details</h2><div class="tile-grid">${[
+        ['History', 'Every session and weekly load', 'note', 'gray', 'history'], ['Recovery', 'How ready each muscle is', 'heart', 'orange', 'recovery'],
+        ['Exercises', 'Progress per exercise', 'dumbbell', 'blue', 'history/progress'], ['Muscles', 'Sets per muscle this week', 'target', 'blue', 'history/muscles'],
+        ['Padel insights', 'Sides, partners, sore spots', 'racket', 'teal', 'history/padel'], ['Weekly review', 'Your week and next week’s focus', 'chart', 'blue', 'review'],
+        ['Body', bodySummary(), 'person', 'gray', 'body/o'], ['Your profile', 'Scores, level, milestones', 'trophy', 'green', 'stats'],
+      ].map(([t, sub, ic, c, to]) => `<button data-action="go" data-to="${to}">${tile(ic, c)}<b>${esc(t)}</b><small>${esc(sub)}</small></button>`).join('')}</div></section>` : ''}`;
   },
   actions: {
     'cal-prev'() { monthOffset--; app.render({ keepScroll: true }); },

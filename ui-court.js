@@ -14,7 +14,7 @@ import { AREAS } from './domain-personalize.js';
 let P = null;
 let tick = null, ctx = null, wake = null;
 const RING = 2 * Math.PI * 110;
-const LOOK = { 'stretch-upper': ['wave', 'teal'], 'stretch-lower': ['wave', 'teal'], 'stretch-full': ['wave', 'teal'], mobility: ['sun', 'indigo'], warmup: ['flame', 'orange'], cooldown: ['wave', 'blue'], elbow: ['heart', 'pink'], shoulder: ['heart', 'pink'], back: ['heart', 'pink'], knee: ['heart', 'pink'], calf: ['heart', 'pink'] };
+const LOOK = { 'stretch-upper': ['wave', 'orange'], 'stretch-lower': ['wave', 'orange'], 'stretch-full': ['wave', 'orange'], mobility: ['sun', 'orange'], warmup: ['flame', 'teal'], cooldown: ['wave', 'teal'], between: ['racket', 'teal'], elbow: ['heart', 'pink'], shoulder: ['heart', 'pink'], back: ['heart', 'pink'], knee: ['heart', 'pink'], calf: ['heart', 'pink'] };
 
 function beep(hi = false) {
   try {

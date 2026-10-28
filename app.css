@@ -93,7 +93,7 @@ button.row:active, a.row:active { background: var(--fill); }
 .tile svg.i { width: 19px; height: 19px; stroke-width: 2; }
 .tile.lg { width: 44px; height: 44px; border-radius: 11px; } .tile.lg svg.i { width: 24px; height: 24px; }
 .tile.green { background: var(--green); } .tile.orange { background: var(--orange); } .tile.teal { background: var(--teal); }
-.tile.indigo { background: var(--indigo); } .tile.pink { background: var(--pink); } .tile.red { background: var(--red); } .tile.gray { background: #8E8E93; }
+.tile.indigo { background: var(--blue); } .tile.pink { background: var(--orange); }   /* folded into the four-colour system */ .tile.red { background: var(--red); } .tile.gray { background: #8E8E93; }
 .row.danger { color: var(--red); justify-content: center; }
 .row.action { color: var(--blue); } .row.action.red { color: var(--red); }
 .check-mark { color: var(--blue); width: 20px; height: 20px; stroke-width: 2.6; }
@@ -106,6 +106,7 @@ button.row:active, a.row:active { background: var(--fill); }
 .hero h2 { font-size: 22px; line-height: 28px; font-weight: 700; margin: 0; }
 .hero .t-sub { margin-top: 2px; }
 .hero-note { font-size: 15px; color: var(--label-2); margin-bottom: 16px; line-height: 20px; }
+.hero-note.orange { color: var(--orange); }
 .banner { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--blue-tint); color: var(--label); border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 16px; }
 .banner b { display: block; font-weight: 600; }
 .banner small { display: block; font-size: 13px; color: var(--label-2); margin-top: 2px; }
@@ -180,12 +181,13 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .stat small { display: block; font-size: 13px; color: var(--label-2); font-weight: 500; }
 .stat strong { display: block; font-family: var(--font-round); font-size: 26px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat strong .u { font-size: 15px; font-weight: 600; color: var(--label-2); margin-left: 2px; }
+.stat strong.sm { font-size: 21px; } .stat strong.xs { font-size: 18px; } .stat strong.sm .u, .stat strong.xs .u { font-size: 13px; }
 
 /* Charts */
 .chart { width: 100%; height: auto; display: block; margin-top: 8px; }
 .chart text { fill: var(--label-2); font-size: 9px; font-family: var(--font); }
 .chart text.val { fill: var(--label); font-size: 8.5px; font-weight: 600; }
-.chart .gym { fill: var(--blue); } .chart .padel { fill: var(--teal); } .chart .other { fill: var(--indigo); }
+.chart .gym { fill: var(--blue); } .chart .padel { fill: var(--teal); } .chart .other { fill: #8E8E93; }
 .chart.line line { stroke: var(--sep); }
 .chart.line .stroke { fill: none; stroke: var(--blue); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .chart.line .area { fill: var(--blue); opacity: .1; }
@@ -193,7 +195,7 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .chart-empty { color: var(--label-2); padding: 20px 0; text-align: center; font-size: 15px; }
 .legend { display: flex; gap: 16px; font-size: 12px; color: var(--label-2); margin-top: 10px; }
 .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
-.legend .gym { background: var(--blue); } .legend .padel, .legend .act { background: var(--teal); } .legend .other { background: var(--indigo); } .legend .both { background: linear-gradient(135deg, var(--blue) 50%, var(--teal) 50%); }
+.legend .gym { background: var(--blue); } .legend .padel, .legend .act { background: var(--teal); } .legend .other { background: #8E8E93; } .legend .both { background: linear-gradient(135deg, var(--blue) 50%, var(--teal) 50%); }
 .heat { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; margin-top: 8px; }
 .heat i { aspect-ratio: 1; border-radius: 3px; background: var(--fill); }
 .heat i.gym { background: var(--blue); } .heat i.act { background: var(--teal); } .heat i.both { background: linear-gradient(135deg, var(--blue) 50%, var(--teal) 50%); }
@@ -224,7 +226,7 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .bl-set { margin: -4px 0 10px; }
 .how { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-size: 15px; margin-top: 10px; min-height: 32px; }
 .how svg.i { width: 18px; height: 18px; }
-.how-row { display: flex; flex-wrap: wrap; column-gap: 20px; }
+.how-row { display: flex; flex-wrap: wrap; column-gap: 16px; }
 .coach-peek { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 0; background: none; text-align: left; font-size: 13px; line-height: 18px; color: var(--label-2); }
 .coach-peek span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .coach-peek.blue span { color: var(--blue); }
@@ -257,10 +259,11 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .all-done { text-align: center; padding: 22px 16px 16px; }
 .all-done .big-tick { width: 56px; height: 56px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; margin: 0 auto 10px; }
 .all-done .big-tick svg.i { width: 30px; height: 30px; stroke-width: 3; }
-.wk-bottom { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 16px calc(10px + var(--safe-b)); background: var(--bar); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-top: .5px solid var(--sep); }
+.wk-bottom { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 10px 16px calc(10px + var(--safe-b)); background: var(--bar); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-top: .5px solid var(--sep); }
 .wk-bottom .btn { min-height: 50px; }
 .wk-bottom .btn.square { width: 50px; padding: 0; }
-.wk-bottom .btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-bottom .btn { min-width: 0; }
+.wk-bottom .btn span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .finish-hero { text-align: center; padding: 16px 0 8px; }
 .finish-hero .big-tick { width: 72px; height: 72px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; margin: 0 auto 14px; }
 .finish-hero .big-tick svg.i { width: 38px; height: 38px; stroke-width: 3; }
@@ -388,8 +391,8 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .radar .rd-prev { fill: none; stroke: var(--label-3); stroke-width: 1.5; stroke-dasharray: 4 4; }
 .radar .rd-cur { fill: var(--blue); fill-opacity: .22; stroke: var(--blue); stroke-width: 2.5; stroke-linejoin: round; }
 .radar .rd-dot { fill: var(--cell); stroke: var(--blue); stroke-width: 2; }
-.radar .rd-label { fill: var(--label-2); font-size: 12px; font-family: var(--font); font-weight: 500; }
-.radar .rd-score { fill: var(--label); font-size: 15px; font-family: var(--font-round); font-weight: 700; }
+.radar .rd-label { fill: var(--label-2); font-size: 19px; font-family: var(--font); font-weight: 600; }
+.radar .rd-score { fill: var(--label); font-size: 23px; font-family: var(--font-round); font-weight: 700; }
 .bm-legend span { display: inline-flex; align-items: center; margin: 0 6px; }
 .lvl-top { display: flex; align-items: center; gap: 12px; }
 .lvl-top b { display: block; font-weight: 600; }
@@ -454,7 +457,7 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .rv-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--fill); }
 .rv-dot.gym { background: var(--blue); }
 .rv-dot.padel { background: var(--teal, #30B0C7); }
-.rv-dot.other { background: var(--indigo, #5E5CE6); opacity: .6; }
+.rv-dot.other { background: #8E8E93; opacity: .6; }
 .rv-dot.missed { background: none; box-shadow: inset 0 0 0 2px var(--label-3); }
 
 /* Rest ended while away; screen-on status on the workout screen */
@@ -479,3 +482,61 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .mline span::before { content: '+ '; }
 .bm-legend .lg { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--blue); }
 .bm-legend .lg.sec { opacity: .38; }
+
+/* ── Padel identity: ball accent, faint court lines on the main card, rounded numbers ── */
+:root { --ball: #B8D82A; --court-line: rgba(0, 122, 120, .07); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ball: #D2EE3C; --court-line: rgba(64, 200, 224, .08); } }
+:root[data-theme="dark"] { --ball: #D2EE3C; --court-line: rgba(64, 200, 224, .08); }
+.brand { display: inline-flex; align-items: center; gap: 6px; }
+.brand-ball { width: 9px; height: 9px; border-radius: 50%; background: var(--ball); box-shadow: inset -1.5px -1.5px 0 rgba(0,0,0,.12); flex: none; }
+/* A padel court seen from above, cropped in the corner of the main card. */
+.hero { position: relative; overflow: hidden; isolation: isolate; }
+.hero::before { content: ''; position: absolute; z-index: -1; right: -34px; top: -26px; width: 150px; height: 230px; border: 2px solid var(--court-line); border-radius: 4px; transform: rotate(-14deg);
+  background: linear-gradient(var(--court-line), var(--court-line)) center 50% / 100% 2px no-repeat,
+              linear-gradient(var(--court-line), var(--court-line)) center 22% / 100% 2px no-repeat,
+              linear-gradient(var(--court-line), var(--court-line)) center 78% / 100% 2px no-repeat,
+              linear-gradient(var(--court-line), var(--court-line)) center center / 2px 56% no-repeat; }
+.hero .t-foot:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.hero .t-foot:first-child::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ball); }
+.week-foot, .tile-stat b, .hero h2 { font-variant-numeric: tabular-nums; }
+.tile-stat b, .week-foot b { font-family: var(--font-round); }
+
+/* ── Quieter Today ── */
+.strip { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 12px; border-radius: 12px; background: var(--fill); font-size: 14px; color: var(--label-2); }
+.strip .i { width: 17px; height: 17px; color: var(--blue); flex: none; }
+.strip span { flex: 1; min-width: 0; }
+.strip button { font-size: 14px; font-weight: 600; color: var(--blue); white-space: nowrap; }
+.strip button.later { font-weight: 400; color: var(--label-2); }
+.done-card { display: flex; align-items: center; gap: 12px; }
+.done-card .row-main { flex: 1; min-width: 0; }
+.done-card b { display: block; font-size: 17px; }
+.done-card small { display: block; font-size: 13px; color: var(--label-2); margin-top: 1px; }
+.done-next { margin-top: 12px; padding-top: 12px; border-top: .5px solid var(--sep); display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.done-next .row-main small { color: var(--label-2); }
+
+/* ── Week strip: filled = done, ring = planned, colour = gym or padel, dot = rest ── */
+.week .dot { background: none; }
+.week .dot.rest::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--fill-2); }
+.week > div { position: relative; padding-bottom: 8px; }
+.week .today::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--label); }
+.week-key { display: flex; justify-content: center; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--label-2); }
+.week-key span { display: inline-flex; align-items: center; white-space: nowrap; }
+.week-key i { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.week-key i.ring { background: none; box-shadow: inset 0 0 0 1.5px var(--label-3); }
+
+/* ── Charts ── */
+.mchips details { display: contents; }
+.mchips summary { list-style: none; font-size: 13px; padding: 4px 10px; border-radius: 12px; color: var(--blue); font-weight: 600; cursor: pointer; }
+.mchips summary::-webkit-details-marker { display: none; }
+.mchips details[open] summary { display: none; }
+.chart .avg { stroke: var(--label-3); stroke-dasharray: 4 4; stroke-width: 1; }
+.chart text.avg-l { fill: var(--label-2); font-size: 9px; }
+
+/* ── Lighter lists: tiles instead of long rows ── */
+.tile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile-grid button { display: grid; gap: 8px; align-content: start; text-align: left; padding: 12px; min-height: 92px; border-radius: var(--r-lg); background: var(--cell); box-shadow: var(--shadow); }
+.tile-grid b { font-size: 15px; font-weight: 600; line-height: 19px; }
+.tile-grid small { font-size: 12px; color: var(--label-2); line-height: 16px; margin-top: -4px; }
+.lib-tools { display: flex; gap: 8px; margin-bottom: 12px; }
+.lib-tools .input { flex: 1; margin: 0; }
+.lib-tools .icon-circle { width: 44px; height: 44px; flex: none; }

@@ -27,10 +27,10 @@ export function radar(axes, before = null, { size = 300, labels = true } = {}) {
   const prev = before && before.some(a => a.score > 0) ? `<polygon points="${poly(before.map(a => a.score))}" class="rd-prev"/>` : '';
   const cur = `<polygon points="${poly(axes.map(a => Math.max(3, a.score)))}" class="rd-cur"/>` + axes.map((a, i) => { const [x, y] = pt(i, Math.max(3, a.score)); return `<circle cx="${x}" cy="${y}" r="3.5" class="rd-dot"/>`; }).join('');
   const lab = labels ? axes.map((a, i) => {
-    const [x, y] = pt(i, 128), anchor = Math.abs(x - cx) < 8 ? 'middle' : x > cx ? 'start' : 'end';
-    return `<text x="${x}" y="${y - 4}" text-anchor="${anchor}" class="rd-label">${esc(a.label)}</text><text x="${x}" y="${y + 12}" text-anchor="${anchor}" class="rd-score">${a.notInPlan ? '—' : a.score}</text>`;
+    const [x, y] = pt(i, 122), anchor = Math.abs(x - cx) < 8 ? 'middle' : x > cx ? 'start' : 'end';
+    return `<text x="${x}" y="${y - 6}" text-anchor="${anchor}" class="rd-label">${esc(a.label)}</text><text x="${x}" y="${y + 18}" text-anchor="${anchor}" class="rd-score">${a.notInPlan ? '—' : a.score}</text>`;
   }).join('') : '';
-  return `<svg class="radar" viewBox="-62 -12 424 334" width="${size}" role="img" aria-label="Progress pentagon: ${esc(axes.map(a => `${a.label} ${a.score}`).join(', '))}">${rings}${spokes}${prev}${cur}${lab}</svg>`;
+  return `<svg class="radar" viewBox="-104 -26 508 360" width="${size}" role="img" aria-label="Progress pentagon: ${esc(axes.map(a => `${a.label} ${a.score}`).join(', '))}">${rings}${spokes}${prev}${cur}${lab}</svg>`;
 }
 
 function levelBar(L) {
