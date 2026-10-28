@@ -343,9 +343,22 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .row.is-today .row-title { color: var(--blue); font-weight: 600; }
 
 /* Body map */
-.bodymap { width: 100%; max-width: 340px; height: auto; display: block; margin: 4px auto 0; }
+.bodymap { --bm-body: color-mix(in srgb, var(--label) 7%, var(--cell)); --bm-idle: color-mix(in srgb, var(--label) 15%, var(--cell));
+  width: 100%; max-width: 250px; height: auto; display: block; margin: 4px auto 0; overflow: visible; -webkit-tap-highlight-color: transparent; }
+.bodymap.labelled { max-width: 400px; }
+.bodymap .bm-body { fill: var(--bm-body); stroke: color-mix(in srgb, var(--label) 14%, var(--cell)); stroke-width: .7; }
 .bodymap .bm-label { fill: var(--label-2); font-size: 9px; font-family: var(--font); }
-.bodymap .bm-part { transition: fill-opacity .2s; }
+.bodymap .bm-part { transition: fill-opacity .2s; stroke: var(--bm-body); stroke-width: .9; stroke-linejoin: round; cursor: pointer; }
+.bodymap .bm-part.on { stroke: var(--label); stroke-width: .8; }
+.bodymap .bm-callout path { stroke: var(--label-3); stroke-width: .7; fill: none; }
+.bodymap .bm-callout circle { fill: var(--label-2); }
+.bodymap .bm-callout text { fill: var(--label-2); font-size: 10.5px; font-family: var(--font); }
+.bodymap .bm-callout.main path { stroke: var(--label-2); }
+.bodymap .bm-callout.main circle { fill: var(--label); }
+.bodymap .bm-callout.main text { fill: var(--label); font-weight: 600; }
+.bodymap .bm-tip { pointer-events: none; }
+.bodymap .bm-tip rect { fill: var(--label); opacity: .88; }
+.bodymap .bm-tip text { fill: var(--cell); font-size: 10.5px; font-weight: 600; font-family: var(--font); text-anchor: middle; }
 .bm-legend { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: var(--label-2); margin-top: 8px; }
 .bm-legend i { width: 72px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--blue) 30%, transparent), var(--blue)); }
 .mbar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; margin-top: 6px; position: relative; }
