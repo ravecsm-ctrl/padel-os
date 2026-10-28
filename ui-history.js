@@ -13,7 +13,6 @@ import { AREAS } from './domain-personalize.js';
 import { COURT_ROUTINES } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
-import { statsCard } from './ui-stats.js';
 import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor } from './domain-muscles.js';
 import { MUSCLES } from './domain-taxonomy.js';
 
@@ -90,7 +89,7 @@ function musclesView() {
     return row({ title: esc(m.label), value: `<span class="mstat ${st.key}">${m.sets ? `${m.sets} · ` : ''}${st.label}</span>`, action: 'muscle-sheet', data: { m: m.id },
       sub: `<span class="mbar"><span class="zone" style="left:${lo / scale * 100}%;width:${(hi - lo) / scale * 100}%"></span><b style="width:${Math.min(100, m.sets / scale * 100)}%"></b></span>` });
   }).join('');
-  return `${navBar({ back: 'Progress', backTo: 'history', title: 'Muscles' })}
+  return `${navBar({ back: 'Overview', backTo: 'overview', title: 'Muscles' })}
     <h1 class="t-title" style="padding:8px 4px 2px">Muscles</h1><p class="t-sub" style="padding:0 4px 16px">Sets per muscle over the last 7 days. <button class="link" data-action="go" data-to="recovery">See recovery</button></p>
     <div class="card">${bodyMap(map)}<div class="bm-legend">Fewer sets <i></i> More sets</div></div>
     <div style="height:24px"></div>
@@ -107,14 +106,13 @@ function muscleSheet(m) {
 }
 
 function logView() {
-  if (!S.sessions.length) return `${pageHead('Progress')}${tabs('log')}${empty('chart', 'No sessions yet', 'Finish a workout or log a match and your progress shows up here.', '<button class="btn filled" data-action="go" data-to="today" style="max-width:260px">Go to Today</button>')}`;
+  if (!S.sessions.length) return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('History')}${tabs('log')}${empty('chart', 'No sessions yet', 'Finish a workout or log a match and your progress shows up here.', '<button class="btn filled" data-action="go" data-to="today" style="max-width:260px">Go to Today</button>')}`;
   const series = weeklySeries(S.sessions, 8), tr = loadTrend(series), cur = series[series.length - 1];
   const groups = new Map();
   for (const s of S.sessions) { const k = isoDate(mondayOf(new Date(s.startedAt))); groups.set(k, [...(groups.get(k) || []), s]); }
   const thisMon = isoDate(mondayOf());
   const lists = [...groups.entries()].slice(0, 12).map(([k, arr]) => group(arr.map(sessionRow).join(''), { header: k === thisMon ? 'This week' : `Week of ${new Date(k + 'T12:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}` })).join('');
-  return `${pageHead('Progress')}${tabs('log')}
-    ${statsCard()}
+  return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('History')}${tabs('log')}
     <div class="tiles">${stat(cur.sessions, 'This week', cur.sessions === 1 ? 'session' : 'sessions')}${(n => stat(n, 'Streak', n === 1 ? 'week' : 'weeks'))(weekStreak(S.sessions))}</div>
     ${weekMusclesCard()}
     <section class="grp"><h2 class="grp-h">Training load</h2><div class="card">${barChart(series.map(w => ({ label: `${w.start.getDate()}/${w.start.getMonth() + 1}`, parts: [{ v: w.gym, cls: 'gym' }, { v: w.padel, cls: 'padel' }, { v: w.other, cls: 'other' }] })))}
@@ -127,9 +125,9 @@ function logView() {
 
 function sessionView(id) {
   const s = S.sessions.find(x => x.id === id);
-  if (!s) return `${navBar({ back: 'Progress', backTo: 'history' })}${empty('chart', 'Not found', 'This session no longer exists.')}`;
+  if (!s) return `${navBar({ back: 'History', backTo: 'history' })}${empty('chart', 'Not found', 'This session no longer exists.')}`;
   const gym = s.kind === 'strength';
-  const nav = navBar({ back: 'Progress', backTo: 'history', title: '' });
+  const nav = navBar({ back: 'History', backTo: 'history', title: '' });
   const head = `<h1 class="t-title" style="padding:8px 4px 2px">${esc(s.title)}</h1><p class="t-sub" style="padding:0 4px 20px">${esc(dateLong(s.startedAt))}</p>`;
   const actions = `<div class="btns"><button class="btn tinted" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">Edit</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>`;
   if (!gym) {
@@ -152,8 +150,8 @@ function sessionView(id) {
 
 function exercisesView() {
   const list = exerciseSummaries(app.strength);
-  if (!list.length) return `${pageHead('Progress')}${tabs('ex')}${empty('dumbbell', 'Nothing to show yet', 'Complete a workout to start tracking each exercise.')}`;
-  return `${pageHead('Progress')}${tabs('ex')}
+  if (!list.length) return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('Exercises')}${tabs('ex')}${empty('dumbbell', 'Nothing to show yet', 'Complete a workout to start tracking each exercise.')}`;
+  return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('Exercises')}${tabs('ex')}
     ${group(list.map(x => row({ title: esc(x.ex.name), sub: `Best ${x.metric.load ? fmtW(x.best, unit()) : fmtNum(x.best)} · ${esc(relDay(x.lastTs))}`, to: `history/ex/${x.id}`,
       right: `${sparkline(x.pts.map(p => p[x.metric.key]).filter(v => v != null))}<span class="chg ${x.change > 0 ? 'up' : x.change < 0 ? 'down' : ''}">${x.change == null ? '' : `${x.change > 0 ? '+' : ''}${x.change}%`}</span>` })).join(''),
       { footer: 'Change compares your first and latest session.' })}`;
@@ -175,7 +173,7 @@ function exerciseView(id) {
 }
 
 export const history = {
-  tab: 'history',
+  tab: 'overview',
   render() {
     const [sub, id] = S.params;
     if (sub === 'session') return sessionView(id);

@@ -20,12 +20,13 @@ const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
-function banners() {
+export function banners({ resumeOnly = false } = {}) {
   let out = '';
   if (S.active) {
     const st = workoutStats(S.active);
     out += `<button class="banner" data-action="resume">${tile('play', 'blue')}<span><b>Continue your workout</b><small>${esc(S.active.title)} · ${st.sets} of ${st.planned} sets done</small></span>${chev}</button>`;
   }
+  if (resumeOnly) return out;
   if (!S.profile.onboarded) out += `<button class="banner" data-action="go" data-to="welcome">${tile('sliders', 'blue')}<span><b>Personalise your plan</b><small>Takes 30 seconds. Your history is kept.</small></span>${chev}</button>`;
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
@@ -92,8 +93,8 @@ export const today = {
     const others = allRoutineIds().filter(id => id !== todays || S.active);
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners()}${hero()}
-      <div style="height:28px"></div>${weekCard()}${recoveryCard()}${stayHealthy()}
+      ${banners({ resumeOnly: true })}${hero()}
+      <div style="height:28px"></div>${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
         return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
         + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
@@ -163,11 +164,11 @@ async function begin(routineId, readiness, light, sore = [], asked = []) {
 }
 
 // ── Activity (padel etc.) logging
-export function activitySheet(kind = 'padel', existing = null) {
+export function activitySheet(kind = 'padel', existing = null, date = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
     ptype: pd.type || 'match', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
-    : { activity: kind, duration: 90, rpe: 7, date: isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: '', side: '', sore: [] };
+    : { activity: kind, duration: 90, rpe: 7, date: date || isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: '', side: '', sore: [] };
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);

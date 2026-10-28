@@ -60,7 +60,7 @@ export const welcome = {
     'w-toggle'(el) { const arr = F()[el.dataset.name], v = el.dataset.value; F()[el.dataset.name] = arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]; app.render({ keepScroll: true }); },
     'w-back'() { step = Math.max(0, step - 1); app.render(); },
     'w-cancel'() { S.form = {}; app.go('settings'); },
-    async 'w-skip'() { S.profile = { ...S.profile, onboarded: true, simple: true }; await app.save('profile'); S.form = {}; app.go('today'); },
+    async 'w-skip'() { S.profile = { ...S.profile, onboarded: true, simple: true }; await app.save('profile'); S.form = {}; app.go('overview'); },
     async 'w-next'() {
       if (step < STEPS) { step++; return app.render(); }
       const f = F();
@@ -75,7 +75,7 @@ export const welcome = {
       await app.save('locations'); await app.save('activeLocation');
       if (replace) { S.schedule = generateSchedule(f.days, f.padelDays); await app.save('schedule'); }
       S.form = {};
-      app.go('today');
+      app.go('overview');
       app.toast('Your plan is ready');
     },
   },

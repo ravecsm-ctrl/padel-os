@@ -106,7 +106,7 @@ function runner() {
   const w = W(), e = cur(), ex = getExercise(e.exId), n = w.exercises.length, isLast = w.index === n - 1;
   const nextName = isLast ? '' : getExercise(w.exercises[w.index + 1].exId).name;
   const ready = entryState(e) === 'done' || e.skipped;
-  return `${navBar({ back: 'Today', backAction: 'leave', title: w.title, sub: `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
+  return `${navBar({ back: 'Back', backAction: 'leave', title: w.title, sub: `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
     ${w.index === 0 || w.adapt?.applied === false ? adaptBanner(w) : ''}
     <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
     <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p><h1>${esc(ex.name)}</h1></div>
@@ -248,12 +248,12 @@ export const workout = {
     jump(el) { W().index = +el.dataset.i; touch(false); },
     prev() { W().index = Math.max(0, W().index - 1); touch(false); },
     next() { W().index = Math.min(W().exercises.length - 1, W().index + 1); touch(false); },
-    leave() { app.saveActive(true); app.go('today'); app.toast('Workout paused. Continue from Today.'); },
+    leave() { app.saveActive(true); app.go('overview'); app.toast('Workout paused. Continue from Overview or Today.'); },
     'to-finish'() { S.form = {}; app.saveActive(true); app.go('workout/finish'); },
     'back-to-runner'() { app.go('workout'); },
     async discard() {
       if (!(await app.confirm('Discard this workout? Nothing will be saved.', { ok: 'Discard Workout', danger: true }))) return;
-      S.active = null; await app.saveActive(true); timer.stop(); app.go('today');
+      S.active = null; await app.saveActive(true); timer.stop(); app.go('overview');
     },
     async 'save-workout'() {
       const pain = S.form.pain === 'yes' ? { flag: true, location: S.form.painLoc || '' } : { flag: false, location: '' };

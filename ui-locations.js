@@ -53,7 +53,7 @@ function promptSheet(title, placeholder, onSave) {
 }
 
 export const locations = {
-  tab: 'today',
+  tab: 'overview',
   render() { return S.params[0] ? detailView(S.params[0]) : listView(); },
   mounted() {
     const n = document.querySelector('#locName');

@@ -33,7 +33,7 @@ function feedbackSheet(m) {
 }
 
 export const recovery = {
-  tab: 'today',
+  tab: 'overview',
   render() {
     const rec = currentRecovery();
     const rows = Object.keys(MUSCLES).sort((a, b) => rec[b].level - rec[a].level).map(m => {
@@ -41,7 +41,7 @@ export const recovery = {
       return row({ title: `${esc(MUSCLES[m])}${tuned ? ' <span class="t-foot">· tuned to you</span>' : ''}`, right: `<span class="row-value" style="color:${r.key === 'ready' ? 'var(--label-2)' : colorFor(r.level)};font-weight:${r.key === 'ready' ? 400 : 600}">${r.label}${r.when ? ` · ${esc(r.when)}` : ''}</span>`, action: 'rec-sheet', data: { m } })
         .replace('<span class="row-main">', `${dot(r.level)}<span class="row-main">`);
     }).join('');
-    return `${navBar({ back: 'Today', backTo: 'today', title: 'Recovery' })}
+    return `${navBar({ back: 'Overview', backTo: 'overview', title: 'Recovery' })}
       <h1 class="t-title" style="padding:8px 4px 2px">Recovery</h1><p class="t-sub" style="padding:0 4px 16px">How rested each muscle is, based on your workouts and padel.</p>
       <div class="card">${recoveryMapSvg(rec)}<div class="bm-legend">Tired <i style="background:linear-gradient(90deg,rgb(255,59,48),rgb(255,149,0),rgb(255,204,0),rgb(52,199,89))"></i> Ready</div></div>
       <div style="height:24px"></div>

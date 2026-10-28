@@ -49,12 +49,12 @@ function axisSheet(key) {
 }
 
 export const stats = {
-  tab: 'history',
+  tab: 'overview',
   render() {
     const { axes, before, level } = currentStats();
     const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) }).slice(0, 8);
     const badges = achievements(S.sessions);
-    return `${navBar({ back: 'Progress', backTo: 'history', title: 'Your Profile' })}
+    return `${navBar({ back: 'Overview', backTo: 'overview', title: 'Your Profile' })}
       <div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>
         <div class="bm-legend"><span><i style="width:14px;height:3px;background:var(--blue);display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></i>Now</span><span><i style="width:14px;height:0;border-top:2px dashed var(--label-3);display:inline-block;margin-right:4px;vertical-align:middle"></i>4 weeks ago</span></div></div>
       <div style="height:24px"></div>

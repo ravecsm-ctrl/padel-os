@@ -17,6 +17,7 @@ import { library } from './ui-library.js';
 import { builder } from './ui-builder.js';
 import { recovery } from './ui-recovery.js';
 import { stats } from './ui-stats.js';
+import { overview } from './ui-overview.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
 app.register('today', today);
@@ -30,6 +31,7 @@ app.register('library', library);
 app.register('builder', builder);
 app.register('recovery', recovery);
 app.register('stats', stats);
+app.register('overview', overview);
 app.register('locations', locations);
 
 const GLOBAL = {
@@ -104,10 +106,11 @@ async function boot() {
   document.querySelector('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') app.closeSheet(); });
   parseHash();
   // First run: onboarding. Existing users keep their data and get a prompt on Today instead.
-  if (!S.profile.onboarded && !S.sessions.length && !S.active && S.route === 'today') S.route = 'welcome';
+  if (!S.profile.onboarded && !S.sessions.length && !S.active && S.route === 'overview') S.route = 'welcome';
+  // A workout in progress always opens first.
+  if (S.active && S.route !== 'workout') { S.route = 'workout'; S.params = []; window.history.replaceState(null, "", "#/workout"); }
   app.render();
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
-  else if (S.active && S.route !== 'workout') app.toast('You have a workout in progress');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 boot();

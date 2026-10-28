@@ -98,7 +98,7 @@ export function applyTheme() {
 
 export function parseHash() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-  S.route = parts[0] || 'today';
+  S.route = parts[0] || 'overview';
   S.params = parts.slice(1);
   if (S.route === 'workout' && !S.active) S.route = 'today';
 }
