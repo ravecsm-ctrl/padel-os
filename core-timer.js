@@ -5,6 +5,10 @@ import { getMeta, setMeta } from './core-db.js';
 let t = { endAt: 0, total: 0, paused: null, label: '' };
 let opts = { sound: true, vibrate: true };
 let el, ctx, firedFor = 0, onDone = () => {};
+// Shown when you come back after the rest ended while the screen was off or the app hidden.
+let late = null, lateTimer = 0;
+const LATE_MIN = 5000, LATE_MAX = 30 * 60000;
+export const lateText = (endedAt, now = Date.now()) => { const s = Math.round((now - endedAt) / 1000); return s < 60 ? `${s} s ago` : `${Math.round(s / 60)} min ago`; };
 
 const remaining = () => t.paused != null ? t.paused : Math.max(0, Math.ceil((t.endAt - Date.now()) / 1000));
 const active = () => t.paused != null || t.endAt > Date.now();
@@ -17,6 +21,7 @@ export async function initTimer(bar, settings, done) {
   el.addEventListener('click', e => {
     const a = e.target.closest('[data-timer]')?.dataset.timer;
     if (a === 'skip') stop();
+    else if (a === 'late-ok') dismissLate();
     else if (a === 'toggle') toggle();
     else if (a) adjust(+a);
   });
@@ -43,6 +48,7 @@ function beep() {
 }
 
 export function start(seconds, label = '') {
+  late = null; clearTimeout(lateTimer);
   unlockAudio();
   t = { endAt: Date.now() + seconds * 1000, total: seconds, paused: null, label };
   firedFor = 0; save(); draw();
@@ -65,8 +71,16 @@ function tick() {
   if (t.endAt && t.paused == null && t.endAt <= Date.now()) {
     if (firedFor !== t.endAt) {
       firedFor = t.endAt;
-      // Only alert if it finished recently; a stale timer from yesterday should just clear.
-      if (Date.now() - t.endAt < 60000) {
+      const age = Date.now() - t.endAt;
+      // Came back after the rest ended (screen locked or app in the background): say so.
+      if (age >= LATE_MIN && age < LATE_MAX) {
+        late = { endedAt: t.endAt, label: t.label };
+        beep(); onDone(); stop();
+        clearTimeout(lateTimer); lateTimer = setTimeout(dismissLate, 12000);
+        return;
+      }
+      // Only alert if it finished just now; a stale timer from yesterday should just clear.
+      if (age < LATE_MIN) {
         beep();
         if (opts.vibrate) navigator.vibrate?.([200, 100, 200, 100, 300]);
         if (document.hidden && globalThis.Notification?.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification('Rest over', { body: t.label ? `Next: ${t.label}` : 'Time for your next set', tag: 'rest', renotify: true })).catch(() => {});
@@ -83,8 +97,16 @@ function tick() {
   }
 }
 
+function dismissLate() { clearTimeout(lateTimer); late = null; draw(); }
+
 function draw() {
   if (!el) return;
+  if (late && !active()) {
+    el.hidden = false; document.body.classList.add('resting');
+    el.innerHTML = `<div class="rest-main"><span class="lbl-rest">${late.label ? `Next: ${late.label}` : 'Time for your next set'}</span><b class="rest-time late">Rest ended ${lateText(late.endedAt)}</b></div>
+      <button data-timer="late-ok" class="rest-skip">OK</button>`;
+    return;
+  }
   const on = active();
   el.hidden = !on;
   document.body.classList.toggle('resting', on);

@@ -30,8 +30,22 @@ const dayLabel = ts => new Date(ts).toLocaleDateString(undefined, { weekday: 'sh
 const touch = (keepScroll = true) => { app.saveActive(); app.render({ keepScroll }); };
 let wakeLock = null;
 
+// Keep the screen on during a workout so the phone doesn't lock mid-rest (a locked phone
+// can't play the rest beep). `awake` records whether iOS actually granted it, for the indicator.
+let awake = null; // 'on' | 'off' (refused) | 'none' (not supported)
 async function keepAwake() {
-  try { if ('wakeLock' in navigator && !wakeLock && document.visibilityState === 'visible') { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch {}
+  const was = awake;
+  if (!('wakeLock' in navigator)) awake = 'none';
+  else if (!wakeLock && document.visibilityState === 'visible') {
+    try { wakeLock = await navigator.wakeLock.request('screen'); awake = 'on'; wakeLock.addEventListener('release', () => { wakeLock = null; if (!document.hidden) { awake = 'off'; if (S.route === 'workout') app.render({ keepScroll: true }); } }); }
+    catch { awake = 'off'; }
+  }
+  if (awake !== was && S.route === 'workout' && S.active) app.render({ keepScroll: true });
+}
+function awakeLine() {
+  if (W().past || awake == null) return '';
+  return awake === 'on' ? '<p class="awake"><i></i>Screen stays on during your workout</p>'
+    : '<p class="awake off"><i></i>Your phone may lock and miss the rest beep. <button data-action="awake-help">Fix this</button></p>';
 }
 document.addEventListener('visibilitychange', () => { if (S.route === 'workout' && S.active) keepAwake(); if (document.hidden && S.active) app.saveActive(true); });
 
@@ -209,6 +223,7 @@ function runner() {
     ${w.past && w.index === 0 ? `<div class="banner" style="margin-bottom:14px">${tile('today', 'blue')}<span><b>Logging ${esc(dayLabel(w.startedAt))}</b><small>Enter what you did that day. Suggestions use only your workouts before it.</small></span></div>` : ''}
     ${w.index === 0 || w.adapt?.applied === false ? adaptBanner(w) : ''}
     <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''} ${x.pair ? 'ss' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
+    ${awakeLine()}
     <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p>${partnerIndex(w, w.index) >= 0 ? `<p class="ss-tag">Superset with ${esc(w.exercises[partnerIndex(w, w.index)].name)}</p>` : ''}<h1>${esc(ex.name)}</h1></div>
       <button class="icon-circle" data-action="more" aria-label="More options">${icon('more')}</button></div>
     ${e.skipped ? `<section class="card setcard" style="text-align:center"><p class="t-head">Skipped</p><p class="t-sub" style="margin:4px 0 14px">This exercise won’t be counted.</p><button class="btn tinted" data-action="skip">Do It After All</button></section>` : `${coach(e)}${setArea(e)}`}
@@ -371,6 +386,13 @@ export const workout = {
     },
     'close-sheet'() { app.closeSheet(); },
     'pick-ex'() { pickerSheet(); },
+    'awake-help'() {
+      app.sheet(`<h2 class="sheet-title">Keep the screen on</h2><p class="sheet-sub">iPhone didn’t let the app keep the screen on, so it may lock during rests. A locked phone can’t play the rest beep.</p>
+        ${group(row({ title: '1. Open Settings', chevron: false }) + row({ title: '2. Display & Brightness → Auto-Lock', chevron: false }) + row({ title: '3. Choose 5 minutes or Never while you train', chevron: false }))}
+        <p class="fine">Also make sure your ringer isn’t silenced if you want to hear the beep. If you come back after a rest ended, the app tells you how long ago.</p>
+        <button class="btn filled" data-action="awake-retry">Try Again</button><button class="btn plain" data-action="close-sheet">Close</button>`);
+    },
+    async 'awake-retry'() { app.closeSheet(); wakeLock = null; awake = null; await keepAwake(); app.render({ keepScroll: true }); app.toast(awake === 'on' ? 'Screen will stay on' : 'Still blocked: set Auto-Lock as shown'); },
     'feels-off'() { app.closeSheet(); setTimeout(() => feedbackSheet(), 250); },
     'add-ex'(el) {
       const w = W(), at = w.exercises.length ? w.index + 1 : 0;

@@ -429,3 +429,11 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .rv-dot.padel { background: var(--teal, #30B0C7); }
 .rv-dot.other { background: var(--indigo, #5E5CE6); opacity: .6; }
 .rv-dot.missed { background: none; box-shadow: inset 0 0 0 2px var(--label-3); }
+
+/* Rest ended while away; screen-on status on the workout screen */
+.restbar .rest-time.late { font-size: 17px; color: var(--orange); }
+.awake { display: flex; align-items: center; gap: 6px; margin: -4px 0 12px; font-size: 13px; color: var(--label-2); }
+.awake i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.awake.off i { background: var(--orange); }
+.awake.off { color: var(--orange); }
+.awake button { color: inherit; text-decoration: underline; font-size: inherit; background: none; padding: 0; }
