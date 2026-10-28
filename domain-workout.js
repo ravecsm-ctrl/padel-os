@@ -61,6 +61,8 @@ export function workoutStats(w) {
 export function finalizeWorkout(w, { rpe, notes, pain, durationMin }, history) {
   const exercises = w.exercises
     .map(e => ({ exId: e.exId, name: e.name, fields: e.fields, perSide: e.perSide, target: e.target, skipped: e.skipped, swappedFrom: e.swappedFrom, note: e.note,
+      // What the app suggested, so the weekly review can check how often it was right.
+      suggested: e.suggestion ? { w: e.suggestion.w ?? null, target: e.suggestion.target ?? null, kind: e.suggestion.kind || null } : null,
       sets: e.sets.filter(s => s.done || s.w != null || s.reps != null || s.sec != null || s.m != null) }));
   const prs = [];
   for (const e of exercises) for (const p of detectPRs(e, history)) prs.push({ exId: e.exId, name: e.name, ...p });

@@ -19,6 +19,7 @@ export const S = {
   customRoutines: {}, // your own workouts
   startWeights: {},   // imported starting weights for library exercises
   body: [],           // body log: [{ date, kg, bf, waist (cm) }]
+  feedback: [],       // "something feels off" notes with what the app was showing
   supersets: {},      // routineId → [[exIdA, exIdB]] pairs you made
   painClear: {},      // area → when you said it feels fine again
   recoveryCal: {},    // per-muscle recovery speed learned from your feedback

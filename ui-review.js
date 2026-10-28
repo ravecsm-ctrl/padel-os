@@ -39,8 +39,12 @@ function view() {
       + row({ title: 'Volume lifted', value: `${vol ? `${vol.toLocaleString()} ${u}` : '—'}${vol && pvol ? delta(vol, pvol, v => v.toLocaleString()) : ''}` })
       + (r.bodyChange != null ? row({ title: 'Weight trend', value: `${r.bodyChange > 0 ? '+' : r.bodyChange < 0 ? '−' : '±'}${fmtNum(Math.abs(u === 'lb' ? Math.round(r.bodyChange * 22.046) / 10 : r.bodyChange))} ${u}` }) : '')
       + (r.routines ? row({ title: 'Stretching & mobility', value: `${r.routines}` }) : ''), { header: 'Compared with the week before', footer: 'Arrows compare with the previous week.' })}
+    ${r.accuracy || r.checkins ? group((r.accuracy ? row({ title: 'Suggested weights', sub: `${r.accuracy.matched} of ${r.accuracy.checked} lifts matched${r.accuracy.heavier ? ` · ${r.accuracy.heavier} heavier` : ''}${r.accuracy.lighter ? ` · ${r.accuracy.lighter} lighter` : ''}`, value: `${Math.round(r.accuracy.matched / r.accuracy.checked * 100)}%` }) : '')
+      + (r.checkins ? row({ title: 'Check-ins', sub: `Sleep ${fmtNum(r.checkins.sleep)} · energy ${fmtNum(r.checkins.energy)} · soreness ${fmtNum(r.checkins.soreness)} (out of 5)`, value: `${r.checkins.count}` }) : ''),
+      { header: 'How the app did', footer: 'Suggested weights count as matched within one weight step. Rate your sets so suggestions learn from how they felt.' }) : ''}
     ${r.prs.length ? group(r.prs.slice(0, 5).map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? 'New estimated max' : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? esc(fmtW(p.value, u)) : fmtNum(p.value), icon: 'trophy', color: 'orange', to: `history/ex/${p.exId}` })).join(''), { header: `Records · ${r.prs.length}`, footer: r.prs.length > 5 ? `And ${r.prs.length - 5} more this week.` : '' }) : ''}
-    ${group(r.focus.map((f, i) => row({ title: esc(f), icon: i === r.focus.length - 1 ? 'target' : 'chevR', color: i === r.focus.length - 1 ? 'indigo' : 'blue' })).join(''), { header: offset === 0 ? 'Focus for next week' : 'What would have helped' })}`;
+    ${group(r.focus.map((f, i) => row({ title: esc(f), icon: i === r.focus.length - 1 ? 'target' : 'chevR', color: i === r.focus.length - 1 ? 'indigo' : 'blue' })).join(''), { header: offset === 0 ? 'Focus for next week' : 'What would have helped' })}
+    <p style="text-align:center;margin:4px 0 8px"><button class="link" data-action="go" data-to="feedback">Feedback notes${S.feedback.length ? ` (${S.feedback.length})` : ''}</button></p>`;
 }
 
 export const review = {

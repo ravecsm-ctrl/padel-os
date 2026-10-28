@@ -25,6 +25,7 @@ export const settings = {
       ${group(row({ title: 'Your plan', sub: `${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week`, icon: 'sliders', color: 'blue', to: 'welcome' })
         + row({ title: 'Locations & equipment', sub: `Training at ${esc(app.location()?.name || '—')} · ${S.locations.length} location${S.locations.length === 1 ? '' : 's'}`, icon: 'target', color: 'teal', to: 'locations' })
         + row({ title: 'Exercise library', sub: 'Browse and import exercises', icon: 'dumbbell', color: 'gray', to: 'library' })
+        + row({ title: 'Feedback notes', sub: S.feedback.length ? `${S.feedback.length} note${S.feedback.length > 1 ? 's' : ''} · share to get the app tuned` : 'Things that felt off while training', icon: 'note', color: 'orange', to: 'feedback' })
         + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Training' })}
       ${group(row({ title: 'Start rest timer automatically', icon: 'clock', color: 'orange', right: sw('autoRest', S.settings.autoRest, 'Start rest timer automatically') })
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })

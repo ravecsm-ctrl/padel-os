@@ -19,6 +19,7 @@ import { recovery } from './ui-recovery.js';
 import { stats } from './ui-stats.js';
 import { body } from './ui-body.js';
 import { review } from './ui-review.js';
+import { feedback } from './ui-feedback.js';
 import { overview } from './ui-overview.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
@@ -35,6 +36,7 @@ app.register('recovery', recovery);
 app.register('stats', stats);
 app.register('body', body);
 app.register('review', review);
+app.register('feedback', feedback);
 app.register('overview', overview);
 app.register('locations', locations);
 
@@ -91,6 +93,7 @@ async function boot() {
     S.recoveryCal = meta.recoveryCal || {};
     S.painClear = meta.painClear || {};
     S.body = Array.isArray(meta.body) ? meta.body : [];
+    S.feedback = Array.isArray(meta.feedback) ? meta.feedback : [];
     S.supersets = meta.supersets || {};
     setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
     // Locations: first run (or upgrade) creates two editable examples from the old tier setting.

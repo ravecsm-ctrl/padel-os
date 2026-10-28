@@ -6,6 +6,7 @@ import { esc, icon, navBar, group, row, stat, tile } from './ui-kit.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { keepExercise, routineFromWorkout, setCustomRoutines, getRoutine } from './domain-program.js';
 import { prescriptionFor } from './domain-builder.js';
+import { feedbackSheet } from './ui-feedback.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
@@ -364,11 +365,13 @@ export const workout = {
             : nextFree() >= 0 ? row({ title: `Superset with ${esc(W().exercises[nextFree()].name)}`, sub: 'Alternate sets, rest after each pair', icon: 'bolt', color: 'orange', action: 'pair' }) : '')
           + row({ title: 'Replace exercise', sub: 'Busy equipment or something feels off', icon: 'swap', color: 'indigo', action: 'swap' })
           + row({ title: e.skipped ? 'Don’t skip' : 'Skip exercise', icon: 'skip', color: 'orange', action: 'skip' })
-          + row({ title: 'My notes', sub: note ? esc(note.slice(0, 40)) : 'Seat height, grip, reminders', icon: 'note', color: 'gray', action: 'notes' }))}
+          + row({ title: 'My notes', sub: note ? esc(note.slice(0, 40)) : 'Seat height, grip, reminders', icon: 'note', color: 'gray', action: 'notes' })
+          + row({ title: 'Something feels off', sub: 'Weight, recovery, anything: saved for tuning', icon: 'info', color: 'orange', action: 'feels-off' }))}
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
     },
     'close-sheet'() { app.closeSheet(); },
     'pick-ex'() { pickerSheet(); },
+    'feels-off'() { app.closeSheet(); setTimeout(() => feedbackSheet(), 250); },
     'add-ex'(el) {
       const w = W(), at = w.exercises.length ? w.index + 1 : 0;
       const i = addExercise(w, el.dataset.id, app.strength, unit(), at);
