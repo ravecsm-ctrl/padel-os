@@ -1,7 +1,7 @@
 // Exercise library (built-in + yours), grouped by category, plus CSV/text import.
 import { app, S } from './core-app.js';
 import { esc, icon, navBar, group, row, seg, chips } from './ui-kit.js';
-import { allExercises, getExercise, setCustomExercises, setStartWeights } from './domain-catalog.js';
+import { allExercises, getExercise, setCustomExercises, setStartWeights, applyExerciseEdits, isEdited } from './domain-catalog.js';
 import { setCustomRoutines } from './domain-program.js';
 import { MUSCLES, MOVEMENTS, CATEGORIES, EQUIPMENT, LEVELS, WEIGHT_TYPES, canDoWith, missingFor, equipLabel, norm } from './domain-taxonomy.js';
 import { rowsFrom, normalizeRow, matchExercise, buildCustomExercise, buildWorkouts, TEMPLATE_CSV, ALLOWED_VALUES, chatgptPrompt, libraryCSV } from './domain-importer.js';
@@ -28,38 +28,71 @@ const toggleChip = (attr, k, label, on) => `<button type="button" class="chip-bt
 function newExerciseView() {
   const f = S.form;
   const gear = { ...EQUIPMENT, ...S.customEquipment };
-  return `${navBar({ back: 'Cancel', backTo: 'library', title: 'New Exercise', right: '<button class="nav-btn right" data-action="nx-save">Save</button>' })}<div style="height:12px"></div>
+  const editing = !!f.editId;
+  return `${navBar({ back: 'Cancel', backTo: 'library', title: editing ? 'Edit Exercise' : 'New Exercise', right: '<button class="nav-btn right" data-action="nx-save">Save</button>' })}<div style="height:12px"></div>
     ${group(`<label class="row"><span class="row-main"><input class="input" id="nxName" value="${esc(f.name)}" placeholder="e.g. Bulgarian split squat jump" maxlength="60" style="padding:0;background:none;min-height:22px" aria-label="Exercise name"></span></label>`, { header: 'Name' })}
-    <label class="field-l">How do you log it? <small>(weight = weight and reps)</small></label>${seg('measure', MEASURES, f.measure)}
+    ${editing ? `<p class="fine" style="margin:-8px 0 12px">Logged as ${esc(f.loggedAs)}. That can’t change, so your history stays comparable.${f.builtIn ? ' Your edits sit on top of the original; you can reset them any time.' : ''}</p>`
+      : `<label class="field-l">How do you log it? <small>(weight = weight and reps)</small></label>${seg('measure', MEASURES, f.measure)}
     ${f.measure === 'wreps' ? `<label class="field-l">Weight is</label>${seg('weightType', [['total', 'Total'], ['per_hand', 'Per hand']], f.weightType)}` : ''}
     <div style="height:16px"></div>
-    ${group(row({ title: 'Each side separately', sub: 'For single-arm or single-leg work', right: `<input type="checkbox" class="switch" id="nxSide" ${f.perSide ? 'checked' : ''} aria-label="Each side separately">` }))}
+    ${group(row({ title: 'Each side separately', sub: 'For single-arm or single-leg work', right: `<input type="checkbox" class="switch" id="nxSide" ${f.perSide ? 'checked' : ''} aria-label="Each side separately">` }))}`}
     <label class="field-l">Main muscles <small>(pick 1–3)</small></label><div class="chipset">${Object.entries(MUSCLES).map(([k, v]) => toggleChip('nx-m', k, v, f.primary.includes(k))).join('')}</div>
+    <label class="field-l">Also works <small>(optional)</small></label><div class="chipset">${Object.entries(MUSCLES).filter(([k]) => !f.primary.includes(k)).map(([k, v]) => toggleChip('nx-s', k, v, f.secondary.includes(k))).join('')}</div>
     <label class="field-l">Type</label><div class="chipset">${Object.entries(CATEGORIES).map(([k, v]) => toggleChip('nx-c', k, v, f.category === k)).join('')}</div>
     <label class="field-l">Movement <small>(optional, helps pain flags and swaps)</small></label><div class="chipset">${Object.entries(MOVEMENTS).map(([k, v]) => toggleChip('nx-mv', k, v, f.movement === k)).join('')}</div>
     <label class="field-l">Equipment <small>(none = bodyweight)</small></label><div class="chipset">${Object.entries(gear).map(([k, v]) => toggleChip('nx-g', k, v, f.needs.includes(k))).join('')}</div>
     <label class="field-l" for="nxUrl">Video link <small>(optional)</small></label><input class="input" id="nxUrl" type="url" value="${esc(f.url)}" placeholder="https://…">
     <label class="field-l" for="nxCues">How to do it <small>(optional)</small></label><textarea class="input" id="nxCues" rows="2" placeholder="Cues you want to see during the set">${esc(f.cues)}</textarea>
-    <div style="height:20px"></div><button class="btn filled" data-action="nx-save">Save Exercise</button>`;
+    <div style="height:20px"></div><button class="btn filled" data-action="nx-save">${editing ? 'Save Changes' : 'Save Exercise'}</button>
+    ${editing && f.builtIn && isEdited(f.editId) ? `<button class="btn plain" data-action="ex-reset" data-id="${esc(f.editId)}" style="margin-top:8px">Reset to Original</button>` : ''}`;
 }
 function bindNewExercise() {
   const f = S.form, rer = () => app.render({ keepScroll: true });
   const bind = (id, key, ev = 'oninput') => { const el = document.querySelector(id); if (el) el[ev] = () => { f[key] = el.value; }; };
   bind('#nxName', 'name'); bind('#nxUrl', 'url'); bind('#nxCues', 'cues');
   const side = document.querySelector('#nxSide'); if (side) side.onchange = () => { f.perSide = side.checked; };
-  document.querySelectorAll('[data-nx-m]').forEach(b => b.onclick = () => { const k = b.dataset.nxM; f.primary = f.primary.includes(k) ? f.primary.filter(x => x !== k) : [...f.primary, k].slice(-3); rer(); });
+  document.querySelectorAll('[data-nx-m]').forEach(b => b.onclick = () => { const k = b.dataset.nxM; f.primary = f.primary.includes(k) ? f.primary.filter(x => x !== k) : [...f.primary, k].slice(-3); f.secondary = f.secondary.filter(x => !f.primary.includes(x)); rer(); });
+  document.querySelectorAll('[data-nx-s]').forEach(b => b.onclick = () => { const k = b.dataset.nxS; f.secondary = f.secondary.includes(k) ? f.secondary.filter(x => x !== k) : [...f.secondary, k]; rer(); });
   document.querySelectorAll('[data-nx-c]').forEach(b => b.onclick = () => { f.category = b.dataset.nxC; rer(); });
   document.querySelectorAll('[data-nx-mv]').forEach(b => b.onclick = () => { f.movement = f.movement === b.dataset.nxMv ? null : b.dataset.nxMv; rer(); });
   document.querySelectorAll('[data-nx-g]').forEach(b => b.onclick = () => { const k = b.dataset.nxG; f.needs = f.needs.includes(k) ? f.needs.filter(x => x !== k) : [...f.needs, k]; rer(); });
 }
+// Edit an existing exercise: library ones keep your changes separately (resettable),
+// your own exercises are updated directly.
+function startEdit(id) {
+  const e = getExercise(id);
+  if (!e) return;
+  const tf = e.fields[e.fields.length - 1];
+  S.form = { nx: true, editId: id, builtIn: !e.custom, name: e.name, primary: [...(e.primary || [])], secondary: [...(e.secondary || [])], category: e.category || 'lower-strength',
+    movement: e.movement || null, needs: [...(e.needs || [])].map(n => n.split('|')[0]), url: e.url || '', cues: e.execute || '',
+    loggedAs: `${e.fields.includes('w') ? 'weight × ' : ''}${tf === 'sec' ? 'time' : tf === 'm' ? 'distance' : 'reps'}${e.perSide ? ', each side' : ''}` };
+  app.closeSheet(); app.go('library/new');
+}
+async function saveEdit() {
+  const f = S.form, id = f.editId, e = getExercise(id), name = (f.name || '').trim();
+  if (!name) return app.toast('Give it a name');
+  if (!f.primary.length) return app.toast('Pick at least one main muscle');
+  const gear = { ...EQUIPMENT, ...S.customEquipment };
+  // Keep "a or b" alternatives you didn't touch; otherwise use what you ticked.
+  const keptAlt = (e.needs || []).filter(n => n.includes('|') && f.needs.includes(n.split('|')[0]));
+  const needs = [...keptAlt, ...f.needs.filter(n => !keptAlt.some(k => k.split('|')[0] === n))];
+  const ed = { name, primary: f.primary, secondary: f.secondary.filter(m => !f.primary.includes(m)), movement: f.movement || null, category: f.category, needs,
+    url: (f.url || '').trim() || null, execute: (f.cues || '').trim() || e.execute || '', muscles: f.primary.map(m => MUSCLES[m]).join(' · '),
+    equipment: needs.length ? needs.map(n => n.split('|').map(a => gear[a] || a).join(' or ')).join(' + ') : 'Bodyweight' };
+  if (f.builtIn) { S.exerciseEdits = { ...S.exerciseEdits, [id]: ed }; await app.save('exerciseEdits'); applyExerciseEdits(S.exerciseEdits); }
+  else { S.customExercises = { ...S.customExercises, [id]: { ...S.customExercises[id], ...ed } }; setCustomExercises(S.customExercises); await app.save('customExercises'); }
+  app.go('library'); app.toast(`“${esc(name)}” updated`);
+}
+
 async function saveNewExercise() {
+  if (S.form.editId) return saveEdit();
   const f = S.form, name = (f.name || '').trim();
   if (!name) { document.querySelector('#nxName')?.focus(); return app.toast('Give it a name'); }
   if (!f.primary.length) return app.toast('Pick at least one main muscle');
   const same = matchExercise(name);
   if (same && same.score >= 0.9 && !(await app.confirm(`“${esc(getExercise(same.id).name)}” is already in the library. Add yours anyway?`, { ok: 'Add Anyway' }))) return;
   const item = { name, unit: f.measure === 'time' ? 'seconds' : f.measure === 'dist' ? 'metres' : 'reps', weight: null, weightType: f.measure === 'wreps' ? f.weightType : 'bodyweight',
-    perSide: f.perSide, primary: f.primary, secondary: [], movement: f.movement || null, category: f.category, needs: f.needs, level: 'intermediate',
+    perSide: f.perSide, primary: f.primary, secondary: (f.secondary || []).filter(m => !f.primary.includes(m)), movement: f.movement || null, category: f.category, needs: f.needs, level: 'intermediate',
     cues: (f.cues || '').trim(), notes: '', url: (f.url || '').trim() || null, sets: null, min: null, max: null, rest: null };
   const ex = buildCustomExercise(item, { customEquipment: S.customEquipment });
   S.customExercises = { ...S.customExercises, [ex.id]: ex }; setCustomExercises(S.customExercises); await app.save('customExercises');
@@ -108,7 +141,9 @@ function exerciseSheet(id) {
     ${group(info.map(([k, v]) => row({ title: k, value: esc(v) })).join(''))}
     ${e.execute ? group(row({ title: esc(e.execute) }), { header: 'How to do it' }) : ''}
     <div class="btns">${e.url ? `<a class="btn tinted" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch Video</a>` : `<a class="btn tinted" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.name + ' exercise form')}" target="_blank" rel="noopener noreferrer">${icon('play')}Find a Video</a>`}
-    ${e.custom ? `<button class="btn destructive" data-action="delete-custom" data-id="${esc(e.id)}">Delete Exercise</button>` : ''}</div>`);
+    <button class="btn gray" data-action="ex-edit" data-id="${esc(e.id)}">Edit Exercise</button>
+    ${e.custom ? `<button class="btn destructive" data-action="delete-custom" data-id="${esc(e.id)}">Delete Exercise</button>` : ''}</div>
+    ${isEdited(e.id) ? '<p class="fine" style="text-align:center">You edited this exercise. Edit it to reset to the original.</p>' : ''}`);
 }
 
 // ── Import page
@@ -253,7 +288,13 @@ export const library = {
   },
   onPick(name, value) { if (name === 'lib-filter') { showAll = value === 'all'; app.render({ keepScroll: true }); } if (name === 'measure') app.render({ keepScroll: true }); },
   actions: {
-    'nx-start'() { S.form = { nx: true, name: '', measure: 'wreps', weightType: 'total', perSide: false, primary: [], category: 'lower-strength', movement: null, needs: [], url: '', cues: '' }; app.go('library/new'); },
+    'nx-start'() { S.form = { nx: true, name: '', measure: 'wreps', weightType: 'total', perSide: false, primary: [], secondary: [], category: 'lower-strength', movement: null, needs: [], url: '', cues: '' }; app.go('library/new'); },
+    'ex-edit'(el) { startEdit(el.dataset.id); },
+    async 'ex-reset'(el) {
+      if (!(await app.confirm('Reset this exercise to the original?', { ok: 'Reset' }))) return;
+      const next = { ...S.exerciseEdits }; delete next[el.dataset.id]; S.exerciseEdits = next; await app.save('exerciseEdits'); applyExerciseEdits(S.exerciseEdits);
+      app.go('library'); app.toast('Back to the original');
+    },
     'nx-save'() { saveNewExercise(); },
     async 'lib-export'() { await saveFile(`padel-os-exercise-library-${isoDate()}.csv`, libraryCSV(allExercises(), { customEquipment: S.customEquipment }), 'text/csv'); },
     'lib-toggle'() { showAll = !showAll; app.render({ keepScroll: true }); },

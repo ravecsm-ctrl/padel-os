@@ -238,6 +238,25 @@ export function registerPack(list) {
   for (const e of list) if (!CATALOG[e.id] && !BY_NAME[norm(e.name)]) { LIST.push(e); CATALOG[e.id] = e; BY_NAME[norm(e.name)] = e.id; n++; }
   return n;
 }
+// Your edits to library exercises (name, muscles, movement, type, equipment, video, how-to),
+// layered on top of the original so they can be reset. How an exercise is logged never
+// changes, so history stays consistent. Your own exercises are edited directly instead.
+export const EDITABLE = ['name', 'primary', 'secondary', 'movement', 'category', 'needs', 'url', 'execute', 'muscles', 'equipment'];
+const ORIG = {};
+let EDITS = {};
+export function applyExerciseEdits(map = {}) {
+  for (const [id, o] of Object.entries(ORIG)) { const e = CATALOG[id]; if (!e) continue; delete BY_NAME[norm(e.name)]; Object.assign(e, o); BY_NAME[norm(e.name)] = id; delete ORIG[id]; }
+  EDITS = map || {};
+  for (const [id, ed] of Object.entries(EDITS)) {
+    const e = CATALOG[id];
+    if (!e) continue;
+    ORIG[id] = Object.fromEntries(EDITABLE.map(k => [k, e[k]]));
+    delete BY_NAME[norm(e.name)];
+    for (const k of EDITABLE) if (k in ed) e[k] = ed[k];
+    BY_NAME[norm(e.name)] = id;
+  }
+}
+export const isEdited = id => !!EDITS[id];
 export function setCustomExercises(map) { for (const k of Object.keys(CUSTOM)) delete CUSTOM[k]; Object.assign(CUSTOM, map || {}); }
 export const customExercises = () => Object.values(CUSTOM);
 // Starting weights from an import, for library exercises you haven't logged yet.

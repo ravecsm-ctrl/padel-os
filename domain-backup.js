@@ -61,8 +61,8 @@ export function toCSV(sessions) {
 
 // Which saved settings and data a restore brings back. "replace" takes the backup as is;
 // "merge" keeps this device's preferences and adds what the backup has on top.
-export const RESTORE_KEYS = ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'recoveryCal', 'body', 'supersets', 'painClear', 'feedback'];
-const ADDITIVE = ['exNotes', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'supersets'];
+export const RESTORE_KEYS = ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'recoveryCal', 'body', 'supersets', 'painClear', 'feedback', 'exerciseEdits'];
+const ADDITIVE = ['exNotes', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'supersets', 'exerciseEdits'];
 export function restoreMeta(current, incoming, mode = 'replace', defaults = {}) {
   const out = {};
   for (const k of RESTORE_KEYS) {

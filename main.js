@@ -10,7 +10,7 @@ import { settings } from './ui-settings.js';
 import { court } from './ui-court.js';
 import { welcome } from './ui-welcome.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
-import { setCustomExercises, setStartWeights } from './domain-catalog.js';
+import { setCustomExercises, setStartWeights, applyExerciseEdits } from './domain-catalog.js';
 import { setCustomRoutines } from './domain-program.js';
 import { PRESET_GEAR } from './domain-taxonomy.js';
 import { library } from './ui-library.js';
@@ -99,6 +99,7 @@ async function boot() {
     S.feedback = Array.isArray(meta.feedback) ? meta.feedback : [];
     S.supersets = meta.supersets || {};
     setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
+    S.exerciseEdits = meta.exerciseEdits || {}; applyExerciseEdits(S.exerciseEdits);
     // Locations: first run (or upgrade) creates two editable examples from the old tier setting.
     if (Array.isArray(meta.locations) && meta.locations.length) { S.locations = meta.locations; S.activeLocation = meta.activeLocation || meta.locations[0].id; }
     else {
