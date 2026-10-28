@@ -16,6 +16,7 @@ import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
 import { recentPain, painHits, gentlerFor, areaName } from './domain-pain.js';
 import { AREAS } from './domain-personalize.js';
+import { barFor, barWeight, platesPerSide, warmupSets, BARS } from './domain-plates.js';
 
 const W = () => S.active;
 const cur = () => W().exercises[W().index];
@@ -83,9 +84,31 @@ function coach(e) {
   const tip = e.adjusted ? '' : sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
     ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
-    ${baseline(e, last)}
+    ${baseline(e, last)}${warmupLine(e)}
     <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${why ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p>
     ${missingHere(ex)}${painNote(e)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+}
+
+// ── Warm-ups and plates
+const barKind = e => barFor(getExercise(e.exId));
+const barD = kind => barWeight(kind, unit(), S.settings.bars);
+function plateText(e, wKg) {
+  const kind = barKind(e);
+  if (!kind || wKg == null) return '';
+  const total = toDisplay(wKg, unit()), bar = barD(kind), { plates, left, under } = platesPerSide(total, bar, unit());
+  if (under) return `Lighter than the ${fmtNum(bar)} ${unit()} bar`;
+  if (!plates.length) return `Just the bar (${fmtNum(bar)} ${unit()})`;
+  return `Per side: ${plates.map(fmtNum).join(' + ')}${left ? ` (+${fmtNum(left)} ${unit()} can’t be made)` : ''} · ${fmtNum(bar)} ${unit()} bar`;
+}
+// Ramp-up sets for the first strength lift of each movement, before any working set.
+function warmupLine(e) {
+  const ex = getExercise(e.exId), w = W(), i = w.exercises.indexOf(e);
+  if (!e.fields.includes('w') || ex.quality || !['lower-strength', 'upper-strength'].includes(ex.category) || e.sets.some(s => s.done)) return '';
+  if (w.exercises.slice(0, i).some(x => !x.skipped && getExercise(x.exId).movement === ex.movement && x.sets.some(s => s.done))) return '';
+  const work = e.sets[0].w ?? e.suggestion.w, kind = barKind(e);
+  const sets = warmupSets(work, { inc: ex.inc, unit: unit(), barKg: kind ? fromDisplay(barD(kind), unit()) : 0, perHand: ex.weightType === 'per_hand' });
+  if (!sets.length) return '';
+  return `<div class="warmup"><small>Warm up first · not logged</small><span>${sets.map(s => `${s.bar ? 'Bar' : `${fmtNum(toDisplay(s.w, unit()))}`} × ${s.reps}`).join(' · ')}${sets.some(s => !s.bar) ? ` <i>${unit()}</i>` : ''}</span></div>`;
 }
 
 // Pain-aware: when this exercise loads an area that hurt recently, say so and offer a gentler
@@ -136,6 +159,7 @@ function setArea(e) {
     : `<section class="card setcard">${feel}<div class="setcard-h"><b>Set ${next + 1} of ${e.sets.length}</b><span class="t-foot">${restLabel(e.target.rest)} rest after</span></div>
         ${lastSet ? `<p class="t-foot bl-set">Last time, set ${next + 1}: ${esc(fmtSet(lastSet, e.fields))}</p>` : ''}
         <div class="steppers">${e.fields.map(f => stepper(e, next, f)).join('')}</div>
+        ${barKind(e) ? `<button class="plates" data-action="plates" id="platesLine">${esc(plateText(e, e.sets[next].w ?? defaultVal(e, next, 'w')))}</button>` : ''}
         <button class="btn filled" data-action="set-done" data-set="${next}">${icon('check')}Done</button></section>`;
   return `${card}${doneRows ? `<div class="done-list">${group(doneRows, { footer: 'Tap a set to change it.' })}</div>` : ''}`;
 }
@@ -180,6 +204,20 @@ function finishView() {
     <div class="btns"><button class="btn filled" data-action="save-workout">Save Workout</button><button class="btn destructive" data-action="discard">Discard Workout</button></div>`;
 }
 
+// Plate breakdown for the current set, plus which bar you're using (trap bars vary).
+function platesSheet() {
+  const e = cur(), kind = barKind(e), i = Math.max(0, e.sets.findIndex(s => !s.done)), wKg = e.sets[i]?.w ?? defaultVal(e, i, 'w');
+  const u = unit(), bar = barD(kind), total = toDisplay(wKg, u), { plates, left } = platesPerSide(total, bar, u);
+  const opts = { barbell: { kg: [15, 20], lb: [35, 45] }, trap_bar: { kg: [20, 25, 27, 30], lb: [45, 55, 60, 65] } }[kind][u];
+  app.sheet(`<h2 class="sheet-title">${total != null ? `${fmtNum(total)} ${u}` : 'Choose a weight first'}</h2><p class="sheet-sub">${kind === 'trap_bar' ? 'Trap bar' : 'Barbell'} of ${fmtNum(bar)} ${u}, plus on each side:</p>
+    <div class="plate-row">${plates.length ? plates.map(p => `<span class="plate" style="--h:${Math.round(44 + 56 * p / PL_MAX[u])}px">${fmtNum(p)}</span>`).join('') : `<span class="t-sub">No plates</span>`}</div>
+    ${left ? `<p class="fine">That’s ${fmtNum(left)} ${u} per side short: the nearest you can load with standard plates.</p>` : ''}
+    <label class="field-l">Your ${kind === 'trap_bar' ? 'trap bar' : 'bar'} weighs</label>
+    <div class="chipset">${opts.map(w => `<button type="button" class="chip-btn ${w === bar ? 'on' : ''}" data-action="set-bar" data-kind="${kind}" data-w="${w}">${w} ${u}</button>`).join('')}</div>
+    <div style="height:20px"></div><button class="btn gray" data-action="close-sheet">Done</button>`);
+}
+const PL_MAX = { kg: 25, lb: 45 };
+
 function howSheet(ex) {
   app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${esc(ex.muscles)} · ${esc(ex.equipment)}</p>
     ${group([['Why it helps', ex.why], ['Get set up', ex.setup], ['Do it', ex.execute], ['Breathing', ex.breathe], ['Avoid', ex.avoid]].map(([t, d]) => row({ title: t, sub: esc(d) })).join(''))}
@@ -206,6 +244,7 @@ export const workout = {
     const s = cur().sets[+el.dataset.set], f = el.dataset.field;
     const raw = el.value === '' ? null : Number(String(el.value).replace(',', '.'));
     s[f] = f === 'w' ? fromDisplay(raw, unit()) : raw;
+    if (f === 'w') { const pl = document.querySelector('#platesLine'); if (pl) pl.textContent = plateText(cur(), s.w ?? defaultVal(cur(), +el.dataset.set, 'w')); }
     app.saveActive();
   },
   onPick(name, value) {
@@ -285,6 +324,12 @@ export const workout = {
         ${other.length ? group(other.map(item).join(''), { header: 'Needs other equipment' }) : ''}
         ${ids.length ? '' : '<p class="t-sub">No alternatives for this one.</p>'}
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
+    },
+    plates() { platesSheet(); },
+    async 'set-bar'(el) {
+      const kind = el.dataset.kind, u = unit();
+      S.settings.bars = { ...S.settings.bars, [u]: { ...(S.settings.bars?.[u] || {}), [kind]: +el.dataset.w } };
+      await app.save('settings'); platesSheet(); app.render({ keepScroll: true });
     },
     'pain-swap'(el) {
       const from = cur().name;

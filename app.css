@@ -406,3 +406,12 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .pain-note b { font-weight: 600; }
 .pain-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
 .pain-acts .btn { width: auto; min-height: 34px; padding: 0 14px; font-size: 15px; }
+
+/* Warm-up ramp and plates */
+.warmup { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; margin: 0 0 8px; border-left: 3px solid var(--blue); background: var(--fill); border-radius: 0 10px 10px 0; }
+.warmup small { font-size: 12px; color: var(--label-2); }
+.warmup span { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+.warmup i { font-style: normal; font-weight: 400; color: var(--label-2); }
+.plates { display: block; width: 100%; margin: -2px 0 12px; font-size: 14px; color: var(--blue); text-align: center; font-variant-numeric: tabular-nums; background: none; }
+.plate-row { display: flex; align-items: center; gap: 6px; min-height: 104px; flex-wrap: wrap; margin: 4px 0 8px; }
+.plate { display: grid; place-items: center; width: 34px; height: var(--h); border-radius: 6px; background: var(--label); color: var(--bg, #fff); font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
