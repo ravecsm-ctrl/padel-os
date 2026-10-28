@@ -4,7 +4,7 @@ import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } 
 import { readinessScore, isRoutine, allRoutineIds } from './domain-program.js';
 import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, startForWeek } from './domain-calendar.js';
 import { weeklySeries, loadTrend, trainingDays } from './domain-analytics.js';
-import { createWorkout, createActivity, workoutStats, applySupersets } from './domain-workout.js';
+import { createWorkout, createActivity, workoutStats, applySupersets, createQuickWorkout } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { prehabFor, PADEL_TYPES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
@@ -100,6 +100,7 @@ export const today = {
       <div style="height:28px"></div>${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
         return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
+        + row({ title: 'Quick workout', sub: 'No plan: add exercises as you go', icon: 'bolt', color: 'indigo', action: 'quick-start' })
         + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
         + row({ title: 'Warm up before playing', sub: `${routineMinutes(COURT_ROUTINES.warmup)} min, guided`, icon: 'flame', color: 'orange', to: 'court/warmup' }),
         { header: 'More', big: true })}`;
@@ -107,6 +108,11 @@ export const today = {
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     'quick-backup'() { saveBackup(); },
+    async 'quick-start'() {
+      if (S.active) return app.go('workout');
+      S.active = createQuickWorkout({ week: app.position().week });
+      await app.saveActive(true); app.go('workout');
+    },
     async 'cycle-restart'() { S.settings.programStart = startForWeek(1, S.settings.programStart); await app.save('settings'); app.render({ keepScroll: true }); app.toast('Plan restarted at week 1'); },
     async 'cycle-keep'(el) { S.settings.breakAck = +el.dataset.ts; await app.save('settings'); app.render({ keepScroll: true }); },
     start(el) { startFlow(el.dataset.routine); },
@@ -177,11 +183,13 @@ export function pastWorkoutSheet(iso) {
   const d = parseISO(iso), planned = S.schedule[DAYS[(d.getDay() + 6) % 7]];
   const ids = [...new Set([...(isRoutine(planned) ? [planned] : []), ...allRoutineIds()])];
   app.sheet(`<h2 class="sheet-title">Which workout?</h2><p class="sheet-sub">${esc(d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}. You’ll fill in your sets next.</p>
-    ${group(ids.map(id => { const r = app.routine(id), look = routineLook(id); return row({ title: esc(r.title), sub: `${r.blocks.length} exercises${id === planned ? ' · planned that day' : ''}`, icon: look.icon, color: look.color, action: 'past-start', data: { id, iso } }); }).join(''))}
+    ${group(ids.map(id => { const r = app.routine(id), look = routineLook(id); return row({ title: esc(r.title), sub: `${r.blocks.length} exercises${id === planned ? ' · planned that day' : ''}`, icon: look.icon, color: look.color, action: 'past-start', data: { id, iso } }); }).join('')
+      + row({ title: 'Something else', sub: 'Pick the exercises you did', icon: 'bolt', color: 'indigo', action: 'past-start', data: { id: '', iso } }))}
     <button class="btn gray" data-action="close-sheet">Cancel</button>`);
 }
 export async function startPast(routineId, iso) {
   const d = parseISO(iso); d.setHours(18, 0, 0, 0);
+  if (!routineId) { S.active = createQuickWorkout({ week: app.position().week, startedAt: d.getTime() }); app.closeSheet(); await app.saveActive(true); return app.go('workout'); }
   const w = createWorkout({ routineId, week: app.position().week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, startedAt: d.getTime(), profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
   applySupersets(w, S.supersets[routineId]);
   S.active = w; app.closeSheet();

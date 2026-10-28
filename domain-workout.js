@@ -2,6 +2,7 @@
 import { getExercise, targetField } from './domain-catalog.js';
 import { resolveRoutine, prescribe } from './domain-program.js';
 import { suggest, detectPRs, doneSets } from './domain-progression.js';
+import { prescriptionFor } from './domain-builder.js';
 
 const uid = () => (globalThis.crypto?.randomUUID?.() || `s-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
@@ -99,4 +100,23 @@ export function applySupersets(w, pairs = []) {
     if (i >= 0 && j >= 0 && !w.exercises[i].pair && !w.exercises[j].pair) pairExercises(w, i, j);
   }
   return w;
+}
+
+// ── Quick workouts and adding exercises on the fly.
+// A quick workout has no plan: you add exercises as you go (or log a past one the same way).
+export function createQuickWorkout({ week = 1, startedAt = null, title = 'Quick workout' } = {}) {
+  const past = startedAt != null;
+  return { id: uid(), kind: 'strength', routineId: null, quick: true, title, week, startedAt: past ? startedAt : Date.now(), index: 0, past, minutes: 45, readiness: null, light: false, exercises: [] };
+}
+
+// Insert an exercise with sensible sets and reps for it (the program builder's defaults) and a
+// weight suggestion from your history before this workout. Returns its index.
+export function addExercise(w, exId, history, unit = 'kg', at = w.exercises.length) {
+  const ex = getExercise(exId);
+  if (!ex) return -1;
+  const before = w.past ? history.filter(s => s.startedAt < w.startedAt) : history;
+  const entry = buildEntry({ ex: exId, ...prescriptionFor(ex) }, w.week, before, unit, false, w.startedAt);
+  entry.added = true;
+  w.exercises.splice(Math.max(0, Math.min(at, w.exercises.length)), 0, entry);
+  return w.exercises.indexOf(entry);
 }

@@ -8,9 +8,9 @@ import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-unit
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
-import { autofill, swapExercise, workoutStats, finalizeWorkout, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
+import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
-import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
+import { canDoWith, missingFor, equipLabel, CATEGORIES } from './domain-taxonomy.js';
 import { bodyMap } from './ui-bodymap.js';
 import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
@@ -159,7 +159,8 @@ function setArea(e) {
   const card = next < 0
     ? `<section class="card all-done"><div class="big-tick">${icon('check')}</div><p class="t-title2">All sets done</p><p class="t-sub" style="margin:4px 0 16px">${lastDone >= 0 && e.sets[lastDone].rpe == null ? 'How did the last set feel?' : 'Great work.'}</p>
         ${lastDone >= 0 && e.sets[lastDone].rpe == null ? `<div style="margin-bottom:16px">${setEffortSeg('set-rpe', '')}</div>` : ''}
-        <button class="btn filled" data-action="${isLast ? 'to-finish' : 'next'}">${isLast ? 'Finish Workout' : 'Next Exercise'}</button></section>`
+        <button class="btn filled" data-action="${isLast ? 'to-finish' : 'next'}">${isLast ? 'Finish Workout' : 'Next Exercise'}</button>
+        ${isLast ? `<button class="btn gray" data-action="pick-ex" style="margin-top:10px">${icon('plus')}Add Another Exercise</button>` : ''}</section>`
     : `<section class="card setcard">${feel}<div class="setcard-h"><b>Set ${next + 1} of ${e.sets.length}</b><span class="t-foot">${partnerIndex(w, w.index) >= 0 ? 'Rest after the pair' : `${restLabel(e.target.rest)} rest after`}</span></div>
         ${lastSet ? `<p class="t-foot bl-set">Last time, set ${next + 1}: ${esc(fmtSet(lastSet, e.fields))}</p>` : ''}
         <div class="steppers">${e.fields.map(f => stepper(e, next, f)).join('')}</div>
@@ -168,7 +169,36 @@ function setArea(e) {
   return `${card}${doneRows ? `<div class="done-list">${group(doneRows, { footer: 'Tap a set to change it.' })}</div>` : ''}`;
 }
 
+// ── Exercise picker: search, what you can do here first (by category), the rest after.
+function pickList(q) {
+  const owned = app.owned(), used = new Set(W().exercises.map(e => e.exId)), norm = s => (s || '').toLowerCase();
+  const list = allExercises().filter(x => !q || norm(`${x.name} ${x.muscles} ${x.equipment}`).includes(norm(q.trim())));
+  if (!list.length) return `<p class="t-sub" style="text-align:center;margin:20px 0">No exercises match “${esc(q)}”.</p>`;
+  const item = x => row({ title: `${esc(x.name)}${used.has(x.id) ? ' <span class="t-foot">· in this workout</span>' : ''}`, sub: esc(x.muscles || CATEGORIES[x.category] || ''), action: 'add-ex', data: { id: x.id }, chevron: false, right: `<span class="blue">${icon('plus')}</span>` });
+  const here = list.filter(x => canDoWith(x.needs || [], owned)), other = list.filter(x => !here.includes(x));
+  const byCat = xs => Object.keys(CATEGORIES).map(c => [c, xs.filter(x => x.category === c)]).filter(([, xs2]) => xs2.length);
+  const groups = q ? group(here.map(item).join('')) : byCat(here).map(([c, xs]) => group(xs.map(item).join(''), { header: CATEGORIES[c] })).join('');
+  return `${groups}${other.length ? group(other.map(item).join(''), { header: `Needs other equipment${app.location() ? ` than ${esc(app.location().name)}` : ''}` }) : ''}`;
+}
+function pickerSheet() {
+  app.sheet(`<h2 class="sheet-title">Add an exercise</h2><p class="sheet-sub">Sets, reps and weight are suggested for you.</p>
+    <input class="input" id="pickQ" type="search" placeholder="Search, e.g. row, calf, dumbbell" autocomplete="off" style="margin-bottom:16px">
+    <div id="pickList">${pickList('')}</div>`, body => {
+    const q = body.querySelector('#pickQ'), out = body.querySelector('#pickList');
+    q.oninput = () => { out.innerHTML = pickList(q.value); };
+  });
+}
+
+function emptyRunner() {
+  const w = W();
+  return `${navBar({ back: 'Back', backAction: 'leave', title: w.title, sub: w.past ? `Past workout · ${esc(dayLabel(w.startedAt))}` : `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="discard">Cancel</button>' })}
+    <section class="card" style="text-align:center;padding:32px 20px;margin-top:24px">${tile('plus', 'blue')}<p class="t-title2" style="margin-top:12px">${w.past ? `Logging ${esc(dayLabel(w.startedAt))}` : 'Quick workout'}</p>
+      <p class="t-sub" style="margin:6px 0 20px">Add exercises one at a time. Each gets suggested sets, reps and a weight from your history.</p>
+      <button class="btn filled" data-action="pick-ex">${icon('plus')}Add Exercise</button></section>`;
+}
+
 function runner() {
+  if (!W().exercises.length) return emptyRunner();
   const w = W(), e = cur(), ex = getExercise(e.exId), n = w.exercises.length, isLast = w.index === n - 1;
   const nextName = isLast ? '' : getExercise(w.exercises[w.index + 1].exId).name;
   const ready = entryState(e) === 'done' || e.skipped;
@@ -309,7 +339,7 @@ export const workout = {
     more() {
       const e = cur(), note = S.exNotes[e.exId] || '';
       app.sheet(`<h2 class="sheet-title">${esc(getExercise(e.exId).name)}</h2><div style="height:12px"></div>
-        ${group(row({ title: 'Add a set', icon: 'plus', action: 'add-set' }) + row({ title: 'Remove a set', icon: 'minus', color: 'gray', action: 'remove-set' })
+        ${group(row({ title: 'Add an exercise', sub: 'Inserted after this one', icon: 'dumbbell', color: 'blue', action: 'pick-ex' }) + row({ title: 'Add a set', icon: 'plus', action: 'add-set' }) + row({ title: 'Remove a set', icon: 'minus', color: 'gray', action: 'remove-set' })
           + (partnerIndex(W(), W().index) >= 0 ? row({ title: 'Unpair superset', sub: `Do ${esc(W().exercises[partnerIndex(W(), W().index)].name)} on its own`, icon: 'swap', color: 'gray', action: 'unpair' })
             : nextFree() >= 0 ? row({ title: `Superset with ${esc(W().exercises[nextFree()].name)}`, sub: 'Alternate sets, rest after each pair', icon: 'bolt', color: 'orange', action: 'pair' }) : '')
           + row({ title: 'Replace exercise', sub: 'Busy equipment or something feels off', icon: 'swap', color: 'indigo', action: 'swap' })
@@ -318,6 +348,13 @@ export const workout = {
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
     },
     'close-sheet'() { app.closeSheet(); },
+    'pick-ex'() { pickerSheet(); },
+    'add-ex'(el) {
+      const w = W(), at = w.exercises.length ? w.index + 1 : 0;
+      const i = addExercise(w, el.dataset.id, app.strength, unit(), at);
+      if (i < 0) return;
+      w.index = i; app.closeSheet(); touch(false); app.toast(`${esc(w.exercises[i].name)} added`);
+    },
     async pair() { const w = W(), j = nextFree(); pairExercises(w, w.index, j); await rememberPairs(); app.closeSheet(); touch(); app.toast(`Paired with ${esc(w.exercises[j].name)}. Remembered for next time.`); },
     async unpair() { unpairExercise(W(), W().index); await rememberPairs(); app.closeSheet(); touch(); app.toast('Superset removed'); },
     notes() {
@@ -379,6 +416,7 @@ export const workout = {
       S.active = null; await app.saveActive(true); timer.stop(); app.go('overview');
     },
     async 'save-workout'() {
+      if (!workoutStats(W()).sets) return app.toast('Log at least one set, or discard the workout');
       const pain = S.form.pain === 'yes' ? { flag: true, areas: S.form.painAreas || [], location: S.form.painLoc || '' } : { flag: false, areas: [], location: '' };
       if (W().past && S.form.date && S.form.date <= isoDate()) { const d = parseISO(S.form.date); d.setHours(new Date(W().startedAt).getHours(), new Date(W().startedAt).getMinutes()); W().startedAt = d.getTime(); }
       const session = finalizeWorkout(W(), { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, before());
