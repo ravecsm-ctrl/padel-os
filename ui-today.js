@@ -18,7 +18,8 @@ import { MUSCLES } from './domain-taxonomy.js';
 import { saveBackup } from './ui-backup.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
-import { recentPain, painHits, areaName } from './domain-pain.js';
+import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
+import { applyPainHolds } from './ui-workout.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -53,6 +54,15 @@ export function banners({ resumeOnly = false } = {}) {
 
 // After you log soreness or pain: say what the app will do about it, so you know it listened.
 // Workout pain counts straight away; padel soreness once it comes back (see recentPain).
+// How long a new session probably lasted: same as your last one of that kind. Tournament
+// matches are shorter, so on tournament day it's 45 min unless you've already logged one there.
+function defaultMinutes(kind, iso) {
+  const last = S.sessions.filter(s => s.kind === 'activity' && s.activity === kind).sort((a, b) => b.startedAt - a.startedAt);
+  const t = S.settings.tournament;
+  if (kind === 'padel' && t?.date === iso) return last.find(s => isoDate(new Date(s.startedAt)) === iso)?.durationMin || 45;
+  return last[0]?.durationMin || (kind === 'padel' ? 90 : 45);
+}
+
 export function soreNote(areas) {
   if (!areas?.length) return '';
   const pain = recentPain(S.sessions, { cleared: S.painClear }), names = l => l.map(a => areaName(a).toLowerCase()).join(' and ');
@@ -64,7 +74,7 @@ export function soreNote(areas) {
 // One line on the workout card when today's plan should go easier: pain first, then recovery.
 function recoveringHint(routineId) {
   const r = app.routine(routineId);
-  const pain = recentPain(S.sessions, { cleared: S.painClear }), hurt = [...new Set(r.blocks.flatMap(b => painHits(b.ex, pain)))];
+  const pain = painWithProfile(S.sessions, S.profile, { cleared: S.painClear }), hurt = [...new Set(r.blocks.flatMap(b => painHits(b.ex, pain)))];
   if (hurt.length) return `Gentler options ready for your ${hurt.slice(0, 2).map(a => areaName(a).toLowerCase()).join(' and ')}`;
   if (S.settings.adaptive === false) return '';
   const rec = currentRecovery();
@@ -226,6 +236,7 @@ async function begin(routineId, readiness, light, sore = [], asked = []) {
       deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit });
   }
   applySupersets(w, S.supersets[routineId]);
+  applyPainHolds(w);
   S.active = w;
   await app.saveActive(true);
   db.requestPersistence();
@@ -257,7 +268,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
     ptype: pd.type || 'match', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
-    : { activity: kind, duration: 90, rpe: 7, date: date || isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: '', side: '', sore: [] };
+    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: '', side: '', sore: [] };
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);

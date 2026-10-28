@@ -3,13 +3,18 @@ import { app, S } from './core-app.js';
 import { esc, icon, navBar, group, row } from './ui-kit.js';
 import { pentagon, xpEvents, levelFor, achievements } from './domain-stats.js';
 import { isRoutine } from './domain-program.js';
+import { getExercise } from './domain-catalog.js';
 import { relDay } from './domain-calendar.js';
 
 const DAY = 86400000;
 const planned = () => Math.max(1, Object.values(S.schedule).filter(isRoutine).length);
+// Power needs jumps and throws. If none of your scheduled workouts has any and you haven't
+// done any, the score isn't a judgement: it's just not part of your plan (shown as "—").
+const powerInPlan = () => Object.values(S.schedule).filter(isRoutine).some(id => app.routine(id)?.blocks.some(b => getExercise(b.ex)?.category === 'power'));
+const markPlan = axes => axes.map(a => a.key === 'power' && a.score === 0 && !powerInPlan() ? { ...a, notInPlan: true } : a);
 export const currentStats = () => {
   const now = Date.now();
-  return { axes: pentagon(S.sessions, { plannedPerWeek: planned(), now }), before: pentagon(S.sessions, { plannedPerWeek: planned(), now: now - 28 * DAY }), level: levelFor(xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) }).reduce((n, e) => n + e.xp, 0)) };
+  return { axes: markPlan(pentagon(S.sessions, { plannedPerWeek: planned(), now })), before: pentagon(S.sessions, { plannedPerWeek: planned(), now: now - 28 * DAY }), level: levelFor(xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) }).reduce((n, e) => n + e.xp, 0)) };
 };
 
 // Original radar chart: five axes, rings at 25/50/75/100, now vs 4 weeks ago.
@@ -23,7 +28,7 @@ export function radar(axes, before = null, { size = 300, labels = true } = {}) {
   const cur = `<polygon points="${poly(axes.map(a => Math.max(3, a.score)))}" class="rd-cur"/>` + axes.map((a, i) => { const [x, y] = pt(i, Math.max(3, a.score)); return `<circle cx="${x}" cy="${y}" r="3.5" class="rd-dot"/>`; }).join('');
   const lab = labels ? axes.map((a, i) => {
     const [x, y] = pt(i, 128), anchor = Math.abs(x - cx) < 8 ? 'middle' : x > cx ? 'start' : 'end';
-    return `<text x="${x}" y="${y - 4}" text-anchor="${anchor}" class="rd-label">${esc(a.label)}</text><text x="${x}" y="${y + 12}" text-anchor="${anchor}" class="rd-score">${a.score}</text>`;
+    return `<text x="${x}" y="${y - 4}" text-anchor="${anchor}" class="rd-label">${esc(a.label)}</text><text x="${x}" y="${y + 12}" text-anchor="${anchor}" class="rd-score">${a.notInPlan ? '—' : a.score}</text>`;
   }).join('') : '';
   return `<svg class="radar" viewBox="-62 -12 424 334" width="${size}" role="img" aria-label="Progress pentagon: ${esc(axes.map(a => `${a.label} ${a.score}`).join(', '))}">${rings}${spokes}${prev}${cur}${lab}</svg>`;
 }
@@ -58,7 +63,7 @@ export const stats = {
       <div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>
         <div class="bm-legend"><span><i style="width:14px;height:3px;background:var(--blue);display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></i>Now</span><span><i style="width:14px;height:0;border-top:2px dashed var(--label-3);display:inline-block;margin-right:4px;vertical-align:middle"></i>4 weeks ago</span></div></div>
       <div style="height:24px"></div>
-      ${group(axes.map(a => { const d = a.score - (before.find(b => b.key === a.key)?.score || 0); return row({ title: esc(a.label), sub: esc(a.parts.map(p => p.detail).join(' · ')), value: `${a.score}${d ? ` <span class="t-foot ${d > 0 ? 'green' : 'red'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>` : ''}`, action: 'axis-sheet', data: { k: a.key } }); }).join(''),
+      ${group(axes.map(a => { const d = a.score - (before.find(b => b.key === a.key)?.score || 0); return row({ title: esc(a.label), sub: a.notInPlan ? 'Not in your plan yet: none of your scheduled workouts has jumps or throws. Add Power & Agility to a day in Plan if you want it.' : esc(a.parts.map(p => p.detail).join(' · ')), value: a.notInPlan ? '—' : `${a.score}${d ? ` <span class="t-foot ${d > 0 ? 'green' : 'red'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>` : ''}`, action: 'axis-sheet', data: { k: a.key } }); }).join(''),
         { header: 'Scores', footer: 'Out of 100. They compare you with your own training over the last 4 weeks, not with other people.' })}
       <section class="grp"><h2 class="grp-h">Level</h2><div class="card">${levelBar(level)}</div><p class="grp-f">Points come from showing up and training well: finishing workouts, hitting your targets, records, prevention routines, logged matches and active weeks. Extra sets don’t earn more, so there’s no reward for overdoing it.</p></section>
       ${group(badges.map(b => row({ title: esc(b.label), value: b.done ? '' : b.progress, right: b.done ? icon('check', 'check-mark') : '', icon: b.done ? 'trophy' : 'target', color: b.done ? 'orange' : 'gray' })).join(''), { header: 'Milestones' })}

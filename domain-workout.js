@@ -1,7 +1,7 @@
 // Active-workout model: building one from a routine, and turning it into a saved session.
 import { getExercise, targetField } from './domain-catalog.js';
 import { resolveRoutine, prescribe } from './domain-program.js';
-import { suggest, detectPRs, doneSets } from './domain-progression.js';
+import { suggest, detectPRs, doneSets, lastPerformance } from './domain-progression.js';
 import { prescriptionFor } from './domain-builder.js';
 
 const uid = () => (globalThis.crypto?.randomUUID?.() || `s-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -152,5 +152,16 @@ export function moveExercise(w, from, to) {
   if (to < 0 || to >= w.exercises.length || from === to) return false;
   const cur = w.exercises[w.index], [e] = w.exercises.splice(from, 1);
   w.exercises.splice(to, 0, e); w.index = w.exercises.indexOf(cur);
+  return true;
+}
+
+// An exercise that loads a sore area doesn't go heavier: same top weight as last time.
+// `areas` are plain names for the message (e.g. "elbow"). Returns true when it changed.
+export function holdForPain(entry, history, areas) {
+  const s = entry.suggestion;
+  if (!areas?.length || s?.kind !== 'up') return false;
+  const last = lastPerformance(history, entry.exId), top = last ? Math.max(0, ...doneSets(last.entry).map(x => x.w || 0)) : 0;
+  if (!top) return false;
+  entry.suggestion = { ...s, w: top, kind: 'hold', reason: `Same weight as last time while your ${areas.join(' and ')} settles.`, painHold: true };
   return true;
 }

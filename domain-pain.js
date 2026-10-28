@@ -28,6 +28,14 @@ export function recentPain(sessions, { now = Date.now(), cleared = {} } = {}) {
   return out;
 }
 
+// Areas you said bother you during setup count as a mild, standing flag until you tap
+// "Feels fine now" (which records a clear time, like for any other pain).
+export function painWithProfile(sessions, profile, { now = Date.now(), cleared = {} } = {}) {
+  const pain = recentPain(sessions, { now, cleared });
+  for (const a of profile?.injuries || []) if (!pain[a] && !cleared[a]) pain[a] = { ts: 0, from: 'profile' };
+  return pain;
+}
+
 // Areas an exercise puts real load through. Prevention and mobility work is left out on
 // purpose: that's usually the gentle work that helps.
 export function loadsAreas(ex) {

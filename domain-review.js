@@ -58,7 +58,7 @@ function summary(sessions, from, to) {
 // Trend value at or before a moment (null without data).
 const trendAt = (pts, t) => [...pts].reverse().find(p => p.x <= t)?.y ?? null;
 
-export function weekReview(sessions, { weekStart, schedule = {}, body = [], week = 1, painClear = {}, now = Date.now() } = {}) {
+export function weekReview(sessions, { weekStart, schedule = {}, body = [], week = 1, painClear = {}, now = Date.now(), name = m => MUSCLES[m] } = {}) {
   const from = mondayOf(weekStart).getTime(), to = from + 7 * DAY, end = Math.min(to, now);
   const cur = summary(sessions, from, to), prev = summary(sessions, from - 7 * DAY, from);
   const planned = DAYS.filter(d => isRoutine(schedule[d])).length;
@@ -69,7 +69,7 @@ export function weekReview(sessions, { weekStart, schedule = {}, body = [], week
 
   // Muscles: big groups that got little or nothing.
   const mm = musclesBetween(sessions, from, to);
-  const under = BIG.filter(m => ['none', 'light'].includes(weeklyStatus(m, mm[m] || 0).key)).map(m => MUSCLES[m]);
+  const under = BIG.filter(m => ['none', 'light'].includes(weeklyStatus(m, mm[m] || 0).key)).map((m, i) => i ? name(m).toLowerCase() : name(m));
 
   // Body: weight trend change across the week.
   const pts = trend(body, 'kg'), w0 = trendAt(pts, from), w1 = trendAt(pts, end);

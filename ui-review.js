@@ -1,8 +1,9 @@
 // Weekly review: the week at a glance, against the week before, and next week's focus.
 import { app, S } from './core-app.js';
 import { esc, icon, navBar, group, row, stat } from './ui-kit.js';
+import { mname } from './ui-words.js';
 import { weekReview, reviewWeekStart } from './domain-review.js';
-import { fmtW, fmtNum, toDisplay } from './domain-units.js';
+import { fmtW, fmtNum, toDisplay, fmtEst } from './domain-units.js';
 import { isoDate, programPosition } from './domain-calendar.js';
 
 let offset = 0; // weeks back from the default review week
@@ -12,7 +13,7 @@ const delta = (a, b, fmt = String) => b == null || a === b ? '' : ` <span class=
 
 export const currentReview = (off = 0) => {
   const start = reviewWeekStart(); start.setDate(start.getDate() - 7 * off);
-  return weekReview(S.sessions, { weekStart: start, schedule: S.schedule, body: S.body, week: programPosition(S.settings.programStart, start).week, painClear: S.painClear });
+  return weekReview(S.sessions, { weekStart: start, schedule: S.schedule, body: S.body, week: programPosition(S.settings.programStart, start).week, painClear: S.painClear, name: mname });
 };
 
 // For Today: a nudge on Sunday and Monday until you've opened the latest review.
@@ -42,7 +43,7 @@ function view() {
     ${r.accuracy || r.checkins ? group((r.accuracy ? row({ title: 'Suggested weights', sub: `${r.accuracy.matched} of ${r.accuracy.checked} lifts matched${r.accuracy.heavier ? ` · ${r.accuracy.heavier} heavier` : ''}${r.accuracy.lighter ? ` · ${r.accuracy.lighter} lighter` : ''}`, value: `${Math.round(r.accuracy.matched / r.accuracy.checked * 100)}%` }) : '')
       + (r.checkins ? row({ title: 'Check-ins', sub: `Sleep ${fmtNum(r.checkins.sleep)} · energy ${fmtNum(r.checkins.energy)} · soreness ${fmtNum(r.checkins.soreness)} (out of 5)`, value: `${r.checkins.count}` }) : ''),
       { header: 'How the app did', footer: 'Suggested weights count as matched within one weight step. Rate your sets so suggestions learn from how they felt.' }) : ''}
-    ${r.prs.length ? group(r.prs.slice(0, 5).map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? 'New estimated max' : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? esc(fmtW(p.value, u)) : fmtNum(p.value), icon: 'trophy', color: 'orange', to: `history/ex/${p.exId}` })).join(''), { header: `Records · ${r.prs.length}`, footer: r.prs.length > 5 ? `And ${r.prs.length - 5} more this week.` : '' }) : ''}
+    ${r.prs.length ? group(r.prs.slice(0, 5).map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? 'New estimated max' : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? esc(fmtEst(p.value, u)) : p.type === 'Heaviest' ? esc(fmtW(p.value, u)) : fmtNum(p.value), icon: 'trophy', color: 'orange', to: `history/ex/${p.exId}` })).join(''), { header: `Records · ${r.prs.length}`, footer: r.prs.length > 5 ? `And ${r.prs.length - 5} more this week.` : '' }) : ''}
     ${group(r.focus.map((f, i) => row({ title: esc(f), icon: i === r.focus.length - 1 ? 'target' : 'chevR', color: i === r.focus.length - 1 ? 'indigo' : 'blue' })).join(''), { header: offset === 0 ? 'Focus for next week' : 'What would have helped' })}
     <p style="text-align:center;margin:4px 0 8px"><button class="link" data-action="go" data-to="feedback">Feedback notes${S.feedback.length ? ` (${S.feedback.length})` : ''}</button></p>`;
 }

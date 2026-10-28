@@ -6,7 +6,7 @@ import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { weeklySeries, loadTrend, setCount, volumeKg, sessionLoad, weekStreak, trainingDays, exerciseSeries, exerciseSummaries, progressMetric } from './domain-analytics.js';
 import { doneSets, recomputePRs, heaviest, looksOff } from './domain-progression.js';
 import { isoDate, mondayOf, relDay, parseISO } from './domain-calendar.js';
-import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
+import { fmtW, fmtNum, toDisplay, fromDisplay, fmtEst } from './domain-units.js';
 import { activitySheet } from './ui-today.js';
 import { padelSummary, padelInsights, PADEL_TYPES, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
@@ -38,7 +38,7 @@ function sessionRow(s) {
   const res = pd?.result === 'won' ? 'Won' : pd?.result === 'lost' ? 'Lost' : '';
   const sub = gym ? `${dateShort(s.startedAt)} · ${s.durationMin} min · ${setCount(s)} sets`
     : `${dateShort(s.startedAt)} · ${[res && `${res}${pd.score ? ' ' + esc(pd.score) : ''}`, `${s.durationMin} min`].filter(Boolean).join(' · ')}`;
-  const right = `${s.prs?.length ? `<span class="badge-pr">${icon('trophy')}${s.prs.length}</span>` : ''}${pd?.sore?.length || s.pain?.flag ? '<span class="pill-count" title="Something was sore">!</span>' : ''}`;
+  const right = `${s.prs?.length ? `<span class="badge-pr">${icon('trophy')}${s.prs.length}</span>` : ''}${s.pain?.flag ? '<span class="pill-sore">Pain</span>' : pd?.sore?.length ? '<span class="pill-sore">Sore</span>' : ''}`;
   return row({ title: esc(s.title), sub, icon: look.icon, color: look.color, to: `history/session/${s.id}`, right });
 }
 
@@ -194,7 +194,7 @@ function sessionView(id) {
     <div class="tiles three">${stat(s.durationMin, 'Minutes')}${stat(setCount(s), 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
     ${Date.now() - (s.endedAt || s.startedAt) < 3 * 3600000 ? (() => { const r = COURT_ROUTINES[stretchFor(s.exercises.map(e => e.exId))]; return group(row({ title: `Stretch now: ${esc(r.title)}`, sub: `${rMin(r)} min, guided · gentle holds to wind down`, icon: 'wave', color: 'teal', to: `court/${r.id}` })); })() : ''}
     ${musclesCard(sessionMuscles(s), 'Muscles worked')}
-    ${s.prs?.length ? group(s.prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
+    ${s.prs?.length ? group(s.prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? fmtEst(p.value, unit()) : p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${group(s.exercises.map(e => { const sets = doneSets(e), ex = getExercise(e.exId);
       return row({ title: esc(e.name), sub: e.skipped ? 'Skipped' : sets.length ? sets.map(x => fmtSet(x, e.fields)).join(' · ') : 'Not done', to: ex ? `history/ex/${e.exId}` : '' }); }).join(''), { header: 'Exercises' })}
     ${s.pain?.flag || s.rpe || s.notes ? group((s.rpe ? row({ title: 'Effort', value: esc(effortWord(s.rpe)) }) : '') + (s.pain?.flag ? row({ title: 'Pain', value: esc([painAreasOf(s).map(x => AREAS[x]).join(', '), s.pain.location].filter(Boolean).join(' · ') || 'Yes'), cls: 'red' }) : '') + (s.notes ? row({ title: esc(s.notes) }) : ''), { header: 'Notes' }) : ''}
@@ -219,7 +219,7 @@ function exerciseView(id) {
   const bestT = pts.length ? Math.max(...pts.map(p => p.topVal || 0)) : 0;
   return `${navBar({ back: 'Exercises', backTo: 'history/progress' })}
     <h1 class="t-title" style="padding:8px 4px 2px">${esc(ex.name)}</h1><p class="t-sub" style="padding:0 4px 20px">${esc(ex.muscles)}</p>
-    <div class="tiles three">${stat(pts.length, 'Sessions')}${m.load ? stat(bestE ? fmtNum(toDisplay(bestE, unit())) : '—', simple() ? 'Est. max' : 'Best e1RM', bestE ? unit() : '') : stat(fmtNum(bestT), 'Best', tf === 'reps' ? 'reps' : FIELD_UNIT[tf])}${stat(heaviest ? fmtNum(toDisplay(heaviest, unit())) : '—', 'Heaviest', heaviest ? unit() : '')}</div>
+    <div class="tiles three">${stat(pts.length, 'Sessions')}${m.load ? stat(bestE ? fmtEst(bestE, unit()).replace(unit(), '') : '—', simple() ? 'Est. max' : 'Best e1RM', bestE ? unit() : '') : stat(fmtNum(bestT), 'Best', tf === 'reps' ? 'reps' : FIELD_UNIT[tf])}${stat(heaviest ? fmtNum(toDisplay(heaviest, unit())) : '—', 'Heaviest', heaviest ? unit() : '')}</div>
     <section class="grp"><h2 class="grp-h">${esc(m.key === 'e1rm' ? e1rmLabel() : m.label)}</h2><div class="card">${lineChart(pts.filter(p => p[m.key] != null).map(p => ({ x: p.ts, y: m.load ? toDisplay(p[m.key], unit()) : p[m.key] })))}</div></section>
     <section class="grp"><h2 class="grp-h">My notes</h2><textarea class="input" data-note="${esc(id)}" rows="2" placeholder="Seat height, grip, reminders…">${esc(S.exNotes[id] || '')}</textarea></section>
     ${pts.length ? group([...pts].reverse().map(p => row({ title: esc(dateShort(p.ts)), sub: p.sets.map(x => fmtSet(x, ex.fields)).join(' · '), to: `history/session/${p.sessionId}` })).join(''), { header: 'History' }) : ''}`;

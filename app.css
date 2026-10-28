@@ -228,7 +228,7 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .coach-peek { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 0; background: none; text-align: left; font-size: 13px; line-height: 18px; color: var(--label-2); }
 .coach-peek span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .coach-peek.blue span { color: var(--blue); }
-.coach-peek b { flex: none; font-weight: 600; color: var(--blue); }
+.how-row .more-btn { margin-left: auto; font-weight: 600; }
 .coach-more { margin-top: 6px; }
 .tile-stat { background: var(--fill); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
 .tile-stat b { font-size: 22px; font-weight: 700; }
@@ -415,6 +415,7 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 /* Planned: a small faint filled dot, so it never reads as the hollow "missed" ring. */
 .cd.plan { background: currentColor; opacity: .45; transform: scale(.75); color: var(--label-2); } .cd.plan.gym { color: var(--blue); } .cd.plan.padel { color: var(--teal); }
 .row.todo .row-title { color: var(--label-2); }
+.pill-sore { font-size: 12px; font-weight: 600; color: var(--orange); background: color-mix(in srgb, var(--orange) 14%, transparent); border-radius: 8px; padding: 2px 7px; }
 .legend i.cd.plan { width: 8px; height: 8px; border-radius: 50%; background: var(--label-2); }
 
 /* Set editor (saved workouts) */
@@ -427,9 +428,10 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .eset-del .i { width: 16px; height: 16px; }
 
 /* Pain-aware note on an exercise */
-.pain-note { background: color-mix(in srgb, var(--orange) 12%, transparent); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 15px; }
+.pain-note { background: color-mix(in srgb, var(--orange) 12%, transparent); border-radius: 12px; padding: 8px 12px; margin: 8px 0; font-size: 14px; line-height: 19px; }
 .pain-note b { font-weight: 600; }
-.pain-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
+.pain-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 4px; }
+.pain-acts .link { font-size: 14px; min-height: 28px; }
 .pain-acts .btn { width: auto; min-height: 34px; padding: 0 14px; font-size: 15px; }
 
 /* Warm-up ramp and plates */

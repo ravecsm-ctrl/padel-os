@@ -8,11 +8,11 @@ import { keepExercise, routineFromWorkout, setCustomRoutines, getRoutine } from 
 import { prescriptionFor } from './domain-builder.js';
 import { feedbackSheet } from './ui-feedback.js';
 import { exercisePicker } from './ui-picker.js';
-import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
+import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep, fmtEst } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips, mname } from './ui-words.js';
-import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, removeExercise, moveExercise, unusedAdded, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
+import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, removeExercise, moveExercise, unusedAdded, holdForPain, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel, CATEGORIES } from './domain-taxonomy.js';
 import { bodyMap, exerciseMap } from './ui-bodymap.js';
@@ -20,7 +20,7 @@ import { startEdit } from './ui-library.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
-import { recentPain, painHits, gentlerFor, areaName, painAreasOf } from './domain-pain.js';
+import { painWithProfile, painHits, gentlerFor, areaName, painAreasOf } from './domain-pain.js';
 import { soreNote } from './ui-today.js';
 import { AREAS } from './domain-personalize.js';
 import { barFor, barWeight, platesPerSide, warmupSets, BARS } from './domain-plates.js';
@@ -74,7 +74,7 @@ function compactSets(sets, fields) {
 function baseline(e, last) {
   if (!last) return '';
   const max = e.fields.includes('w') ? bestE1rm(last.entry) : null;
-  return `<div class="baseline"><div><small>Last time · ${esc(relDay(last.session.startedAt))}</small><b>${esc(compactSets(doneSets(last.entry), e.fields))}</b></div>${max ? `<div class="bl-max"><small>${simple() ? 'Est. max' : 'Est. 1RM'}</small><b>${esc(fmtW(max, unit()))}</b></div>` : ''}</div>`;
+  return `<div class="baseline"><div><small>Last time · ${esc(relDay(last.session.startedAt))}</small><b>${esc(compactSets(doneSets(last.entry), e.fields))}</b></div>${max ? `<div class="bl-max"><small>${simple() ? 'Est. max' : 'Est. 1RM'}</small><b>${esc(fmtEst(max, unit()))}</b></div>` : ''}</div>`;
 }
 
 // What the field shows before the user touches it: previous set, else the suggestion.
@@ -109,12 +109,14 @@ function coach(e) {
     ${missingHere(ex)}${painNote(e)}
     ${(() => {
       // One short line; last time, warm-up and tips open with More (and stay open between sets).
+      // The set card already shows last time for this set, so the line here is only for a tip
+      // or first-time advice; everything else opens with More.
       const tipText = tip.replace(/<[^>]+>/g, '').trim(), wu = warmupLine(e);
-      const peek = tipText || (last ? `Last time: ${compactSets(doneSets(last.entry), e.fields)}` : why || effortTarget(e.target.rpe));
-      return `<button class="coach-peek ${tipText ? 'blue' : ''}" data-action="coach-more" aria-expanded="${COACH_OPEN}"><span>${esc(peek)}${!COACH_OPEN && wu ? ' · warm-up' : ''}</span><b>${COACH_OPEN ? 'Less' : 'More'}</b></button>
-        ${COACH_OPEN ? `<div class="coach-more">${baseline(e, last)}${wu}<p class="t-foot">${why && why !== peek ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p></div>` : ''}`;
-    })()}
-    <div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a></div></div>`;
+      const peek = tipText || (!last && !e.suggestion?.painHold ? why : '');
+      return `${peek ? `<p class="coach-peek ${tipText ? 'blue' : ''}"><span>${esc(peek)}</span></p>` : ''}
+        ${COACH_OPEN ? `<div class="coach-more">${baseline(e, last)}${wu}<p class="t-foot">${why && why !== peek ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p></div>` : ''}
+    <div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a><button class="how more-btn" data-action="coach-more" aria-expanded="${COACH_OPEN}">${COACH_OPEN ? 'Less' : wu ? 'More · warm-up' : 'More'}</button></div>`;
+    })()}</div>`;
 }
 
 // ── Muscles: main ones bold, secondary ones lighter; tap for the body map.
@@ -159,18 +161,24 @@ function warmupLine(e) {
 
 // Pain-aware: when this exercise loads an area that hurt recently, say so and offer a gentler
 // swap, a lighter version, or "feels fine now". Never blocks.
-const currentPain = () => recentPain(S.sessions, { cleared: S.painClear });
+const currentPain = () => painWithProfile(S.sessions, S.profile, { cleared: S.painClear });
+// Hold the weight on every exercise that loads a sore area (run when a workout starts or changes).
+export function applyPainHolds(w, history = app.strength) {
+  const pain = currentPain(), before = w.past ? history.filter(s => s.startedAt < w.startedAt) : history;
+  for (const e of w.exercises) holdForPain(e, before, painHits(e.exId, pain).map(a => areaName(a).toLowerCase()));
+}
 function painNote(e) {
   if (W().past || e.painOk) return '';
   const pain = currentPain(), hits = painHits(e.exId, pain);
   if (!hits.length) return '';
-  const a = hits[0], when = relDay(pain[a].ts).toLowerCase();
+  const a = hits[0], area = areaName(a).toLowerCase(), from = pain[a].from;
   const alt = gentlerFor(e.exId, pain, app.owned(), W().exercises.map(x => x.exId));
-  const said = pain[a].from === 'padel' ? `sore after padel more than once lately` : `hurt ${when}`;
-  return `<div class="pain-note"><p><b>Your ${esc(areaName(a).toLowerCase())} ${said}.</b> This exercise loads it.${e.painLight ? ' Lighter version on: stop if it hurts.' : ''}</p>
-    <div class="pain-acts">${alt ? `<button class="btn tinted small" data-action="pain-swap" data-id="${esc(alt)}">Swap for ${esc(getExercise(alt).name)}</button>` : ''}
-      ${e.painLight ? '' : `<button class="btn gray small" data-action="pain-light">Go Lighter</button>`}
-      <button class="link" data-action="pain-fine" data-a="${esc(a)}">Feels fine now</button></div></div>`;
+  const said = from === 'padel' ? 'it was sore after padel more than once lately' : from === 'profile' ? 'you said it bothers you' : `it hurt ${relDay(pain[a].ts).toLowerCase()}`;
+  // Kept short so the set controls stay on screen: one line of text, one line of actions.
+  return `<div class="pain-note"><p><b>Easy on your ${esc(area)}:</b> ${said}.${e.suggestion?.painHold ? ' Same weight as last time.' : ''}${e.painLight ? ' Lighter version on.' : ''}</p>
+    <div class="pain-acts">${alt ? `<button class="link" data-action="pain-swap" data-id="${esc(alt)}">Swap for ${esc(getExercise(alt).name)}</button>` : ''}
+      ${e.painLight ? '' : '<button class="link" data-action="pain-light">Go lighter</button>'}
+      <button class="link" data-action="pain-fine" data-a="${esc(a)}">Feels fine</button></div></div>`;
 }
 
 // A gentle note (never a block) when this exercise needs gear the current location lacks.
@@ -215,6 +223,7 @@ function pickerSheet() {
   exercisePicker({ inUse: W().exercises.map(e => e.exId), pick: id => {
     const w = W(), at = w.exercises.length ? w.index + 1 : 0, i = addExercise(w, id, app.strength, unit(), at);
     if (i < 0) return;
+    applyPainHolds(w);
     w.index = i; touch(false); app.toast(`${esc(w.exercises[i].name)} added`);
   } });
 }
@@ -255,7 +264,7 @@ function finishView() {
       return `<div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">${doneN >= all ? 'Workout complete' : 'Nice work'}</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}${doneN < all ? ` · ${doneN} of ${all} exercises done` : ''}</p></div>`; })()}
     <div class="tiles three" style="margin-top:20px">${stat(`<span class="num">${S.form.duration || st.minutes}</span>`, 'Minutes')}${stat(`${st.sets}`, 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
     ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => mname(m.id)).join(' · '))}</p></div></section>` : ''; })()}
-    ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
+    ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' ? fmtEst(p.value, unit()) : p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
     ${unused.length ? `<p class="fine" style="margin-bottom:20px">${esc(unused.map(e => e.name).join(', '))} ${unused.length > 1 ? 'have' : 'has'} no sets logged and won’t be saved.</p>` : ''}
     ${keepGroup(w)}
@@ -506,7 +515,7 @@ export const workout = {
     },
     'do-swap'(el) {
       if (doneSets(cur()).length) app.toast('Sets you’d logged for the old exercise were cleared');
-      swapExercise(W(), W().index, el.dataset.id, app.strength, unit()); app.closeSheet(); touch(false);
+      swapExercise(W(), W().index, el.dataset.id, app.strength, unit()); applyPainHolds(W()); app.closeSheet(); touch(false);
     },
     jump(el) { W().index = +el.dataset.i; touch(false); },
     prev() { W().index = Math.max(0, W().index - 1); touch(false); },
