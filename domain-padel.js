@@ -57,3 +57,25 @@ export function prehabFor(profile, sessions, now = Date.now(), { cleared = {} } 
   for (const a of Object.keys(hurt)) { if (AREA_ROUTINE[a]) ids.add(AREA_ROUTINE[a]); flagged[a] = Math.max(flagged[a] || 0, 2); }
   return { ids: [...ids], flagged, hurt };
 }
+
+// Deeper look at your matches. Everything here describes your log; small numbers are noisy,
+// so each comparison needs a few matches on both sides before it says anything.
+const decided = list => list.filter(s => ['won', 'lost'].includes(s.padel?.result));
+const rate = list => { const d = decided(list), w = d.filter(s => s.padel.result === 'won').length; return d.length ? { won: w, lost: d.length - w, pct: Math.round(w / d.length * 100), n: d.length } : null; };
+export function padelInsights(sessions, { minEach = 3 } = {}) {
+  const padel = sessions.filter(isPadel).sort((a, b) => a.startedAt - b.startedAt);
+  const matches = padel.filter(s => ['match', 'americano'].includes(s.padel?.type || 'match'));
+  const bySide = Object.keys(SIDES).map(k => [k, rate(matches.filter(s => s.padel?.side === k))]).filter(([, r]) => r);
+  const names = new Map();
+  for (const s of matches) { const raw = (s.padel?.partner || '').trim(); if (!raw) continue; const k = raw.toLowerCase(); if (!names.has(k)) names.set(k, raw); }
+  const byPartner = [...names].map(([k, label]) => ({ label, ...rate(matches.filter(s => (s.padel?.partner || '').trim().toLowerCase() === k)) })).filter(p => p.n >= 2).sort((a, b) => b.n - a.n);
+  // Gym in the 48 hours before a match, or not.
+  const gymBefore = m => sessions.some(s => s.kind === 'strength' && s.startedAt < m.startedAt && m.startedAt - s.startedAt <= 2 * DAY);
+  const afterGym = rate(matches.filter(gymBefore)), fresh = rate(matches.filter(m => !gymBefore(m)));
+  const gymCompare = afterGym && fresh && afterGym.n >= minEach && fresh.n >= minEach ? { afterGym, fresh } : null;
+  // Sore spots across your last 10 padel sessions, and whether they're coming up less often.
+  const last = padel.slice(-10), half = Math.floor(last.length / 2), count = (list, a) => list.filter(s => s.padel?.sore?.includes(a)).length;
+  const areas = [...new Set(last.flatMap(s => s.padel?.sore || []))];
+  const recurring = areas.map(a => ({ area: a, n: count(last, a), of: last.length, trend: last.length >= 6 ? Math.sign(count(last.slice(half), a) - count(last.slice(0, half), a)) : 0 })).filter(r => r.n >= 2).sort((a, b) => b.n - a.n);
+  return { total: rate(matches), matches: matches.length, bySide, byPartner, gymCompare, gymCounts: { afterGym: afterGym?.n || 0, fresh: fresh?.n || 0 }, recurring, minEach };
+}

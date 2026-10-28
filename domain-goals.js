@@ -37,3 +37,13 @@ export function liftProgress(goal, sessions) {
   const best = heaviest(sessions, goal.exId);
   return { best, pct: goal.kg > 0 ? Math.min(1, best / goal.kg) : 0, done: goal.kg > 0 && best >= goal.kg };
 }
+
+// Padel logged on the tournament day: matches, wins, minutes, sore spots.
+export function tournamentSummary(sessions, t) {
+  if (!t?.date) return null;
+  const list = sessions.filter(s => s.kind === 'activity' && s.activity === 'padel' && isoDate(new Date(s.startedAt)) === t.date);
+  const sore = {};
+  for (const s of list) for (const a of s.padel?.sore || []) sore[a] = (sore[a] || 0) + 1;
+  return { matches: list.length, won: list.filter(s => s.padel?.result === 'won').length, lost: list.filter(s => s.padel?.result === 'lost').length,
+    minutes: list.reduce((n, s) => n + (s.durationMin || 0), 0), sore };
+}

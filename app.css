@@ -230,6 +230,9 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .coach-peek.blue span { color: var(--blue); }
 .coach-peek b { flex: none; font-weight: 600; color: var(--blue); }
 .coach-more { margin-top: 6px; }
+.tile-stat { background: var(--fill); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.tile-stat b { font-size: 22px; font-weight: 700; }
+.tile-stat small { font-size: 12px; color: var(--label-2); }
 .setcard { margin-top: 18px; padding: 18px 16px 16px; }
 .setcard-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
 .setcard-h b { font-size: 17px; font-weight: 600; }

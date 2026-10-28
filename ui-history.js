@@ -8,14 +8,14 @@ import { doneSets, recomputePRs, heaviest, looksOff } from './domain-progression
 import { isoDate, mondayOf, relDay, parseISO } from './domain-calendar.js';
 import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
 import { activitySheet } from './ui-today.js';
-import { padelSummary, PADEL_TYPES, SIDES } from './domain-padel.js';
+import { padelSummary, padelInsights, PADEL_TYPES, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { painAreasOf } from './domain-pain.js';
 import { routineFromWorkout, setCustomRoutines } from './domain-program.js';
 import { feedbackSheet } from './ui-feedback.js';
 import { exercisePicker } from './ui-picker.js';
 import { savedEntry } from './domain-workout.js';
-import { COURT_ROUTINES, stretchFor, routineMinutes as rMin } from './domain-court.js';
+import { COURT_ROUTINES, AREA_ROUTINE, stretchFor, routineMinutes as rMin } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips, mname, fmtSets } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
 import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor, SMALL } from './domain-muscles.js';
@@ -63,9 +63,27 @@ function padelGroup() {
     + (p.winRate != null ? row({ title: 'Win rate', value: `${p.winRate}% <span class="t-foot">(${p.won}–${p.lost})</span>` }) : '')
     + (side ? row({ title: 'Usual side', value: esc(SIDES[side[0]].split(' ')[0] === 'Drive' ? 'Right' : SIDES[side[0]].startsWith('Rev') ? 'Left' : 'Both') }) : '')
     + (sore.length ? row({ title: 'Sore after playing', value: sore.map(([a, n]) => `${esc(AREAS[a].split(' ')[0])} ${n}×`).join(', ') }) : '')
-    + (p.suggestRoutine ? row({ title: `Try “${esc(COURT_ROUTINES[p.suggestRoutine].title)}”`, icon: 'heart', color: 'pink', to: `court/${p.suggestRoutine}` }) : '');
+    + (p.suggestRoutine ? row({ title: `Try “${esc(COURT_ROUTINES[p.suggestRoutine].title)}”`, icon: 'heart', color: 'pink', to: `court/${p.suggestRoutine}` }) : '')
+    + row({ title: 'Padel insights', sub: 'By side and partner, gym before matches, sore spots', icon: 'chart', color: 'teal', to: 'history/padel' });
   const note = p.weeksCompared && p.soreWeekMin > p.okWeekMin * 1.2 ? `In weeks you felt sore, you played about ${p.soreWeekMin} min of padel vs ${p.okWeekMin} min otherwise. A pattern worth watching, not proof.` : '';
   return group(rows, { header: 'Padel · last 60 days', footer: note });
+}
+
+// All your matches: what you win more with, and what keeps getting sore.
+function padelView() {
+  const p = padelInsights(S.sessions), rec = r => r ? `${r.pct}% <span class="t-foot">(${r.won}–${r.lost})</span>` : '—';
+  const nav = navBar({ back: 'History', backTo: 'history', title: '' });
+  const head = `<h1 class="t-title" style="padding:8px 4px 2px">Padel insights</h1><p class="t-sub" style="padding:0 4px 20px">From every match you’ve logged with a result.</p>`;
+  if (!p.total) return `${nav}${head}${empty('racket', 'No results yet', 'Log matches with Won or Lost to see what you win more with.')}`;
+  const sideName = k => k === 'drive' ? 'Right side' : k === 'reves' ? 'Left side' : 'Both sides';
+  const trend = t => t < 0 ? ' · less often lately' : t > 0 ? ' · more often lately' : '';
+  return `${nav}${head}
+    <div class="tiles three">${stat(p.matches, 'Matches')}${stat(`${p.total.pct}%`, 'Won')}${stat(`${p.total.won}–${p.total.lost}`, 'Record')}</div>
+    ${p.bySide.length ? group(p.bySide.map(([k, r]) => row({ title: sideName(k), value: rec(r) })).join(''), { header: 'By side' }) : ''}
+    ${group(p.byPartner.length ? p.byPartner.map(x => row({ title: esc(x.label), sub: plural(x.n, 'match'), value: rec(x) })).join('') : row({ title: 'Add a partner when you log matches', sub: 'Partners show here after 2 matches together' }), { header: 'By partner' })}
+    ${group(p.gymCompare ? row({ title: 'Gym in the 2 days before', value: rec(p.gymCompare.afterGym) }) + row({ title: 'No gym in the 2 days before', value: rec(p.gymCompare.fresh) })
+      : row({ title: 'Not enough matches yet', sub: `Needs ${p.minEach} with a result of each kind (now ${p.gymCounts.afterGym} after gym, ${p.gymCounts.fresh} without).` }), { header: 'Gym before matches', footer: p.gymCompare ? 'A pattern in your log, not proof: opponents, sleep and nerves matter too.' : '' })}
+    ${group(p.recurring.length ? p.recurring.map(r => row({ title: esc(AREAS[r.area]), sub: `Sore after ${r.n} of your last ${plural(r.of, 'session')}${trend(r.trend)}`, icon: 'heart', color: 'pink', to: AREA_ROUTINE[r.area] ? `court/${AREA_ROUTINE[r.area]}` : '' })).join('') : row({ title: 'Nothing keeps coming back', sub: 'Areas sore after 2 or more of your last 10 sessions show here' }), { header: 'Sore spots', footer: p.recurring.length ? 'Tap one for its prevention routine.' : '' })}`;
 }
 
 // Body map + sets per muscle for one session.
@@ -129,6 +147,7 @@ function logView() {
 }
 
 // ── Edit a saved workout: fix sets, add a forgotten exercise, remove one added by mistake.
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : /(ch|sh|s|x)$/.test(w) ? 'es' : 's'}`;
 let EDIT = null;
 function editView(id) {
   if (!EDIT || EDIT.id !== id) {
@@ -165,7 +184,7 @@ function sessionView(id) {
     <p style="text-align:center;margin-top:14px"><button class="link" data-action="feels-off-session" data-id="${esc(s.id)}">Something feels off?</button></p>`;
   if (!gym) {
     const pd = s.padel;
-    const details = pd ? [['Type', PADEL_TYPES[pd.type]], ['Result', pd.result === 'won' ? 'Won' : pd.result === 'lost' ? 'Lost' : ''], ['Score', pd.score], ['Partner', pd.partner], ['Side', pd.side === 'drive' ? 'Right' : pd.side === 'reves' ? 'Left' : pd.side === 'both' ? 'Both' : ''], ['Sore', pd.sore?.length ? pd.sore.map(a => AREAS[a]).join(', ') : 'Nothing']].filter(r => r[1]) : [];
+    const details = pd ? [['Event', pd.event], ['Type', PADEL_TYPES[pd.type]], ['Result', pd.result === 'won' ? 'Won' : pd.result === 'lost' ? 'Lost' : ''], ['Score', pd.score], ['Partner', pd.partner], ['Side', pd.side === 'drive' ? 'Right' : pd.side === 'reves' ? 'Left' : pd.side === 'both' ? 'Both' : ''], ['Sore', pd.sore?.length ? pd.sore.map(a => AREAS[a]).join(', ') : 'Nothing']].filter(r => r[1]) : [];
     return `${nav}${head}<div class="tiles three">${stat(s.durationMin, 'Minutes')}${stat(esc(effortWord(s.rpe)), 'Effort')}${stat(sessionLoad(s), 'Load')}</div>
       ${details.length ? group(details.map(([k, v]) => row({ title: k, value: esc(v) })).join('')) : ''}
       ${s.notes ? group(row({ title: esc(s.notes) }), { header: 'Notes' }) : ''}${actions}`;
@@ -215,6 +234,7 @@ export const history = {
     if (sub === 'progress') return exercisesView();
     if (sub === 'ex') return exerciseView(id);
     if (sub === 'muscles') return musclesView();
+    if (sub === 'padel') return padelView();
     return logView();
   },
   onInput(el) {

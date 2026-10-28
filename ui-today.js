@@ -17,12 +17,12 @@ import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { saveBackup } from './ui-backup.js';
 import { reviewBanner } from './ui-review.js';
-import { taperFor, taperText } from './domain-goals.js';
+import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { recentPain, painHits, areaName } from './domain-pain.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : /(ch|sh|s|x)$/.test(w) ? 'es' : 's'}`;
 
 export function banners({ resumeOnly = false } = {}) {
   let out = '';
@@ -37,7 +37,11 @@ export function banners({ resumeOnly = false } = {}) {
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
   const tp = taperFor(S.settings.tournament);
-  if (tp && !tp.noGym) out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'orange')}<span><b>${esc(tp.phase === 'recover' ? 'After the tournament' : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(taperText(tp))}</small></span>${chev}</button>`;
+  if (tp && !tp.noGym) {
+    const sum = tp.phase === 'recover' ? tournamentSummary(S.sessions, S.settings.tournament) : null;
+    const res = sum?.matches ? `${plural(sum.matches, 'match')}${sum.won + sum.lost ? `, ${sum.won}–${sum.lost}` : ''}. ` : '';
+    out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'orange')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`;
+  }
   // Everything lives on this phone, so nudge a backup from the first saved session, then weekly.
   if (S.sessions.length) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
@@ -73,17 +77,22 @@ function recoveringHint(routineId) {
 function hero() {
   const plan = S.schedule[dayKey()];
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
-  if (doneToday.length && !S.active) {
+  const tp = taperFor(S.settings.tournament);
+  // On tournament day the tournament card stays up after each match (that's when you need it most).
+  if (doneToday.length && !S.active && tp?.phase !== 'day') {
     return `<section class="card hero"><div class="hero-top">${tile('check', 'green', true)}<div><h2>Done for today</h2><p class="t-sub">${doneToday.map(s => esc(s.title)).join(' and ')}</p></div></div>
       <p class="hero-note">Nice work. Rest and sleep are when your body gets stronger.</p>
       <button class="btn tinted" data-action="go" data-to="history/session/${esc(doneToday[0].id)}">See Summary</button></section>`;
   }
-  const tp = taperFor(S.settings.tournament);
   if (tp?.noGym) {
-    const day = tp.phase === 'day';
+    const day = tp.phase === 'day', sum = day ? tournamentSummary(S.sessions, S.settings.tournament) : null, played = sum?.matches || 0;
+    const sore = sum ? Object.keys(sum.sore).map(a => AREAS[a].split(' ')[0].toLowerCase()) : [];
+    const so = played ? `<div class="tiles three" style="margin:4px 0 16px">${['Matches', 'Won–lost', 'Minutes'].map((l, i) => `<div class="tile-stat"><b class="num">${[played, `${sum.won}–${sum.lost}`, sum.minutes][i]}</b><small>${l}</small></div>`).join('')}</div>${sore.length ? `<p class="hero-note orange">Sore so far: ${esc(sore.join(', '))}. Ease off where you can.</p>` : ''}` : '';
     return `<section class="card hero"><div class="hero-top">${tile('trophy', 'orange', true)}<div><p class="t-foot">${day ? 'Today' : tp.days === 1 ? 'Tomorrow' : 'In 2 days'}</p><h2>${esc(tp.name)}</h2><p class="t-sub">${day ? 'Tournament day' : 'Rest up before you play'}</p></div></div>
-      <p class="hero-note">${esc(taperText(tp))}</p>
-      <div class="btns">${day ? `<button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button><button class="btn tinted" data-action="log-activity" data-kind="padel">Log a Match</button>`
+      ${played ? so : `<p class="hero-note">${esc(taperText(tp))}</p>`}
+      <div class="btns">${day ? (played
+        ? `<button class="btn filled" data-action="log-activity" data-kind="padel">Log Another Match</button><button class="btn tinted" data-action="go" data-to="court/between">${icon('play')}Between Matches · ${routineMinutes(COURT_ROUTINES.between)} min</button>`
+        : `<button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button><button class="btn tinted" data-action="log-activity" data-kind="padel">Log a Match</button>`)
         : `<button class="btn filled" data-action="go" data-to="court/mobility">${icon('play')}Daily Mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</button>${isRoutine(plan) && !S.active ? `<button class="btn plain" data-action="start" data-routine="${plan}">Train anyway</button>` : ''}`}</div></section>`;
   }
   if (isRoutine(plan)) {
@@ -142,7 +151,8 @@ export const today = {
         + row({ title: 'Quick workout', sub: 'No plan: add exercises as you go', icon: 'bolt', color: 'indigo', action: 'quick-start' })
         + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
         + row({ title: 'Warm up before playing', sub: `${routineMinutes(COURT_ROUTINES.warmup)} min, guided`, icon: 'flame', color: 'orange', to: 'court/warmup' }),
-        { header: 'More', big: true })}`;
+        { header: 'More', big: true })}
+      ${S.sessions.length ? `<p class="t-foot" style="text-align:center;margin:8px 0 4px">${S.lastBackup ? `Last backup ${esc(relDay(S.lastBackup).toLowerCase())}` : 'Not backed up yet'} · <button class="link" data-action="quick-backup" style="font-size:inherit">Back up now</button></p>` : ''}`;
   },
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
@@ -277,7 +287,8 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
       // Logged today = you just finished: it ended now and started `dur` minutes ago (not before midnight).
       if (isoDate(d) === isoDate(now)) d.setTime(Math.max(parseISO(isoDate(now)).getTime(), now.getTime() - dur * 60000));
       else d.setHours(12);
-      const padel = f().activity === 'padel' ? { type: f().ptype, result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().side, sore: f().sore } : undefined;
+      const t = S.settings.tournament, event = t?.date && t.date === isoDate(d) ? t.name || 'Tournament' : existing?.padel?.event;
+      const padel = f().activity === 'padel' ? { type: f().ptype, result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().side, sore: f().sore, ...(event ? { event } : {}) } : undefined;
       const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];
       const base = existing ? { ...existing, activity: f().activity, durationMin: dur, rpe: +f().rpe, notes: f().notes, startedAt: d.getTime(), endedAt: d.getTime() + dur * 60000 }
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });

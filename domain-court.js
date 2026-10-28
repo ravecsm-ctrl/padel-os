@@ -73,6 +73,18 @@ export const COURT_ROUTINES = {
       s('Shadow strokes', 60, 'Bandeja, volley, bajada, at 50% then 80%. Move your feet into each one.'),
       s('2 short sprints', 30, 'Net to back glass twice, decelerate under control.'),
     ] },
+  between: {
+    id: 'between', title: 'Between matches', kind: 'court', tag: 'Tournament days', areas: [],
+    blurb: 'Four minutes to stay warm and loose between matches. Keep it easy: this is not a workout.',
+    steps: [
+      s('Walk + slow breathing', 45, 'Walk around, breathe in for 4, out for 6. Sip some water.'),
+      s('Leg swings, front–back', 20, 'Hold the fence, small relaxed swings.', true),
+      s('Hip circles + lateral rocks', 30, 'Big slow hip circles, then shift side to side in a wide stance.'),
+      s('Calf pumps', 30, 'Rise up and down on your toes, relaxed.'),
+      s('Arm circles + wrist rolls', 30, 'Small to big circles, then roll the wrists both ways.'),
+      s('Shadow strokes, easy', 45, 'A few bandejas and volleys at half speed. Move the feet.'),
+      s('Split-steps', 20, 'Light hops on the balls of your feet, react left and right.'),
+    ] },
   cooldown: {
     id: 'cooldown', title: 'Post-match cool-down', kind: 'court', tag: 'After you play', areas: [],
     blurb: 'Bring the heart rate down and ease the areas padel loads most.',

@@ -15,7 +15,10 @@ export function validateBackup(data) {
   if (errors.length) return { ok: false, errors };
   const bad = data.sessions.filter(s => !s || typeof s.id !== 'string' || !Number.isFinite(Number(s.startedAt))).length;
   if (bad) errors.push(`${bad} session(s) lack an id or start time and will be skipped.`);
-  return { ok: true, errors, version: data.schemaVersion, count: data.sessions.length - bad };
+  // Backups since v34 say how many sessions they hold; a mismatch means the file was cut short or edited.
+  const incomplete = Number.isFinite(data.summary?.sessions) && data.summary.sessions !== data.sessions.length;
+  if (incomplete) errors.push(`This file should hold ${data.summary.sessions} sessions but has ${data.sessions.length}. It may be incomplete.`);
+  return { ok: true, errors, incomplete, version: data.schemaVersion, count: data.sessions.length - bad };
 }
 
 // v1 stored the exercise name and string weights in whatever unit was active.
@@ -46,7 +49,13 @@ export function normalizeBackup(data) {
   return { meta, sessions: data.sessions.filter(s => s?.id && s?.startedAt).map(s => migrateV1Session(s, unit)) };
 }
 
-export const buildBackup = (meta, sessions) => ({ app: 'padel-os-pro', schemaVersion: SCHEMA, exportedAt: new Date().toISOString(), meta, sessions });
+// What a backup (or this phone) holds, in plain numbers.
+export function backupSummary(sessions) {
+  const ts = sessions.map(s => Number(s.startedAt)).filter(Number.isFinite);
+  return { sessions: sessions.length, workouts: sessions.filter(s => s.kind === 'strength').length, matches: sessions.filter(s => s.kind === 'activity' && s.activity === 'padel').length,
+    first: ts.length ? Math.min(...ts) : null, last: ts.length ? Math.max(...ts) : null };
+}
+export const buildBackup = (meta, sessions) => ({ app: 'padel-os-pro', schemaVersion: SCHEMA, exportedAt: new Date().toISOString(), summary: backupSummary(sessions), meta, sessions });
 
 const csvCell = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 export function toCSV(sessions) {
