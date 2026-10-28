@@ -3,7 +3,7 @@ import * as db from './core-db.js';
 import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } from './ui-kit.js';
 import { readinessScore, isRoutine, allRoutineIds } from './domain-program.js';
 import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, startForWeek } from './domain-calendar.js';
-import { weeklySeries, loadTrend, trainingDays } from './domain-analytics.js';
+import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-analytics.js';
 import { createWorkout, createActivity, workoutStats, applySupersets, createQuickWorkout } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { prehabFor, PADEL_TYPES } from './domain-padel.js';
@@ -132,6 +132,37 @@ function hero() {
     <button class="btn tinted" data-action="${rec ? 'go' : 'log-activity'}" ${rec ? 'data-to="court"' : 'data-kind="mobility"'}>${rec ? 'Browse Routines' : 'Log an Activity'}</button></section>`;
 }
 
+// ── The court panel's rings: how ready you are for today, this week's workouts, your streak.
+const UPPER = ['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serratus', 'upper_chest', 'chest', 'lower_chest', 'traps', 'mid_back', 'lats', 'biceps', 'triceps', 'forearms'];
+const CORE = ['abs', 'obliques', 'lower_back', 'hip_flexors'];
+const LEGS = ['glutes', 'glute_med', 'adductors', 'quads', 'hamstrings', 'calves', 'soleus', 'shins'];
+const readyPct = (rec, ms) => ms.length ? Math.round(100 * (1 - ms.reduce((n, m) => n + (rec[m]?.level || 0), 0) / ms.length)) : 100;
+function ring(pct, color, big, small, label) {
+  const r = 24, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
+  return `<div class="ring-stat"><svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="${r}" class="rg-bg"/><circle cx="30" cy="30" r="${r}" class="rg-fg" stroke="${color}" stroke-dasharray="${(c * p).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 30 30)"/>
+    <text x="30" y="${small ? 31 : 35}" text-anchor="middle" class="rg-big">${big}</text>${small ? `<text x="30" y="43" text-anchor="middle" class="rg-small">${small}</text>` : ''}</svg><small>${label}</small></div>`;
+}
+function rings() {
+  if (!S.sessions.length) return '';
+  const rec = currentRecovery(), plan = S.schedule[dayKey()];
+  const muscles = isRoutine(plan) ? [...new Set(app.routine(plan).blocks.flatMap(b => getExercise(b.ex)?.primary || []))] : [...UPPER, ...CORE, ...LEGS];
+  const ready = readyPct(rec, muscles), planned = Object.values(S.schedule).filter(isRoutine).length;
+  const done = app.strength.filter(s => s.startedAt >= mondayOf().getTime()).length, streak = weekStreak(S.sessions);
+  const readyColor = ready >= 75 ? 'var(--ball)' : ready >= 50 ? '#FFD60A' : '#FF9F0A';
+  return `<button class="court-rings" data-action="go" data-to="recovery" aria-label="Ready ${ready}%, ${done} of ${planned} workouts this week, ${streak} week streak">
+    ${ring(ready / 100, readyColor, `${ready}%`, '', isRoutine(plan) ? 'Ready for today' : 'Ready')}
+    ${ring(planned ? done / planned : 0, '#64D2FF', `${done}/${planned || done}`, '', 'This week')}
+    ${ring(Math.min(1, streak / 8), '#FFFFFF', String(streak), streak === 1 ? 'week' : 'weeks', 'Streak')}</button>`;
+}
+
+// Recovery at a glance: three bars instead of the full body map (one tap opens it).
+function recoveryStrip() {
+  if (!S.sessions.some(s => Date.now() - s.startedAt < 8 * 86400000)) return '';
+  const rec = currentRecovery(), part = (label, ms) => { const p = readyPct(rec, ms); return `<div class="rs-part"><span>${label}</span><i><b style="width:${p}%;background:${colorFor(1 - p / 100)}"></b></i><em>${p}%</em></div>`; };
+  return `<section class="grp"><h2 class="grp-h big">Recovery</h2><button class="card rec-strip" data-action="go" data-to="recovery">
+    ${part('Upper body', UPPER)}${part('Core', CORE)}${part('Legs', LEGS)}<p class="t-foot">Tap for the body map and each muscle ${chev}</p></button></section>`;
+}
+
 function weekCard() {
   const days = trainingDays(S.sessions), today = isoDate();
   const planned = Object.values(S.schedule).filter(isRoutine).length;
@@ -163,8 +194,8 @@ export const today = {
     const others = allRoutineIds().filter(id => id !== todays || S.active);
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners()}${reviewBanner()}${hero()}
-      <div style="height:28px"></div>${weekCard()}${recoveryCard()}${stayHealthy()}
+      ${banners()}${reviewBanner()}<div class="court-stack">${hero()}${rings()}</div>
+      <div style="height:28px"></div>${weekCard()}${recoveryStrip()}${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
         return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
         + row({ title: 'Quick workout', sub: 'No plan: add exercises as you go', icon: 'bolt', color: 'indigo', action: 'quick-start' })

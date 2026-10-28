@@ -540,3 +540,37 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .lib-tools { display: flex; gap: 8px; margin-bottom: 12px; }
 .lib-tools .input { flex: 1; margin: 0; }
 .lib-tools .icon-circle { width: 44px; height: 44px; flex: none; }
+
+/* ── Court panel (Today): deep court blue, ball-green action, white text. Same in light and
+   dark, and high contrast so it reads outdoors. ── */
+:root { --court: #0B3D6E; --court-2: #0E4A84; --court-ink: #FFFFFF; --court-ink-2: rgba(224, 238, 255, .72); --on-ball: #1E2A00; }
+.court-stack { background: var(--court); border-radius: 20px; overflow: hidden; color: var(--court-ink); box-shadow: 0 10px 30px rgba(11, 61, 110, .22); }
+.court-stack > .card { background: none; box-shadow: none; border-radius: 0; color: var(--court-ink); }
+.court-stack .hero::before { --court-line: rgba(255, 255, 255, .09); }
+.court-stack .hero h2, .court-stack .done-card b, .court-stack .row-title { color: var(--court-ink); }
+.court-stack .t-sub, .court-stack .hero-note, .court-stack .t-foot, .court-stack small, .court-stack .done-card small { color: var(--court-ink-2); }
+.court-stack .hero-note.orange { color: #FFB340; }
+.court-stack .btn.filled { background: var(--ball); color: var(--on-ball); }
+.court-stack .btn.tinted { background: rgba(255, 255, 255, .14); color: var(--court-ink); }
+.court-stack .btn.plain { color: var(--court-ink); }
+.court-stack .chev { stroke: var(--court-ink-2); }
+.court-stack .done-next { border-top-color: rgba(255, 255, 255, .14); }
+.court-stack .tile-stat { background: rgba(255, 255, 255, .1); }
+.court-stack .tile-stat small { color: var(--court-ink-2); }
+/* Rings row: the bottom of the court panel, a shade lighter. */
+.court-rings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; padding: 12px 10px 14px; background: var(--court-2); color: var(--court-ink); }
+.ring-stat { display: grid; justify-items: center; gap: 4px; }
+.ring-stat svg { width: 64px; height: 64px; }
+.ring-stat small { font-size: 12px; color: var(--court-ink-2); }
+.rg-bg { fill: none; stroke: rgba(255, 255, 255, .14); stroke-width: 6; }
+.rg-fg { fill: none; stroke-width: 6; stroke-linecap: round; }
+.rg-big { fill: var(--court-ink); font-family: var(--font-round); font-size: 15px; font-weight: 700; }
+.rg-small { fill: var(--court-ink-2); font-size: 8px; font-weight: 600; }
+/* Compact recovery: three bars. */
+.rec-strip { display: grid; gap: 10px; width: 100%; text-align: left; }
+.rs-part { display: grid; grid-template-columns: 84px 1fr 40px; align-items: center; gap: 10px; font-size: 15px; }
+.rs-part i { height: 8px; border-radius: 4px; background: var(--fill); overflow: hidden; }
+.rs-part b { display: block; height: 100%; border-radius: 4px; }
+.rs-part em { font-style: normal; font-family: var(--font-round); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.rec-strip .t-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+.court-stack .done-next .row-main small { color: var(--court-ink-2); }
