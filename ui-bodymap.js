@@ -51,20 +51,20 @@ export function blueScale(v, max) {
   return { fill: 'var(--blue)', opacity: (0.3 + 0.7 * t).toFixed(2) };
 }
 
-function figure(regions, values, dx, color, max, label) {
+function figure(regions, values, dx, color, max, label, tipFn) {
   const base = BASE.map(s => shape(s, 'fill="var(--fill)"')).join('');
   const parts = Object.entries(regions).map(([m, shapes]) => {
     const c = color(values[m] || 0, max, m);
-    const tip = `${MUSCLES[m]}${values[m] ? `: ${values[m]} set${values[m] === 1 ? '' : 's'}` : ''}`;
+    const tip = tipFn ? tipFn(m, values[m] || 0) : `${MUSCLES[m]}${values[m] ? `: ${values[m]} set${values[m] === 1 ? '' : 's'}` : ''}`;
     return `<g class="bm-part" data-muscle="${m}"><title>${esc(tip)}</title>${shapes.map(s => shape(s, `fill="${c.fill}" fill-opacity="${c.opacity}"`)).join('')}</g>`;
   }).join('');
   return `<g transform="translate(${dx} 0)">${base}${parts}<text x="60" y="262" text-anchor="middle" class="bm-label">${label}</text></g>`;
 }
 
 // values: { muscleId: number }. Returns an accessible SVG.
-export function bodyMap(values = {}, { color = blueScale, max = null, title = 'Muscles worked' } = {}) {
+export function bodyMap(values = {}, { color = blueScale, max = null, title = 'Muscles worked', tip = null } = {}) {
   const m = max ?? Math.max(0, ...Object.values(values));
   const worked = Object.entries(values).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k]) => MUSCLES[k]).join(', ');
   return `<svg class="bodymap" viewBox="0 0 250 268" role="img" aria-label="${esc(title)}: ${esc(worked || 'none')}">
-    ${figure(FRONT, values, 0, color, m, 'Front')}${figure(BACK, values, 130, color, m, 'Back')}</svg>`;
+    ${figure(FRONT, values, 0, color, m, 'Front', tip)}${figure(BACK, values, 130, color, m, 'Back', tip)}</svg>`;
 }

@@ -90,7 +90,7 @@ function musclesView() {
       sub: `<span class="mbar"><span class="zone" style="left:${lo / scale * 100}%;width:${(hi - lo) / scale * 100}%"></span><b style="width:${Math.min(100, m.sets / scale * 100)}%"></b></span>` });
   }).join('');
   return `${navBar({ back: 'Progress', backTo: 'history', title: 'Muscles' })}
-    <h1 class="t-title" style="padding:8px 4px 2px">Muscles</h1><p class="t-sub" style="padding:0 4px 16px">Sets per muscle over the last 7 days.</p>
+    <h1 class="t-title" style="padding:8px 4px 2px">Muscles</h1><p class="t-sub" style="padding:0 4px 16px">Sets per muscle over the last 7 days. <button class="link" data-action="go" data-to="recovery">See recovery</button></p>
     <div class="card">${bodyMap(map)}<div class="bm-legend">Fewer sets <i></i> More sets</div></div>
     <div style="height:24px"></div>
     ${group(rows, { footer: 'The green band is a common weekly range for getting stronger: about 10–20 hard sets for big muscles, a bit less for small ones. Fewer usually keeps what you have. It’s a rough guide, not a rule, and padel counts too.' })}`;

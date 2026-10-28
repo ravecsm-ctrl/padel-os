@@ -12,6 +12,7 @@ import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { bodyMap } from './ui-bodymap.js';
+import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
 
 const W = () => S.active;
@@ -44,13 +45,25 @@ function defaultVal(e, i, f) {
   return prev?.[f] ?? (f === tf ? (e.suggestion.target ?? e.target.min) : null);
 }
 
+// Banner when today's plan was adjusted (or the adjustment was undone).
+function adaptBanner(w) {
+  const a = w.adapt;
+  if (!a?.changes?.length) return '';
+  const n = a.changes.length, up = a.changes.filter(c => c.dir === 'up').length, down = a.changes.filter(c => c.dir === 'down').length;
+  const what = down && !up ? 'a little lighter' : up && !down ? 'a bit harder' : 'tuned';
+  return a.applied
+    ? `<div class="banner" style="margin-bottom:14px">${tile('sliders', up && !down ? 'green' : 'orange')}<span><b>Adjusted for today</b><small>${n} exercise${n > 1 ? 's' : ''} ${what}, based on your recovery.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="adapt-why" style="font-size:15px">Why?</button><button class="link" data-action="adapt-undo" style="font-size:13px">Use original</button></span></div>`
+    : `<div class="banner" style="margin-bottom:14px;background:var(--fill)">${tile('sliders', 'gray')}<span><b>Original plan</b><small>Recovery adjustments are off for this workout.</small></span><button class="link" data-action="adapt-redo" style="margin-left:auto;font-size:15px">Use recommended</button></div>`;
+}
+
 function coach(e) {
   const ex = getExercise(e.exId), tf = targetField(ex), sug = e.suggestion;
   const range = e.target.min === e.target.max ? `${e.target.min}` : `${e.target.min}–${e.target.max}`;
   const weight = sug.w != null ? ` at <b>${fmtW(sug.w, unit())}</b>` : e.fields.includes('w') && sug.kind === 'first' ? ', choosing a weight that feels manageable' : '';
   const last = lastPerformance(app.strength, e.exId);
-  const tip = sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
+  const tip = e.adjusted ? '' : sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
+    ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
     <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${esc(effortTarget(e.target.rpe))}.${last ? ` Last time: ${esc(doneSets(last.entry).map(s => fmtSet(s, e.fields)).join(', '))}.` : ''}</p>
     ${missingHere(ex)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
 }
@@ -94,6 +107,7 @@ function runner() {
   const nextName = isLast ? '' : getExercise(w.exercises[w.index + 1].exId).name;
   const ready = entryState(e) === 'done' || e.skipped;
   return `${navBar({ back: 'Today', backAction: 'leave', title: w.title, sub: `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
+    ${w.index === 0 || w.adapt?.applied === false ? adaptBanner(w) : ''}
     <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
     <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p><h1>${esc(ex.name)}</h1></div>
       <button class="icon-circle" data-action="more" aria-label="More options">${icon('more')}</button></div>
@@ -185,6 +199,16 @@ export const workout = {
     },
     'undo-set'(el) { const s = cur().sets[+el.dataset.set]; s.done = false; s.rpe = null; touch(); app.toast(`Set ${+el.dataset.set + 1} reopened`); },
     how() { howSheet(getExercise(cur().exId)); },
+    'adapt-why'() {
+      const a = W().adapt, inp = a.inputs;
+      const ctx = [inp.readiness && `Check-in: ${inp.readiness.toLowerCase()} readiness`, inp.sore.length && `Sore: ${inp.sore.join(', ').replace(/_/g, ' ')}`, inp.padelTomorrow && 'Padel tomorrow'].filter(Boolean).join(' · ');
+      app.sheet(`<h2 class="sheet-title">Why it changed</h2><p class="sheet-sub">${ctx ? esc(ctx) + '. ' : ''}Based on how recently and how hard each muscle worked.</p>
+        ${group(a.changes.map(c => row({ title: esc(c.name), sub: esc(c.reason), value: `${c.from.sets}→${c.to.sets} sets${c.to.w != null && c.from.w != null && c.to.w !== c.from.w ? ` · ${fmtW(c.from.w, unit())}→${fmtW(c.to.w, unit())}` : ''}` })).join(''))}
+        <div class="btns"><button class="btn filled" data-action="close-sheet">Keep Adjustments</button><button class="btn plain" data-action="adapt-undo">Use Original Plan</button></div>
+        <p class="fine">You can turn this off in Settings → Adapt workouts to recovery.</p>`);
+    },
+    'adapt-undo'() { revertAdaptation(W()); app.closeSheet(); touch(); app.toast('Back to the original plan'); },
+    'adapt-redo'() { applyAdaptation(W()); touch(); app.toast('Recommended adjustments applied'); },
     more() {
       const e = cur(), note = S.exNotes[e.exId] || '';
       app.sheet(`<h2 class="sheet-title">${esc(getExercise(e.exId).name)}</h2><div style="height:12px"></div>

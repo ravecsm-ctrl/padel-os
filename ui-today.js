@@ -9,6 +9,12 @@ import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { prehabFor, PADEL_TYPES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { sessionEffortChips } from './ui-words.js';
+import { recoveryCard, currentRecovery } from './ui-recovery.js';
+import { adaptWorkout } from './domain-adaptive.js';
+import { calibrate, colorFor } from './domain-recovery.js';
+import { phaseFor, DAYS } from './domain-program.js';
+import { getExercise } from './domain-catalog.js';
+import { MUSCLES } from './domain-taxonomy.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -87,7 +93,7 @@ export const today = {
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
       ${banners()}${hero()}
-      <div style="height:28px"></div>${weekCard()}${stayHealthy()}
+      <div style="height:28px"></div>${weekCard()}${recoveryCard()}${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
         return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
         + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
@@ -115,27 +121,41 @@ const SCALE = {
 function startFlow(routineId) {
   if (S.active) return app.go('workout');
   if (!S.settings.readinessPrompt) return begin(routineId, null, false);
-  S.form = { sleep: 4, energy: 3, soreness: 2, light: null };
+  // Muscles this workout relies on, most tired first, so you can flag soreness.
+  const rec = currentRecovery();
+  const muscles = [...new Set(app.routine(routineId).blocks.flatMap(b => getExercise(b.ex)?.primary || []))].sort((a, b) => rec[b].level - rec[a].level).slice(0, 8);
+  S.form = { sleep: 4, energy: 3, soreness: 2, light: null, sore: [] };
   const draw = () => {
     const sc = readinessScore(S.form), low = sc.label === 'Low';
     const light = S.form.light ?? low;
     return `<h2 class="sheet-title">How do you feel today?</h2><p class="sheet-sub">We’ll adjust today’s workout if you need a lighter day.</p>
       ${Object.entries(SCALE).map(([k, [q, opts]]) => `<label class="field-l">${q}</label>${seg(k, opts.map((o, i) => [i + 1, o]), S.form[k])}`).join('')}
+      ${muscles.length ? `<label class="field-l">Sore anywhere? <small>(optional)</small></label><div class="chipset">${muscles.map(m => `<button type="button" class="chip-btn ${S.form.sore.includes(m) ? 'warn-on' : ''}" data-sore-m="${m}" aria-pressed="${S.form.sore.includes(m)}"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(rec[m].level)};margin-right:6px"></span>${esc(MUSCLES[m])}</button>`).join('')}</div>` : ''}
       <div style="height:20px"></div>
       ${group(row({ title: 'Lighter workout today', sub: low ? 'Recommended: one fewer set and easier effort.' : sc.label === 'Moderate' ? 'Optional. You seem OK to train.' : 'You seem ready to train as planned.', right: `<input type="checkbox" class="switch" id="lightToggle" ${light ? 'checked' : ''} aria-label="Lighter workout today">` }))}
       <div class="btns"><button class="btn filled" id="go">${icon('play')}Start Workout</button><button class="btn plain" id="skipCheck">Skip check-in</button></div>`;
   };
   const mount = body => {
     body.querySelector('#lightToggle').onchange = e => { S.form.light = e.target.checked; };
-    body.querySelector('#skipCheck').onclick = () => { app.closeSheet(); begin(routineId, null, false); };
-    body.querySelector('#go').onclick = () => { const r = { sleep: +S.form.sleep, energy: +S.form.energy, soreness: +S.form.soreness }; app.closeSheet(); begin(routineId, r, S.form.light ?? readinessScore(r).label === 'Low'); };
+    body.querySelectorAll('[data-sore-m]').forEach(b => b.onclick = () => { const m = b.dataset.soreM; S.form.sore = S.form.sore.includes(m) ? S.form.sore.filter(x => x !== m) : [...S.form.sore, m]; app.sheet(draw(), mount); });
+    body.querySelector('#skipCheck').onclick = () => { app.closeSheet(); begin(routineId, null, false, [], []); };
+    body.querySelector('#go').onclick = () => { const r = { sleep: +S.form.sleep, energy: +S.form.energy, soreness: +S.form.soreness }; app.closeSheet(); begin(routineId, r, S.form.light ?? readinessScore(r).label === 'Low', S.form.sore, muscles); };
   };
   app.sheet(draw(), mount);
   app.onPick = () => app.sheet(draw(), mount);
 }
 
-async function begin(routineId, readiness, light) {
-  const w = createWorkout({ routineId, week: app.position().week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: S.profile });
+async function begin(routineId, readiness, light, sore = [], asked = []) {
+  const week = app.position().week;
+  const w = createWorkout({ routineId, week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
+  const rec = currentRecovery();
+  // Only explicit answers teach the model: a muscle you marked sore. (Not ticking one isn't the same as "feels fine".)
+  if (sore.length) { for (const m of sore) S.recoveryCal = calibrate(S.recoveryCal, m, true, rec[m].level); app.save('recoveryCal'); }
+  if (S.settings.adaptive !== false) {
+    const tomorrow = DAYS[(DAYS.indexOf(dayKey()) + 1) % 7];
+    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: S.schedule[tomorrow] === 'Padel', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
+      deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit });
+  }
   S.active = w;
   await app.saveActive(true);
   db.requestPersistence();

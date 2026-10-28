@@ -5,7 +5,7 @@ import { DEFAULT_SCHEDULE, resolveRoutine } from './domain-program.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition } from './domain-calendar.js';
 
-export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, appearance: 'system', programStart: isoDate(mondayOf()) };
+export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, adaptive: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
 export const S = {
   route: 'today', params: [],
@@ -18,6 +18,7 @@ export const S = {
   customExercises: {},// your own exercises (imported or created)
   customRoutines: {}, // your own workouts
   startWeights: {},   // imported starting weights for library exercises
+  recoveryCal: {},    // per-muscle recovery speed learned from your feedback
   overrides: {},      // routine block customisations
   exNotes: {},        // persistent per-exercise notes ("seat 4")
   lastBackup: 0,

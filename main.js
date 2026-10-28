@@ -15,6 +15,7 @@ import { setCustomRoutines } from './domain-program.js';
 import { PRESET_GEAR } from './domain-taxonomy.js';
 import { library } from './ui-library.js';
 import { builder } from './ui-builder.js';
+import { recovery } from './ui-recovery.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
 app.register('today', today);
@@ -26,6 +27,7 @@ app.register('court', court);
 app.register('welcome', welcome);
 app.register('library', library);
 app.register('builder', builder);
+app.register('recovery', recovery);
 app.register('locations', locations);
 
 const GLOBAL = {
@@ -78,6 +80,7 @@ async function boot() {
     S.customExercises = meta.customExercises || {};
     S.customRoutines = meta.customRoutines || {};
     S.startWeights = meta.startWeights || {};
+    S.recoveryCal = meta.recoveryCal || {};
     setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
     // Locations: first run (or upgrade) creates two editable examples from the old tier setting.
     if (Array.isArray(meta.locations) && meta.locations.length) { S.locations = meta.locations; S.activeLocation = meta.activeLocation || meta.locations[0].id; }

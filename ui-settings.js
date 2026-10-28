@@ -35,6 +35,7 @@ export const settings = {
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
         + row({ title: 'Vibration', icon: 'phone', color: 'gray', right: sw('vibrate', S.settings.vibrate, 'Vibration') })
         + row({ title: 'Check-in before workouts', icon: 'heart', color: 'red', right: sw('readinessPrompt', S.settings.readinessPrompt, 'Check-in before workouts') })
+        + row({ title: 'Adapt workouts to recovery', sub: 'Lighter when tired, a bit more when fresh', icon: 'sliders', color: 'green', right: sw('adaptive', S.settings.adaptive !== false, 'Adapt workouts to recovery') })
         + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'During workouts' })}
       <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>
       <section class="grp"><h2 class="grp-h">Appearance</h2>${seg('appearance', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.settings.appearance || 'system')}</section>
@@ -95,7 +96,7 @@ async function importFile(file) {
       if (b.dataset.mode === 'replace') { await db.clearAll(); }
       const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
       await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
-      for (const k of ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights']) {
+      for (const k of ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'recoveryCal']) {
         if (norm.meta[k] == null) continue;
         const additive = ['exNotes', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights'];
         if (b.dataset.mode === 'merge' && !additive.includes(k)) continue; // keep current preferences on merge
