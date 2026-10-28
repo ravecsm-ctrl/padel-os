@@ -261,7 +261,8 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
       const dur = +f().duration;
       if (!(dur > 0)) return app.toast('Add how many minutes');
       const d = parseISO(f().date || isoDate()), now = new Date();
-      if (isoDate(d) === isoDate(now)) d.setHours(now.getHours(), now.getMinutes());
+      // Logged today = you just finished: it ended now and started `dur` minutes ago (not before midnight).
+      if (isoDate(d) === isoDate(now)) d.setTime(Math.max(parseISO(isoDate(now)).getTime(), now.getTime() - dur * 60000));
       else d.setHours(12);
       const padel = f().activity === 'padel' ? { type: f().ptype, result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().side, sore: f().sore } : undefined;
       const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];

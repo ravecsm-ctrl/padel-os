@@ -28,11 +28,13 @@ const effort = rpe => rpe == null ? 1 : rpe <= 6 ? 0.85 : rpe <= 7 ? 1 : rpe <= 
 const windowHours = (m, dose, cal = {}) => (BASE_HOURS[m] || 48) * Math.min(1.25, Math.max(0.6, 0.55 + 0.45 * dose / STANDARD_DOSE)) * (cal[m] || 1);
 
 // Fatigue "events": [{ t, muscle, dose }]
-export function events(sessions, since) {
+export function events(sessions, since, now = Date.now()) {
   const out = [];
   for (const s of sessions) {
     if (s.startedAt < since) continue;
-    const t = s.endedAt || s.startedAt;
+    // A session that has started counts from now even if its saved end is later (matches
+    // logged straight after playing used to end in the future and count for nothing).
+    const t = s.startedAt <= now ? Math.min(s.endedAt || s.startedAt, now) : s.startedAt;
     if (s.kind === 'strength') {
       const by = {};
       for (const e of s.exercises || []) {
@@ -78,7 +80,7 @@ export const roundHours = h => h <= 0 ? '' : h < 1 ? 'ready soon' : h < 48 ? `~$
 
 // Full picture: { muscleId: { level, state, hours, label } }
 export function recoveryMap(sessions, now = Date.now(), cal = {}) {
-  const evts = events(sessions, now - 8 * 24 * HOUR);
+  const evts = events(sessions, now - 8 * 24 * HOUR, now);
   return Object.fromEntries(Object.keys(MUSCLES).map(m => {
     const level = Math.round(fatigueAt(evts, m, now, cal) * 100) / 100, st = stateFor(level), hours = hoursUntilReady(evts, m, now, cal);
     return [m, { level, ...st, hours, when: roundHours(hours) }];

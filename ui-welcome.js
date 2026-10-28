@@ -67,13 +67,15 @@ export const welcome = {
       if (step < STEPS) { step++; return app.render(); }
       const f = F();
       const replace = document.querySelector('#wSched') ? document.querySelector('#wSched').checked : true;
-      const { _wizard, ...profile } = f;
+      const { _wizard, ...profile } = f, firstTime = !S.profile.onboarded;
       S.profile = { ...profile, simple: document.querySelector('#wSimple').checked, onboarded: true };
       await app.save('profile');
       // The equipment answer sets up where you train; edit it any time in Settings → Locations.
       const home = S.locations.find(l => l.id === 'home'), gym = S.locations.find(l => l.id === 'gym');
       if (home && profile.equipment !== 'gym') home.equipment = [...PRESET_GEAR[profile.equipment]];
       S.activeLocation = profile.equipment === 'gym' ? (gym?.id || S.activeLocation) : (home?.id || S.activeLocation);
+      // First setup: keep only the place you said you train (the starter pair is untouched). Add more in Settings → Locations.
+      if (firstTime && S.locations.length === 2 && home && gym) S.locations = S.locations.filter(l => l.id === S.activeLocation);
       await app.save('locations'); await app.save('activeLocation');
       if (replace) { S.schedule = generateSchedule(f.days, f.padelDays); await app.save('schedule'); }
       S.form = {};
