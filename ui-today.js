@@ -183,7 +183,7 @@ export function pastWorkoutSheet(iso) {
   const d = parseISO(iso), planned = S.schedule[DAYS[(d.getDay() + 6) % 7]];
   const ids = [...new Set([...(isRoutine(planned) ? [planned] : []), ...allRoutineIds()])];
   app.sheet(`<h2 class="sheet-title">Which workout?</h2><p class="sheet-sub">${esc(d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}. You’ll fill in your sets next.</p>
-    ${group(ids.map(id => { const r = app.routine(id), look = routineLook(id); return row({ title: esc(r.title), sub: `${r.blocks.length} exercises${id === planned ? ' · planned that day' : ''}`, icon: look.icon, color: look.color, action: 'past-start', data: { id, iso } }); }).join('')
+    ${group(ids.map(id => { const r = app.routine(id), look = routineLook(id); return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"}${id === planned ? ' · planned that day' : ''}`, icon: look.icon, color: look.color, action: 'past-start', data: { id, iso } }); }).join('')
       + row({ title: 'Something else', sub: 'Pick the exercises you did', icon: 'bolt', color: 'indigo', action: 'past-start', data: { id: '', iso } }))}
     <button class="btn gray" data-action="close-sheet">Cancel</button>`);
 }

@@ -11,6 +11,7 @@ import { activitySheet } from './ui-today.js';
 import { padelSummary, PADEL_TYPES, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { painAreasOf } from './domain-pain.js';
+import { routineFromWorkout, setCustomRoutines } from './domain-program.js';
 import { COURT_ROUTINES, stretchFor, routineMinutes as rMin } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
@@ -154,7 +155,7 @@ function sessionView(id) {
   const gym = s.kind === 'strength';
   const nav = navBar({ back: 'History', backTo: 'history', title: '' });
   const head = `<h1 class="t-title" style="padding:8px 4px 2px">${esc(s.title)}</h1><p class="t-sub" style="padding:0 4px 20px">${esc(dateLong(s.startedAt))}</p>`;
-  const actions = `<div class="btns">${gym ? `<button class="btn tinted" data-action="go" data-to="history/edit/${esc(s.id)}">Edit Sets</button>` : ''}<button class="btn ${gym ? 'gray' : 'tinted'}" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">${gym ? 'Edit Details' : 'Edit'}</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>`;
+  const actions = `<div class="btns">${gym && !s.routineId ? `<button class="btn tinted" data-action="save-as-routine" data-id="${esc(s.id)}">Save as a Workout</button>` : ''}${gym ? `<button class="btn ${s.routineId ? 'tinted' : 'gray'}" data-action="go" data-to="history/edit/${esc(s.id)}">Edit Sets</button>` : ''}<button class="btn ${gym ? 'gray' : 'tinted'}" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">${gym ? 'Edit Details' : 'Edit'}</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>`;
   if (!gym) {
     const pd = s.padel;
     const details = pd ? [['Type', PADEL_TYPES[pd.type]], ['Result', pd.result === 'won' ? 'Won' : pd.result === 'lost' ? 'Lost' : ''], ['Score', pd.score], ['Partner', pd.partner], ['Side', pd.side === 'drive' ? 'Right' : pd.side === 'reves' ? 'Left' : pd.side === 'both' ? 'Both' : ''], ['Sore', pd.sore?.length ? pd.sore.map(a => AREAS[a]).join(', ') : 'Nothing']].filter(r => r[1]) : [];
@@ -225,6 +226,21 @@ export const history = {
       app.toast('Deleted', async () => { await db.putSession(s); await app.reloadSessions(); app.render({ keepScroll: true }); });
     },
     'muscle-sheet'(el) { muscleSheet(el.dataset.m); },
+    'save-as-routine'(el) {
+      const s = S.sessions.find(x => x.id === el.dataset.id);
+      app.sheet(`<h2 class="sheet-title">Save as a workout</h2><p class="sheet-sub">It shows up in Plan with these exercises, ready to schedule or repeat.</p>
+        <input class="input" id="srName" placeholder="Name, e.g. Hotel gym" maxlength="40"><div style="height:16px"></div>
+        <div class="btns"><button class="btn filled" id="srOk">Save</button><button class="btn plain" data-action="close-sheet">Cancel</button></div>`, b => {
+        const inp = b.querySelector('#srName'); setTimeout(() => inp.focus(), 50);
+        b.querySelector('#srOk').onclick = async () => {
+          const r = routineFromWorkout(s, inp.value.trim() || 'My workout');
+          if (!r.blocks.length) return app.toast('No logged exercises to save');
+          S.customRoutines = { ...S.customRoutines, [r.id]: r }; setCustomRoutines(S.customRoutines); await app.save('customRoutines');
+          await db.putSession({ ...s, routineId: r.id, title: r.title }); await app.reloadSessions();
+          app.closeSheet(); app.render({ keepScroll: true }); app.toast(`“${esc(r.title)}” added to Plan`);
+        };
+      });
+    },
     'eset-add'(el) {
       const e = EDIT.exercises[+el.dataset.ei], last = e.sets[e.sets.length - 1];
       e.sets.push({ w: last?.w ?? null, reps: last?.reps ?? null, sec: last?.sec ?? null, m: last?.m ?? null, rpe: null, done: true });

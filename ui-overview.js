@@ -16,6 +16,7 @@ import { currentRecovery, recoveryMapSvg } from './ui-recovery.js';
 import { currentStats, radar } from './ui-stats.js';
 import { banners, activitySheet, pastWorkoutSheet } from './ui-today.js';
 import { bodySummary } from './ui-body.js';
+import { reviewBanner } from './ui-review.js';
 
 let monthOffset = 0;
 const MONTH = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -104,11 +105,12 @@ export const overview = {
     const rec = currentRecovery();
     const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your overview fills in as you train</b><small>Finish a workout or log a match to see your calendar, recovery and progress here.</small></span></div>` : '';
     return `${pageHead('Overview', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners()}${upNext(rec)}${empty}
+      ${banners()}${reviewBanner()}${upNext(rec)}${empty}
       <div style="height:24px"></div>${calendar()}${recoverySection(rec)}${headed()}
       ${S.sessions.length ? group(row({ title: 'History', sub: 'Every session, weekly load, padel stats', icon: 'note', color: 'gray', to: 'history' })
         + row({ title: 'Exercises', sub: 'Progress per exercise', icon: 'dumbbell', color: 'indigo', to: 'history/progress' })
         + row({ title: 'Muscles', sub: 'Sets per muscle this week', icon: 'target', color: 'blue', to: 'history/muscles' })
+        + row({ title: 'Weekly review', sub: 'Your week vs the last, and next week’s focus', icon: 'chart', color: 'indigo', to: 'review' })
         + row({ title: 'Body', sub: esc(bodySummary()), icon: 'person', color: 'teal', to: 'body/o' })
         + row({ title: 'Your profile', sub: 'Scores, level and milestones', icon: 'trophy', color: 'orange', to: 'stats' }), { header: 'Details' }) : ''}`;
   },

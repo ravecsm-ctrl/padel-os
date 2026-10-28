@@ -18,6 +18,7 @@ import { builder } from './ui-builder.js';
 import { recovery } from './ui-recovery.js';
 import { stats } from './ui-stats.js';
 import { body } from './ui-body.js';
+import { review } from './ui-review.js';
 import { overview } from './ui-overview.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
@@ -33,6 +34,7 @@ app.register('builder', builder);
 app.register('recovery', recovery);
 app.register('stats', stats);
 app.register('body', body);
+app.register('review', review);
 app.register('overview', overview);
 app.register('locations', locations);
 

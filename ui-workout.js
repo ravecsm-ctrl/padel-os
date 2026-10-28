@@ -4,6 +4,8 @@ import * as db from './core-db.js';
 import * as timer from './core-timer.js';
 import { esc, icon, navBar, group, row, stat, tile } from './ui-kit.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
+import { keepExercise, routineFromWorkout, setCustomRoutines, getRoutine } from './domain-program.js';
+import { prescriptionFor } from './domain-builder.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
@@ -225,6 +227,7 @@ function finishView() {
     ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => m.label).join(' · '))}</p></div></section>` : ''; })()}
     ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
+    ${keepGroup(w)}
     <label class="field-l">How hard was it overall?</label>${sessionEffortChips('rpe', S.form.rpe)}
     <div style="height:24px"></div>
     ${group(row({ title: 'Anything hurt?', right: `<input type="checkbox" class="switch" id="painSw" ${S.form.pain === 'yes' ? 'checked' : ''} aria-label="Anything hurt">` })
@@ -252,6 +255,20 @@ function platesSheet() {
 }
 const PL_MAX = { kg: 25, lb: 45 };
 
+// Exercises you added: keep them in this planned workout? Quick workout: save it as one of yours?
+const keepable = w => w.routineId && getRoutine(w.routineId) ? w.exercises.map((e, i) => [e, i]).filter(([e]) => e.added && !e.skipped && doneSets(e).length) : [];
+function keepGroup(w) {
+  S.form.keep ??= [];
+  if (w.quick) {
+    S.form.saveAs ??= false;
+    return group(row({ title: 'Save as a workout', sub: 'Shows up in Plan, ready to schedule or repeat', right: `<input type="checkbox" class="switch" id="saveAsSw" ${S.form.saveAs ? 'checked' : ''} aria-label="Save as a workout">` })
+      + (S.form.saveAs ? `<label class="row"><span class="row-main"><input class="input" id="saveAsName" value="${esc(S.form.saveAsName ?? '')}" placeholder="Name, e.g. Hotel gym" maxlength="40" style="padding:0;background:none;min-height:22px" aria-label="Workout name"></span></label>` : ''), { header: 'This workout' });
+  }
+  const rows = keepable(w);
+  if (!rows.length) return '';
+  return group(rows.map(([e, i]) => row({ title: esc(e.name), sub: `Add to ${esc(w.title)} for next time`, right: `<input type="checkbox" class="switch" data-keep="${i}" ${S.form.keep.includes(i) ? 'checked' : ''} aria-label="Keep ${esc(e.name)}">` })).join(''), { header: 'Added today', footer: 'Kept exercises show up in this workout from now on. Remove them any time in Plan.' });
+}
+
 function howSheet(ex) {
   app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${esc(ex.muscles)} · ${esc(ex.equipment)}</p>
     ${group([['Why it helps', ex.why], ['Get set up', ex.setup], ['Do it', ex.execute], ['Breathing', ex.breathe], ['Avoid', ex.avoid]].map(([t, d]) => row({ title: t, sub: esc(d) })).join(''))}
@@ -269,6 +286,9 @@ export const workout = {
       document.querySelector('#notesIn').oninput = ev => { S.form.notes = ev.target.value; };
       document.querySelector('#durIn').oninput = ev => { S.form.duration = +ev.target.value; };
       const di = document.querySelector('#dateIn'); if (di) di.onchange = ev => { S.form.date = ev.target.value; };
+      document.querySelectorAll('[data-keep]').forEach(c => c.onchange = () => { const i = +c.dataset.keep; S.form.keep = c.checked ? [...S.form.keep, i] : S.form.keep.filter(x => x !== i); });
+      const sa = document.querySelector('#saveAsSw'); if (sa) sa.onchange = () => { S.form.saveAs = sa.checked; app.render({ keepScroll: true }); };
+      const sn = document.querySelector('#saveAsName'); if (sn) { sn.oninput = () => { S.form.saveAsName = sn.value; }; if (S.form.saveAs && !S.form.saveAsName) sn.focus(); }
       document.querySelector('#painSw').onchange = ev => { S.form.pain = ev.target.checked ? 'yes' : 'no'; app.render({ keepScroll: true }); };
     }
   },
@@ -419,12 +439,26 @@ export const workout = {
       if (!workoutStats(W()).sets) return app.toast('Log at least one set, or discard the workout');
       const pain = S.form.pain === 'yes' ? { flag: true, areas: S.form.painAreas || [], location: S.form.painLoc || '' } : { flag: false, areas: [], location: '' };
       if (W().past && S.form.date && S.form.date <= isoDate()) { const d = parseISO(S.form.date); d.setHours(new Date(W().startedAt).getHours(), new Date(W().startedAt).getMinutes()); W().startedAt = d.getTime(); }
-      const session = finalizeWorkout(W(), { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, before());
+      const w = W(), session = finalizeWorkout(w, { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, before());
+      // Keep added exercises in the planned workout (in the order they appear).
+      let kept = 0;
+      for (const i of [...(S.form.keep || [])].sort((a, b) => a - b)) {
+        const e = w.exercises[i], ex = getExercise(e.exId), after = w.exercises.slice(0, i).reverse().find(x => !x.skipped)?.exId ?? null;
+        const r = keepExercise({ overrides: S.overrides, customRoutines: S.customRoutines }, w.routineId, { ex: e.exId, ...prescriptionFor(ex) }, after);
+        S.overrides = r.overrides; S.customRoutines = r.customRoutines; kept++;
+      }
+      if (kept) { setCustomRoutines(S.customRoutines); await app.save('overrides'); await app.save('customRoutines'); }
+      // Save a quick workout as one of your workouts, and link this session to it.
+      let savedAs = null;
+      if (w.quick && S.form.saveAs) {
+        const r = routineFromWorkout(w, (S.form.saveAsName || '').trim() || 'My workout');
+        if (r.blocks.length) { S.customRoutines = { ...S.customRoutines, [r.id]: r }; setCustomRoutines(S.customRoutines); await app.save('customRoutines'); session.routineId = r.id; session.title = r.title; savedAs = r.title; }
+      }
       try { await db.putSession(session); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }
       S.active = null; await app.saveActive(true); timer.stop(); wakeLock?.release?.();
       await app.reloadSessions();
       app.go(`history/session/${session.id}`);
-      app.toast(session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''}` : 'Workout saved');
+      app.toast(savedAs ? `Saved · “${esc(savedAs)}” added to Plan` : kept ? `Saved · ${kept} exercise${kept > 1 ? 's' : ''} kept for next time` : session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''}` : 'Workout saved');
     },
   },
 };

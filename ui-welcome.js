@@ -38,7 +38,7 @@ function body() {
       return `${q('Your plan is ready', 'You can change any of this later.')}
         <div class="plan-week" style="margin-bottom:28px">${DAYS.map(d => `<div>${d[0]}<b>${ROUTINES[sched[d]] ? '●' : sched[d] === 'Padel' ? '<span style="color:var(--teal)">●</span>' : '–'}</b></div>`).join('')}</div>
         ${group(ids.map(id => { const r = resolveRoutine(id, {}, f), look = routineLook(id);
-          return row({ title: esc(r.title), sub: `${r.blocks.length} exercises · about ${r.minutes} min · ${DAYS.filter(d => sched[d] === id).map(d => DAY_LONG[d]).join(', ')}`, icon: look.icon, color: look.color }); }).join(''), { header: 'Your workouts' })}
+          return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min · ${DAYS.filter(d => sched[d] === id).map(d => DAY_LONG[d]).join(', ')}`, icon: look.icon, color: look.color }); }).join(''), { header: 'Your workouts' })}
         ${group(row({ title: 'Simple mode', sub: 'Plain words instead of training terms', right: `<input type="checkbox" class="switch" id="wSimple" ${f.simple ? 'checked' : ''} aria-label="Simple mode">` })
           + (S.profile.onboarded ? row({ title: 'Update my weekly schedule', right: '<input type="checkbox" class="switch" id="wSched" checked aria-label="Update my weekly schedule">' }) : ''))}`;
     }

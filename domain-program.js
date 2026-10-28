@@ -39,15 +39,21 @@ export const isCustomRoutine = id => !!CUSTOM_ROUTINES[id];
 
 export const phaseFor = week => PHASES[(week - 1) % 4];
 
-// overrides: { [routineId]: { [blockIndex]: { ex?, sets?, min?, max?, rest? } } }
-// profile: adapts the routine to equipment, time and level (see personalize.js).
+// overrides: { [routineId]: { [blockIndex]: { ex?, sets?, min?, max?, rest? }, _extra?: [block + { after }] } }
+// `_extra` holds exercises you added to a built-in workout; each sits after the exercise
+// named in `after` (null = first). profile: adapts the routine to equipment, time and level.
 export function resolveRoutine(id, overrides = {}, profile = null) {
   const base = getRoutine(id);
   if (!base) return null;
   const o = overrides[id] || {};
   const blocks = base.blocks.map((blk, i) => ({ ...blk, ...(o[i] || {}), baseEx: blk.ex, index: i }));
+  (o._extra || []).forEach((x, k) => {
+    const blk = { pri: 2, ...x, baseEx: x.ex, index: `x${k}`, extra: true };
+    const after = x.after == null ? -1 : blocks.findIndex(b => b.ex === x.after || b.baseEx === x.after);
+    blocks.splice(x.after == null ? 0 : after < 0 ? blocks.length : after + 1, 0, blk);
+  });
   if (!profile) return { ...base, blocks, dropped: [] };
-  const overridden = new Set(Object.entries(o).filter(([, v]) => v.ex).map(([k]) => +k));
+  const overridden = new Set([...Object.entries(o).filter(([, v]) => v.ex).map(([k]) => +k), ...blocks.filter(b => b.extra).map(b => b.index)]);
   const a = adaptBlocks(blocks, profile, overridden);
   return { ...base, blocks: a.blocks, dropped: a.dropped, minutes: a.minutes };
 }
@@ -72,4 +78,33 @@ export function readinessScore(r) {
   if (!r) return null;
   const score = (r.sleep + r.energy + (6 - r.soreness)) / 3;
   return { score: Math.round(score * 10) / 10, label: score >= 3.7 ? 'Good' : score >= 2.7 ? 'Moderate' : 'Low' };
+}
+
+// Keep an exercise you added mid-workout. Built-in workouts store it as an extra in
+// overrides; your own workouts get it inserted directly. Returns { overrides, customRoutines }.
+export function keepExercise({ overrides = {}, customRoutines = {} }, id, block, after = null) {
+  if (CUSTOM_ROUTINES[id] || customRoutines[id]) {
+    const r = customRoutines[id] || CUSTOM_ROUTINES[id];
+    if (r.blocks.some(b => b.ex === block.ex)) return { overrides, customRoutines };
+    const blocks = [...r.blocks], at = after == null ? 0 : blocks.findIndex(b => b.ex === after) + 1 || blocks.length;
+    blocks.splice(at, 0, { pri: 2, ...block });
+    return { overrides, customRoutines: { ...customRoutines, [id]: { ...r, blocks } } };
+  }
+  const o = overrides[id] || {}, extra = o._extra || [];
+  if (ROUTINES[id]?.blocks.some(b => b.ex === block.ex) || extra.some(x => x.ex === block.ex)) return { overrides, customRoutines };
+  return { overrides: { ...overrides, [id]: { ...o, _extra: [...extra, { ...block, after }] } }, customRoutines };
+}
+export function removeExtra(overrides, id, k) {
+  const o = overrides[id] || {}, extra = (o._extra || []).filter((_, i) => i !== k);
+  const next = { ...o, _extra: extra };
+  if (!extra.length) delete next._extra;
+  return { ...overrides, [id]: next };
+}
+
+// A workout you did (e.g. a quick workout) saved as one of your workouts, ready to schedule.
+export function routineFromWorkout(w, title, id = `q-${Date.now().toString(36)}`) {
+  const blocks = w.exercises.filter(e => !e.skipped && (e.sets || []).some(s => s.done))
+    .map((e, k) => ({ ex: e.exId, sets: Math.max(2, e.target?.sets || 3), min: e.target?.min ?? 8, max: e.target?.max ?? 12, rest: e.target?.rest ?? 90, pri: k + 1 }));
+  const minutes = Math.max(15, Math.round(blocks.reduce((n, b) => n + b.sets * (1 + b.rest / 60), 0) / 5) * 5);
+  return { id, title: title || 'My workout', custom: true, minutes, focus: 'Saved from a workout you did.', blocks };
 }

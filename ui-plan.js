@@ -1,7 +1,7 @@
 // Plan: the week at a glance, the schedule, and each workout's exercises.
 import { app, S } from './core-app.js';
 import { esc, icon, pageHead, navBar, group, row, routineLook } from './ui-kit.js';
-import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines } from './domain-program.js';
+import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra } from './domain-program.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { getExercise } from './domain-catalog.js';
@@ -22,7 +22,7 @@ function overview() {
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'teal', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
     ${group(allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id);
-      return row({ title: esc(r.title), sub: `${r.blocks.length} exercises · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')
+      return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')
       + row({ title: 'Exercise library', sub: 'Browse, filter by equipment, import your own', icon: 'dumbbell', color: 'gray', to: 'library' }), { header: 'Workouts' })}
     ${group(row({ title: 'Your setup', sub: esc(setup), icon: 'sliders', color: 'gray', to: 'welcome' })
       + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' }), { header: 'About your plan' })}`;
@@ -33,9 +33,10 @@ function routineView(id) {
   if (!r) return navBar({ back: 'Plan', backTo: 'plan' });
   const edited = Object.keys(S.overrides[id] || {}).length;
   return `${navBar({ back: 'Plan', backTo: 'plan', title: '' })}
-    <div class="hero-top" style="padding:8px 4px 16px">${icon(look.icon) && `<span class="tile ${look.color} lg">${icon(look.icon)}</span>`}<div><h1 class="t-title">${esc(r.title)}</h1><p class="t-sub">${r.blocks.length} exercises · about ${r.minutes} min</p></div></div>
+    <div class="hero-top" style="padding:8px 4px 16px">${icon(look.icon) && `<span class="tile ${look.color} lg">${icon(look.icon)}</span>`}<div><h1 class="t-title">${esc(r.title)}</h1><p class="t-sub">${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min</p></div></div>
     <p class="t-sub" style="padding:0 4px 20px">${esc(r.focus)}</p>
     ${group(r.blocks.map(blk => { const ex = getExercise(blk.ex), rx = prescribe(blk, wk);
+      if (blk.extra) return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))} · added by you`, action: 'extra-sheet', data: { r: id, k: String(blk.index).slice(1) } });
       return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
       { header: 'Exercises', footer: `${r.dropped.length ? `Left out to fit ${S.profile.minutes} minutes: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}. ` : ''}Tap an exercise to change it.` })}
     <div class="btns">${S.active ? '<button class="btn tinted" data-action="resume">Continue Current Workout</button>' : `<button class="btn filled" data-action="start" data-routine="${id}">${icon('play')}Start Workout</button>`}
@@ -77,6 +78,13 @@ export const plan = {
       for (const d of Object.keys(S.schedule)) if (S.schedule[d] === el.dataset.r) S.schedule[d] = 'Rest';
       await app.save('customRoutines'); await app.save('schedule'); app.go('plan');
     },
+    'extra-sheet'(el) {
+      const x = S.overrides[el.dataset.r]?._extra?.[+el.dataset.k];
+      if (!x) return;
+      app.sheet(`<h2 class="sheet-title">${esc(getExercise(x.ex).name)}</h2><p class="sheet-sub">You added this to the workout. Remove it to go back to the original exercises.</p>
+        <button class="btn destructive" data-action="extra-remove" data-r="${esc(el.dataset.r)}" data-k="${esc(el.dataset.k)}">Remove from Workout</button><button class="btn plain" data-action="close-sheet">Cancel</button>`);
+    },
+    async 'extra-remove'(el) { S.overrides = removeExtra(S.overrides, el.dataset.r, +el.dataset.k); await app.save('overrides'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Removed'); },
     async 'reset-routine'(el) {
       if (!(await app.confirm('Restore the original exercises for this workout?', { ok: 'Restore' }))) return;
       delete S.overrides[el.dataset.r]; await app.save('overrides'); app.render({ keepScroll: true });
