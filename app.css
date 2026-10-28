@@ -354,3 +354,17 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .mbar, .mbar b, .mbar .zone { display: block; }
 .row-value { min-width: 0; max-width: 62%; overflow: hidden; text-overflow: ellipsis; }
 .row-main { flex-shrink: 1; }
+
+/* Pentagon & level */
+.radar { width: 100%; height: auto; display: block; }
+.radar .rd-ring { fill: none; stroke: var(--sep); stroke-width: 1; }
+.radar .rd-prev { fill: none; stroke: var(--label-3); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.radar .rd-cur { fill: var(--blue); fill-opacity: .22; stroke: var(--blue); stroke-width: 2.5; stroke-linejoin: round; }
+.radar .rd-dot { fill: var(--cell); stroke: var(--blue); stroke-width: 2; }
+.radar .rd-label { fill: var(--label-2); font-size: 12px; font-family: var(--font); font-weight: 500; }
+.radar .rd-score { fill: var(--label); font-size: 15px; font-family: var(--font-round); font-weight: 700; }
+.bm-legend span { display: inline-flex; align-items: center; margin: 0 6px; }
+.lvl-top { display: flex; align-items: center; gap: 12px; }
+.lvl-top b { display: block; font-weight: 600; }
+.lvl-top small { display: block; font-size: 13px; color: var(--label-2); }
+.lvl-badge { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, #3D9BFF, #0060DF); color: #fff; display: grid; place-items: center; font-family: var(--font-round); font-weight: 700; font-size: 19px; flex: 0 0 auto; }

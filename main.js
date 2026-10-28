@@ -16,6 +16,7 @@ import { PRESET_GEAR } from './domain-taxonomy.js';
 import { library } from './ui-library.js';
 import { builder } from './ui-builder.js';
 import { recovery } from './ui-recovery.js';
+import { stats } from './ui-stats.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
 app.register('today', today);
@@ -28,6 +29,7 @@ app.register('welcome', welcome);
 app.register('library', library);
 app.register('builder', builder);
 app.register('recovery', recovery);
+app.register('stats', stats);
 app.register('locations', locations);
 
 const GLOBAL = {

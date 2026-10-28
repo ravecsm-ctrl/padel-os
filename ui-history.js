@@ -13,6 +13,7 @@ import { AREAS } from './domain-personalize.js';
 import { COURT_ROUTINES } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
+import { statsCard } from './ui-stats.js';
 import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor } from './domain-muscles.js';
 import { MUSCLES } from './domain-taxonomy.js';
 
@@ -113,6 +114,7 @@ function logView() {
   const thisMon = isoDate(mondayOf());
   const lists = [...groups.entries()].slice(0, 12).map(([k, arr]) => group(arr.map(sessionRow).join(''), { header: k === thisMon ? 'This week' : `Week of ${new Date(k + 'T12:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}` })).join('');
   return `${pageHead('Progress')}${tabs('log')}
+    ${statsCard()}
     <div class="tiles">${stat(cur.sessions, 'This week', cur.sessions === 1 ? 'session' : 'sessions')}${(n => stat(n, 'Streak', n === 1 ? 'week' : 'weeks'))(weekStreak(S.sessions))}</div>
     ${weekMusclesCard()}
     <section class="grp"><h2 class="grp-h">Training load</h2><div class="card">${barChart(series.map(w => ({ label: `${w.start.getDate()}/${w.start.getMonth() + 1}`, parts: [{ v: w.gym, cls: 'gym' }, { v: w.padel, cls: 'padel' }, { v: w.other, cls: 'other' }] })))}
