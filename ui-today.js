@@ -17,6 +17,7 @@ import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { saveBackup } from './ui-backup.js';
 import { reviewBanner } from './ui-review.js';
+import { taperFor, taperText } from './domain-goals.js';
 import { recentPain, painHits, areaName } from './domain-pain.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
@@ -35,6 +36,8 @@ export function banners({ resumeOnly = false } = {}) {
   if (br) out += `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`;
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
+  const tp = taperFor(S.settings.tournament);
+  if (tp && !tp.noGym) out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'orange')}<span><b>${esc(tp.phase === 'recover' ? 'After the tournament' : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(taperText(tp))}</small></span>${chev}</button>`;
   // Everything lives on this phone, so nudge a backup from the first saved session, then weekly.
   if (S.sessions.length) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
@@ -74,6 +77,14 @@ function hero() {
     return `<section class="card hero"><div class="hero-top">${tile('check', 'green', true)}<div><h2>Done for today</h2><p class="t-sub">${doneToday.map(s => esc(s.title)).join(' and ')}</p></div></div>
       <p class="hero-note">Nice work. Rest and sleep are when your body gets stronger.</p>
       <button class="btn tinted" data-action="go" data-to="history/session/${esc(doneToday[0].id)}">See Summary</button></section>`;
+  }
+  const tp = taperFor(S.settings.tournament);
+  if (tp?.noGym) {
+    const day = tp.phase === 'day';
+    return `<section class="card hero"><div class="hero-top">${tile('trophy', 'orange', true)}<div><p class="t-foot">${day ? 'Today' : tp.days === 1 ? 'Tomorrow' : 'In 2 days'}</p><h2>${esc(tp.name)}</h2><p class="t-sub">${day ? 'Tournament day' : 'Rest up before you play'}</p></div></div>
+      <p class="hero-note">${esc(taperText(tp))}</p>
+      <div class="btns">${day ? `<button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button><button class="btn tinted" data-action="log-activity" data-kind="padel">Log a Match</button>`
+        : `<button class="btn filled" data-action="go" data-to="court/mobility">${icon('play')}Daily Mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</button>${isRoutine(plan) && !S.active ? `<button class="btn plain" data-action="start" data-routine="${plan}">Train anyway</button>` : ''}`}</div></section>`;
   }
   if (isRoutine(plan)) {
     const r = app.routine(plan), look = routineLook(plan), last = lastDone(plan);
@@ -192,7 +203,9 @@ function startFlow(routineId) {
 }
 
 async function begin(routineId, readiness, light, sore = [], asked = []) {
-  const week = app.position().week;
+  const week = app.position().week, tp = taperFor(S.settings.tournament);
+  // Before (and just after) a tournament every workout is the lighter version.
+  if (tp?.lighter || tp?.noGym) { light = true; app.toast(tp.phase === 'recover' ? 'Easy session while you recover from the tournament' : 'Tournament week: lighter workout today'); }
   const w = createWorkout({ routineId, week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
   const rec = currentRecovery();
   // Only explicit answers teach the model: a muscle you marked sore. (Not ticking one isn't the same as "feels fine".)

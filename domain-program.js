@@ -46,12 +46,18 @@ export function resolveRoutine(id, overrides = {}, profile = null) {
   const base = getRoutine(id);
   if (!base) return null;
   const o = overrides[id] || {};
-  const blocks = base.blocks.map((blk, i) => ({ ...blk, ...(o[i] || {}), baseEx: blk.ex, index: i }));
+  let blocks = base.blocks.map((blk, i) => ({ ...blk, ...(o[i] || {}), baseEx: blk.ex, index: i }));
   (o._extra || []).forEach((x, k) => {
     const blk = { pri: 2, ...x, baseEx: x.ex, index: `x${k}`, extra: true };
     const after = x.after == null ? -1 : blocks.findIndex(b => b.ex === x.after || b.baseEx === x.after);
     blocks.splice(x.after == null ? 0 : after < 0 ? blocks.length : after + 1, 0, blk);
   });
+  // Your own order (`_order`: block keys). Exercises it doesn't mention stay where they were.
+  if (o._order?.length) {
+    const pos = new Map(o._order.map((k, i) => [String(k), i])), has = b => pos.has(String(b.index));
+    const known = blocks.filter(has).sort((a, b) => pos.get(String(a.index)) - pos.get(String(b.index)));
+    let k = 0; blocks = blocks.map(b => has(b) ? known[k++] : b);
+  }
   if (!profile) return { ...base, blocks, dropped: [] };
   const overridden = new Set([...Object.entries(o).filter(([, v]) => v.ex).map(([k]) => +k), ...blocks.filter(b => b.extra).map(b => b.index)]);
   const a = adaptBlocks(blocks, profile, overridden);
@@ -96,9 +102,19 @@ export function keepExercise({ overrides = {}, customRoutines = {} }, id, block,
 }
 export function removeExtra(overrides, id, k) {
   const o = overrides[id] || {}, extra = (o._extra || []).filter((_, i) => i !== k);
-  const next = { ...o, _extra: extra };
+  // Extras after the removed one shift down a key; renumber them in your saved order.
+  const order = o._order?.filter(x => x !== `x${k}`).map(x => /^x\d+$/.test(x) && +x.slice(1) > k ? `x${+x.slice(1) - 1}` : x);
+  const next = { ...o, _extra: extra, ...(order ? { _order: order } : {}) };
   if (!extra.length) delete next._extra;
   return { ...overrides, [id]: next };
+}
+
+// Move one exercise of a workout up or down. `blocks` is the workout as you see it.
+export function moveBlock(overrides, id, blocks, from, to) {
+  if (to < 0 || to >= blocks.length || from === to) return overrides;
+  const keys = blocks.map(b => String(b.index));
+  const [k] = keys.splice(from, 1); keys.splice(to, 0, k);
+  return { ...overrides, [id]: { ...(overrides[id] || {}), _order: keys } };
 }
 
 // A workout you did (e.g. a quick workout) saved as one of your workouts, ready to schedule.

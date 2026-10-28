@@ -2,12 +2,15 @@
 import { app, S } from './core-app.js';
 import { esc, icon, pageHead, group, row } from './ui-kit.js';
 import { isRoutine, getRoutine } from './domain-program.js';
-import { isoDate, mondayOf } from './domain-calendar.js';
+import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
 import { monthGrid, monthStats, liftProjections, levelEta, whatIf, trackingSince } from './domain-overview.js';
 import { xpEvents } from './domain-stats.js';
 import { weekStreak } from './domain-analytics.js';
-import { fmtW, fmtNum, toDisplay } from './domain-units.js';
+import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
+import { getExercise } from './domain-catalog.js';
+import { taperFor, taperText, daysUntil, liftProgress } from './domain-goals.js';
+import { exercisePicker } from './ui-picker.js';
 import { currentStats, radar } from './ui-stats.js';
 import { activitySheet, pastWorkoutSheet } from './ui-today.js';
 import { bodySummary } from './ui-body.js';
@@ -30,6 +33,52 @@ function calendar() {
     <div class="card"><div class="cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<small>${d}</small>`).join('')}${weeks.flat().map(cell).join('')}</div>
       <div class="legend" style="justify-content:center"><span><i class="gym"></i>Workout</span><span><i class="padel"></i>Padel</span><span><i class="cd plan"></i>Planned</span><span><i style="background:none;box-shadow:inset 0 0 0 1.5px var(--label-3)"></i>Missed</span></div></div>
     <p class="grp-f">${plural(st.sessions, 'session')} this month${streak ? ` · 🔥 ${plural(streak, 'week')} in a row` : ''}${st.missed ? ` · ${st.missed} planned missed` : ''}</p></section>`;
+}
+
+// ── Goals: a tournament to peak for, and lift targets.
+function goals() {
+  const t = S.settings.tournament, lifts = S.settings.liftGoals || [], u = S.settings.unit;
+  const tRow = t?.date ? (() => {
+    const d = daysUntil(t.date), when = parseISO(t.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    const sub = d > 0 ? `${when} · in ${plural(d, 'day')}` : d === 0 ? `${when} · today` : `${when} · done`;
+    return row({ title: esc(t.name || 'Tournament'), sub: `${esc(sub)}${taperFor(t) ? `<br><span class="orange">${esc(taperText(taperFor(t)))}</span>` : ''}`, icon: 'trophy', color: 'orange', action: 'goal-tour' });
+  })() : row({ title: 'Add a tournament', sub: 'Workouts ease off in the week before so you play fresh', icon: 'trophy', color: 'orange', action: 'goal-tour' });
+  const lRows = lifts.map((g, i) => { const ex = getExercise(g.exId); if (!ex) return ''; const p = liftProgress(g, app.strength);
+    return row({ title: esc(ex.name), sub: `<span class="mbar" style="margin:6px 0 4px"><b style="width:${Math.round(p.pct * 100)}%"></b></span>${p.done ? `Reached ${esc(fmtW(g.kg, u))}!` : p.best ? `Best ${esc(fmtW(p.best, u))} of ${esc(fmtW(g.kg, u))}` : `Goal ${esc(fmtW(g.kg, u))} · not lifted yet`}`, icon: p.done ? 'check' : 'dumbbell', color: p.done ? 'green' : 'indigo', action: 'goal-lift', data: { i } }); }).join('');
+  return group(tRow + lRows + row({ title: 'Add a lift goal', icon: 'plus', color: 'green', action: 'goal-lift-add', chevron: false, cls: 'action' }), { header: 'Goals', big: true });
+}
+
+function tournamentSheet() {
+  const t = S.settings.tournament || {};
+  app.sheet(`<h2 class="sheet-title">Tournament</h2><p class="sheet-sub">From a week before, workouts get lighter; the two days before are for rest and mobility.</p>
+    ${group(`<label class="row"><span class="row-main"><input class="input" id="tName" value="${esc(t.name || '')}" placeholder="Name, e.g. Club Open" maxlength="40" style="padding:0;background:none;min-height:22px" aria-label="Tournament name"></span></label>`
+      + row({ title: 'Date', right: `<input class="input" id="tDate" type="date" min="${isoDate()}" value="${esc(t.date || '')}" style="width:150px;text-align:right;background:none;padding:0" aria-label="Tournament date">` }))}
+    <div class="btns"><button class="btn filled" id="tSave">Save</button>${t.date ? '<button class="btn destructive" id="tDel">Remove Tournament</button>' : '<button class="btn plain" data-action="close-sheet">Cancel</button>'}</div>`, b => {
+    b.querySelector('#tSave').onclick = async () => {
+      const date = b.querySelector('#tDate').value;
+      if (!date) return app.toast('Pick the date');
+      S.settings.tournament = { name: b.querySelector('#tName').value.trim() || 'Tournament', date };
+      await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(taperText(taperFor(S.settings.tournament)) || 'Tournament saved. Training eases off from a week before.');
+    };
+    b.querySelector('#tDel')?.addEventListener('click', async () => { delete S.settings.tournament; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Tournament removed'); });
+  });
+}
+
+function liftSheet(exId, i = -1) {
+  const ex = getExercise(exId), u = S.settings.unit, g = (S.settings.liftGoals || [])[i], best = liftProgress({ exId, kg: 1 }, app.strength).best;
+  app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${best ? `Your best so far: ${esc(fmtW(best, u))}.` : 'You haven’t logged this one yet.'} Progress uses the heaviest weight you log.</p>
+    ${group(row({ title: `Goal (${u})`, right: `<input class="input num" id="gKg" type="number" inputmode="decimal" step="any" min="0" value="${g ? fmtNum(toDisplay(g.kg, u)) : ''}" style="width:90px;text-align:right;background:none;padding:0" aria-label="Goal weight">` }))}
+    <div class="btns"><button class="btn filled" id="gSave">Save</button>${g ? '<button class="btn destructive" id="gDel">Remove Goal</button>' : '<button class="btn plain" data-action="close-sheet">Cancel</button>'}</div>`, b => {
+    setTimeout(() => b.querySelector('#gKg').focus(), 50);
+    b.querySelector('#gSave').onclick = async () => {
+      const v = Number(String(b.querySelector('#gKg').value).replace(',', '.'));
+      if (!(v > 0)) return app.toast('Enter a weight');
+      const list = [...(S.settings.liftGoals || [])], goal = { exId, kg: fromDisplay(v, u) };
+      if (i >= 0) list[i] = goal; else list.push(goal);
+      S.settings.liftGoals = list; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Goal saved');
+    };
+    b.querySelector('#gDel')?.addEventListener('click', async () => { S.settings.liftGoals = S.settings.liftGoals.filter((_, k) => k !== i); await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Goal removed'); });
+  });
 }
 
 // ── Your first few weeks: early wins instead of scores that don't mean much yet.
@@ -76,7 +125,7 @@ export const overview = {
     const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
     const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your progress fills in as you train</b><small>Finish a workout or log a match to see your calendar, scores and history here.</small></span></div>` : '';
     return `${pageHead('Progress', { right: avatar })}${empty}
-      <div style="height:${empty ? 24 : 8}px"></div>${calendar()}${headed()}
+      <div style="height:${empty ? 24 : 8}px"></div>${calendar()}${goals()}${headed()}
       ${S.sessions.length ? group(row({ title: 'History', sub: 'Every session, weekly load, padel stats', icon: 'note', color: 'gray', to: 'history' })
         + row({ title: 'Recovery', sub: 'How ready each muscle is', icon: 'heart', color: 'pink', to: 'recovery' })
         + row({ title: 'Exercises', sub: 'Progress per exercise', icon: 'dumbbell', color: 'indigo', to: 'history/progress' })
@@ -97,6 +146,15 @@ export const overview = {
         ${future ? '' : `<div class="btns">${iso < isoDate() ? `<button class="btn tinted" data-action="cal-past" data-iso="${iso}">Log a Past Workout</button>` : ''}<button class="btn ${iso < isoDate() ? 'gray' : 'tinted'}" data-action="cal-log" data-iso="${iso}">Log Padel or Activity</button></div>`}`);
     },
     'cal-past'(el) { pastWorkoutSheet(el.dataset.iso); },
+    'goal-tour'() { tournamentSheet(); },
+    'goal-lift'(el) { const g = S.settings.liftGoals[+el.dataset.i]; liftSheet(g.exId, +el.dataset.i); },
+    'goal-lift-add'() {
+      exercisePicker({ title: 'Lift goal', sub: 'Pick an exercise you lift with weight.', inUse: (S.settings.liftGoals || []).map(g => g.exId), usedNote: 'has a goal', pick: id => {
+        if (!getExercise(id).fields.includes('w')) return app.toast('Pick an exercise with a weight');
+        const i = (S.settings.liftGoals || []).findIndex(g => g.exId === id);
+        setTimeout(() => liftSheet(id, i), 250);
+      } });
+    },
     'cal-log'(el) { app.closeSheet(); activitySheet('padel', null, el.dataset.iso); },
   },
 };

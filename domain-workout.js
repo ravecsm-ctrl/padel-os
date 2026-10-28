@@ -146,3 +146,11 @@ export function savedEntry(exId) {
   return { exId, name: ex.name, fields: ex.fields, perSide: ex.perSide, target: { sets: rx.sets, min: rx.min, max: rx.max, rest: rx.rest }, skipped: false, added: true,
     sets: [{ w: null, reps: null, sec: null, m: null, rpe: null, done: true }] };
 }
+
+// Move an exercise earlier or later in today's workout; the one you're on stays selected.
+export function moveExercise(w, from, to) {
+  if (to < 0 || to >= w.exercises.length || from === to) return false;
+  const cur = w.exercises[w.index], [e] = w.exercises.splice(from, 1);
+  w.exercises.splice(to, 0, e); w.index = w.exercises.indexOf(cur);
+  return true;
+}

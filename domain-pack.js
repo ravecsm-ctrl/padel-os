@@ -26,7 +26,7 @@ Smith machine hack squat,quads,"glutes, hamstrings",squat,lower-strength,bar,rep
 Smith machine split squat,"quads, glutes","adductors, abs, glute_med",single-leg,lower-strength,bar,reps,total,yes,beginner,expanded
 Smith machine hip thrust,glutes,"hamstrings, glute_med, quads",hinge,lower-strength,bar,reps,total,no,beginner,expanded
 Smith machine glute bridge,glutes,"hamstrings, glute_med",hinge,lower-strength,bar,reps,total,no,beginner,expanded
-Smith machine seated shoulder press,"front_delts, side_delts","triceps, upper_chest",push,upper-strength,bar,reps,total,no,beginner,expanded
+Smith machine seated shoulder press,"front_delts, side_delts","triceps, upper_chest, serratus",push,upper-strength,bar,reps,total,no,beginner,expanded
 Smith machine bench press,chest,"front_delts, triceps",push,upper-strength,bar,reps,total,no,beginner,expanded
 Smith machine incline bench press,"upper_chest, front_delts","triceps, chest",push,upper-strength,bar,reps,total,no,beginner,expanded
 Smith machine close-grip bench press,"triceps, chest",front_delts,push,upper-strength,bar,reps,total,no,beginner,expanded
@@ -58,7 +58,7 @@ Barbell incline bench press,"upper_chest, front_delts","triceps, chest",push,upp
 Barbell decline bench press,"lower_chest, chest","triceps, front_delts",push,upper-strength,barbell,reps,total,no,beginner,expanded
 Close-grip bench press,"triceps, chest",front_delts,push,upper-strength,barbell,reps,total,no,beginner,expanded
 Floor press,"chest, triceps",front_delts,push,upper-strength,barbell,reps,total,no,beginner,expanded
-Barbell overhead press,"front_delts, side_delts","triceps, upper_chest, traps, abs",push,upper-strength,barbell,reps,total,no,beginner,expanded
+Barbell overhead press,"front_delts, side_delts","triceps, upper_chest, traps, abs, serratus",push,upper-strength,barbell,reps,total,no,beginner,expanded
 Barbell push press,"front_delts, side_delts","triceps, quads, glutes, traps",power,power,barbell,reps,total,no,intermediate,expanded
 Barbell bent-over row,"mid_back, lats","biceps, lower_back, rear_delts",pull,upper-strength,barbell,reps,total,no,beginner,expanded
 Pendlay row,"mid_back, lats","biceps, lower_back, rear_delts",pull,upper-strength,barbell,reps,total,no,intermediate,expanded
@@ -74,12 +74,12 @@ Dumbbell decline bench press,"lower_chest, chest","triceps, front_delts",push,up
 Dumbbell floor press,"chest, triceps",front_delts,push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Dumbbell fly,chest,front_delts,push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Incline dumbbell fly,upper_chest,"front_delts, chest",push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
-Dumbbell shoulder press,"front_delts, side_delts","triceps, upper_chest, traps",push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
-Arnold press,"front_delts, side_delts","triceps, upper_chest",push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
+Dumbbell shoulder press,"front_delts, side_delts","triceps, upper_chest, traps, serratus",push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
+Arnold press,"front_delts, side_delts","triceps, upper_chest, serratus",push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Dumbbell lateral raise,side_delts,traps,push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Dumbbell front raise,front_delts,"upper_chest, side_delts",push,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Dumbbell reverse fly,"rear_delts, mid_back","rotator_cuff, traps",pull,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
-Dumbbell pullover,"lats, chest","triceps, abs",pull,upper-strength,dumbbells,reps,total,no,beginner,expanded
+Dumbbell pullover,"lats, chest","triceps, abs, serratus",pull,upper-strength,dumbbells,reps,total,no,beginner,expanded
 Dumbbell shrug,traps,forearms,pull,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Dumbbell biceps curl,biceps,forearms,pull,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
 Hammer curl,"biceps, forearms",,pull,upper-strength,dumbbells,reps,per_hand,no,beginner,expanded
@@ -110,10 +110,10 @@ Chest press machine,chest,"front_delts, triceps",push,upper-strength,chest press
 Incline chest press machine,"upper_chest, front_delts","triceps, chest",push,upper-strength,chest press,reps,total,no,beginner,expanded
 Pec deck fly,chest,front_delts,push,upper-strength,pec deck,reps,total,no,beginner,expanded
 Reverse pec deck,"rear_delts, mid_back",rotator_cuff,pull,upper-strength,pec deck,reps,total,no,beginner,expanded
-Shoulder press machine,"front_delts, side_delts","triceps, upper_chest",push,upper-strength,shoulder press,reps,total,no,beginner,expanded
+Shoulder press machine,"front_delts, side_delts","triceps, upper_chest, serratus",push,upper-strength,shoulder press,reps,total,no,beginner,expanded
 Lateral raise machine,side_delts,,push,upper-strength,lateral raise machine,reps,total,no,beginner,expanded
 High row machine,"mid_back, lats","biceps, rear_delts",pull,upper-strength,row machine,reps,total,no,beginner,expanded
-Pullover machine,lats,"chest, triceps",pull,upper-strength,pullover machine,reps,total,no,beginner,expanded
+Pullover machine,lats,"chest, triceps, serratus",pull,upper-strength,pullover machine,reps,total,no,beginner,expanded
 Assisted pull-up,"lats, mid_back","biceps, abs, rear_delts",pull,upper-strength,assisted pull-up machine,reps,bodyweight,no,beginner,expanded
 Assisted dip,"lower_chest, triceps","front_delts, chest",push,upper-strength,assisted dip machine,reps,bodyweight,no,beginner,expanded
 Biceps curl machine,biceps,forearms,pull,upper-strength,curl machine,reps,total,no,beginner,expanded
@@ -122,15 +122,15 @@ Pull-up,"lats, mid_back","biceps, abs, rear_delts",pull,upper-strength,bar,reps,
 Chin-up,"lats, biceps","mid_back, abs, rear_delts",pull,upper-strength,bar,reps,bodyweight,no,beginner,expanded
 Neutral-grip pull-up,"lats, mid_back","biceps, abs, rear_delts",pull,upper-strength,bar,reps,bodyweight,no,beginner,expanded
 Dip,"lower_chest, triceps","front_delts, chest",push,upper-strength,bar,reps,bodyweight,no,beginner,expanded
-Diamond push-up,"triceps, chest","front_delts, abs",push,upper-strength,none,reps,bodyweight,no,beginner,expanded
-Decline push-up,"upper_chest, front_delts","triceps, chest, abs",push,upper-strength,none,reps,bodyweight,no,beginner,expanded
-Handstand push-up,"front_delts, triceps","side_delts, traps, upper_chest, abs",push,upper-strength,none,reps,bodyweight,no,advanced,expanded
+Diamond push-up,"triceps, chest","front_delts, abs, serratus",push,upper-strength,none,reps,bodyweight,no,beginner,expanded
+Decline push-up,"upper_chest, front_delts","triceps, chest, abs, serratus",push,upper-strength,none,reps,bodyweight,no,beginner,expanded
+Handstand push-up,"front_delts, triceps","side_delts, traps, upper_chest, abs, serratus",push,upper-strength,none,reps,bodyweight,no,advanced,expanded
 Burpee,"quads, glutes, chest","front_delts, triceps, abs, hip_flexors",power,conditioning,none,reps,bodyweight,no,beginner,expanded
 Mountain climber,"abs, hip_flexors","front_delts, quads, obliques",anti-rotation,conditioning,none,reps,bodyweight,yes,beginner,expanded
 Kettlebell swing,"glutes, hamstrings","lower_back, abs, forearms",power,power,kettlebell,reps,total,no,beginner,expanded
 Kettlebell clean,"glutes, hamstrings","front_delts, traps, forearms, abs",power,power,kettlebell,reps,per_hand,yes,intermediate,expanded
 Kettlebell snatch,"glutes, hamstrings, front_delts","side_delts, traps, forearms, abs",power,power,kettlebell,reps,per_hand,yes,advanced,expanded
-Kettlebell clean and press,"front_delts, side_delts, glutes","triceps, hamstrings, traps, abs",power,power,kettlebell,reps,per_hand,yes,intermediate,expanded
+Kettlebell clean and press,"front_delts, side_delts, glutes","triceps, hamstrings, traps, abs, serratus",power,power,kettlebell,reps,per_hand,yes,intermediate,expanded
 Kettlebell front-rack squat,"quads, glutes","abs, mid_back, adductors",squat,lower-strength,kettlebell,reps,per_hand,no,beginner,expanded
 Kettlebell Turkish get-up,"front_delts, abs, obliques","side_delts, rotator_cuff, glutes, triceps",mobility,core,kettlebell,reps,per_hand,yes,advanced,expanded
 Kettlebell windmill,"obliques, abs","front_delts, rotator_cuff, hamstrings, glutes",rotation,core,kettlebell,reps,per_hand,yes,intermediate,expanded
@@ -145,9 +145,9 @@ Landmine Romanian deadlift,"hamstrings, glutes","lower_back, forearms",hinge,low
 Landmine row,"mid_back, lats","biceps, rear_delts",pull,upper-strength,landmine,reps,total,no,beginner,expanded
 Meadows row,"lats, mid_back","biceps, obliques, rear_delts",pull,upper-strength,landmine,reps,total,yes,intermediate,expanded
 Landmine rotation,"obliques, abs","front_delts, glutes",rotation,core,landmine,reps,total,yes,beginner,expanded
-Landmine thruster,"quads, glutes, front_delts","triceps, upper_chest, abs",power,power,landmine,reps,total,no,beginner,expanded
+Landmine thruster,"quads, glutes, front_delts","triceps, upper_chest, abs, serratus",power,power,landmine,reps,total,no,beginner,expanded
 TRX row,"mid_back, lats","biceps, abs, rear_delts",pull,upper-strength,suspension trainer,reps,bodyweight,no,beginner,expanded
-TRX chest press,"chest, front_delts","triceps, abs",push,upper-strength,suspension trainer,reps,bodyweight,no,beginner,expanded
+TRX chest press,"chest, front_delts","triceps, abs, serratus",push,upper-strength,suspension trainer,reps,bodyweight,no,beginner,expanded
 TRX Y raise,"mid_back, rear_delts","side_delts, rotator_cuff",pull,prevention,suspension trainer,reps,bodyweight,no,beginner,expanded
 TRX hamstring curl,"hamstrings, glutes","calves, abs",hinge,lower-strength,suspension trainer,reps,bodyweight,no,beginner,expanded
 TRX fallout,"abs, front_delts",lats,anti-rotation,core,suspension trainer,reps,bodyweight,no,beginner,expanded
@@ -175,11 +175,11 @@ Single-leg hop to stick,"glutes, quads, calves","adductors, abs, soleus",power,p
 Lateral line hop,"calves, soleus","shins, glute_med, quads",power,conditioning,none,seconds,bodyweight,no,beginner,expanded
 Forward-back line hop,"calves, soleus","shins, quads",power,conditioning,none,seconds,bodyweight,no,beginner,expanded
 Box jump over,"quads, glutes, calves","abs, soleus",power,power,box,reps,bodyweight,no,advanced,expanded
-Medicine-ball chest pass,"chest, triceps","front_delts, abs",power,power,med_ball,reps,total,no,beginner,expanded
+Medicine-ball chest pass,"chest, triceps","front_delts, abs, serratus",power,power,med_ball,reps,total,no,beginner,expanded
 Medicine-ball overhead slam,"lats, front_delts, abs","triceps, glutes",power,power,med_ball,reps,total,no,beginner,expanded
 Medicine-ball rotational wall throw,"obliques, glutes","front_delts, abs",power,power,med_ball,reps,total,yes,beginner,expanded
-Medicine-ball overhead throw,"lats, abs","front_delts, triceps, glutes",power,power,med_ball,reps,total,no,beginner,expanded
-Medicine-ball shot-put throw,"chest, front_delts, obliques","triceps, glutes",power,power,med_ball,reps,total,yes,beginner,expanded
+Medicine-ball overhead throw,"lats, abs","front_delts, triceps, glutes, serratus",power,power,med_ball,reps,total,no,beginner,expanded
+Medicine-ball shot-put throw,"chest, front_delts, obliques","triceps, glutes, serratus",power,power,med_ball,reps,total,yes,beginner,expanded
 Medicine-ball backward throw,"glutes, hamstrings","lower_back, front_delts, traps",power,power,med_ball,reps,total,no,beginner,expanded
 Agility ladder two-feet-in,"calves, shins","soleus, quads, hip_flexors",lateral,conditioning,agility ladder,seconds,bodyweight,no,beginner,expanded
 Agility ladder in-in-out-out,"calves, shins","soleus, glute_med, quads, hip_flexors",lateral,conditioning,agility ladder,seconds,bodyweight,no,beginner,expanded
@@ -190,13 +190,13 @@ Lateral shuffle,"glute_med, adductors, quads","glutes, calves",lateral,condition
 Carioca drill,"adductors, glute_med","obliques, hip_flexors, calves",rotation,conditioning,cones,metres,bodyweight,no,beginner,expanded
 Hanging knee raise,"abs, hip_flexors","forearms, lats, obliques",rotation,core,bar,reps,bodyweight,no,beginner,expanded
 Hanging leg raise,"abs, hip_flexors","forearms, lats, obliques",rotation,core,bar,reps,bodyweight,no,intermediate,expanded
-Ab wheel rollout,abs,"front_delts, lats",anti-rotation,core,ab wheel,reps,bodyweight,no,intermediate,expanded
+Ab wheel rollout,abs,"front_delts, lats, serratus",anti-rotation,core,ab wheel,reps,bodyweight,no,intermediate,expanded
 Cable crunch,abs,obliques,rotation,core,cable,reps,total,no,beginner,expanded
 Reverse crunch,abs,"hip_flexors, obliques",rotation,core,none,reps,bodyweight,no,beginner,expanded
 Bird dog,"abs, lower_back","glutes, front_delts",anti-rotation,core,none,reps,bodyweight,yes,beginner,expanded
 Hollow body hold,abs,"hip_flexors, obliques",anti-rotation,core,none,seconds,bodyweight,no,beginner,expanded
 Plank,abs,"obliques, front_delts, glutes",anti-rotation,core,none,seconds,bodyweight,no,beginner,expanded
-Bear crawl,"abs, front_delts","quads, hip_flexors, triceps",carry,conditioning,none,metres,bodyweight,no,beginner,expanded
+Bear crawl,"abs, front_delts","quads, hip_flexors, triceps, serratus",carry,conditioning,none,metres,bodyweight,no,beginner,expanded
 Turkish sit-up,"abs, hip_flexors","obliques, front_delts",rotation,core,kettlebell,reps,per_hand,yes,beginner,expanded
 Cable lift,"obliques, abs","front_delts, glutes",rotation,core,cable,reps,total,yes,beginner,expanded
 Stir the pot,"abs, front_delts","obliques, lats",anti-rotation,core,stability ball,reps,bodyweight,no,beginner,expanded
@@ -206,8 +206,8 @@ Half-kneeling hip flexor stretch,"hip_flexors, quads",glutes,mobility,mobility,n
 Adductor rock-back,"adductors, glutes",abs,mobility,mobility,none,reps,bodyweight,yes,beginner,expanded
 Ankle dorsiflexion mobilization,"soleus, calves",shins,mobility,mobility,none,reps,bodyweight,yes,beginner,expanded
 Thoracic rotation,"mid_back, obliques",lats,mobility,mobility,none,reps,bodyweight,yes,beginner,expanded
-Wall slide,"rotator_cuff, mid_back",,mobility,mobility,none,reps,bodyweight,no,beginner,expanded
-Scapular push-up,"front_delts, chest","abs, triceps",push,prevention,none,reps,bodyweight,no,beginner,expanded
+Wall slide,"serratus, rotator_cuff",mid_back,mobility,mobility,none,reps,bodyweight,no,beginner,expanded
+Scapular push-up,serratus,"front_delts, chest, abs",push,prevention,none,reps,bodyweight,no,beginner,expanded
 Scapular pull-up,"mid_back, lats",forearms,pull,prevention,bar,reps,bodyweight,no,beginner,expanded
 Band internal rotation,rotator_cuff,"chest, lats",pull,prevention,band,reps,bodyweight,yes,beginner,expanded
 Cable Y raise,"mid_back, rear_delts","side_delts, rotator_cuff",pull,prevention,cable,reps,total,no,beginner,expanded

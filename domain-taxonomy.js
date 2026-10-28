@@ -3,7 +3,7 @@
 // free text from CSVs is normalised onto these ids.
 
 export const MUSCLES = {
-  front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts', rotator_cuff: 'Rotator cuff',
+  front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts', rotator_cuff: 'Rotator cuff', serratus: 'Serratus',
   upper_chest: 'Upper chest', chest: 'Chest', lower_chest: 'Lower chest',
   traps: 'Traps', mid_back: 'Mid back', lats: 'Lats', lower_back: 'Lower back',
   biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms',
@@ -75,6 +75,7 @@ const ALIAS = {
     pecs: 'chest', pec: 'chest', 'mid chest': 'chest', 'middle chest': 'chest', 'upper pecs': 'upper_chest', 'upper pec': 'upper_chest', 'clavicular pec': 'upper_chest', 'lower pecs': 'lower_chest', 'lower pec': 'lower_chest',
     'upper back': 'mid_back', 'mid back': 'mid_back', 'middle back': 'mid_back', rhomboids: 'mid_back', 'mid traps': 'mid_back', 'middle traps': 'mid_back', 'lower traps': 'mid_back', back: 'mid_back',
     trap: 'traps', trapezius: 'traps', 'upper traps': 'traps',
+    'serratus anterior': 'serratus', serratus: 'serratus', 'boxer muscle': 'serratus', 'side ribs': 'serratus',
     lat: 'lats', latissimus: 'lats', 'latissimus dorsi': 'lats',
     delts: 'front_delts', deltoids: 'front_delts', deltoid: 'front_delts', shoulder: 'front_delts', shoulders: 'front_delts', 'front delt': 'front_delts', 'anterior delts': 'front_delts', 'anterior deltoid': 'front_delts',
     'side delt': 'side_delts', 'lateral delts': 'side_delts', 'lateral delt': 'side_delts', 'medial delts': 'side_delts', 'middle delts': 'side_delts',

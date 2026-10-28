@@ -32,7 +32,7 @@ export const setEffortWord = rpe => rpe == null ? '' : simple() ? (SET_EFFORT.fi
 
 // Muscle names: everyday words in Simple mode, the anatomy terms otherwise.
 const PLAIN = {
-  front_delts: 'Front shoulders', side_delts: 'Side shoulders', rear_delts: 'Rear shoulders', rotator_cuff: 'Shoulder stabilisers',
+  front_delts: 'Front shoulders', side_delts: 'Side shoulders', rear_delts: 'Rear shoulders', rotator_cuff: 'Shoulder stabilisers', serratus: 'Side ribs',
   traps: 'Upper back & neck', lats: 'Wide back', lower_back: 'Lower back', forearms: 'Forearms & grip', obliques: 'Side abs',
   hip_flexors: 'Front of hips', glute_med: 'Side glutes', adductors: 'Inner thighs', quads: 'Front thighs', hamstrings: 'Back thighs',
   soleus: 'Deep calves', shins: 'Shins',

@@ -12,7 +12,7 @@ import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-unit
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips, mname } from './ui-words.js';
-import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, removeExercise, unusedAdded, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
+import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, removeExercise, moveExercise, unusedAdded, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel, CATEGORIES } from './domain-taxonomy.js';
 import { bodyMap, exerciseMap } from './ui-bodymap.js';
@@ -96,6 +96,7 @@ function adaptBanner(w) {
     : `<div class="banner" style="margin-bottom:14px;background:var(--fill)">${tile('sliders', 'gray')}<span><b>Original plan</b><small>Recovery adjustments are off for this workout.</small></span><button class="link" data-action="adapt-redo" style="margin-left:auto;font-size:15px">Use recommended</button></div>`;
 }
 
+let COACH_OPEN = false;   // the More details under each exercise, remembered while you train
 function coach(e) {
   const ex = getExercise(e.exId), tf = targetField(ex), sug = e.suggestion;
   const range = e.target.min === e.target.max ? `${e.target.min}` : `${e.target.min}–${e.target.max}`;
@@ -105,9 +106,15 @@ function coach(e) {
   const tip = e.adjusted ? '' : sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
     ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
-    ${baseline(e, last)}${warmupLine(e)}
-    <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${why ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p>
-    ${missingHere(ex)}${painNote(e)}<div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a></div></div>`;
+    ${missingHere(ex)}${painNote(e)}
+    ${(() => {
+      // One short line; last time, warm-up and tips open with More (and stay open between sets).
+      const tipText = tip.replace(/<[^>]+>/g, '').trim(), wu = warmupLine(e);
+      const peek = tipText || (last ? `Last time: ${compactSets(doneSets(last.entry), e.fields)}` : why || effortTarget(e.target.rpe));
+      return `<button class="coach-peek ${tipText ? 'blue' : ''}" data-action="coach-more" aria-expanded="${COACH_OPEN}"><span>${esc(peek)}${!COACH_OPEN && wu ? ' · warm-up' : ''}</span><b>${COACH_OPEN ? 'Less' : 'More'}</b></button>
+        ${COACH_OPEN ? `<div class="coach-more">${baseline(e, last)}${wu}<p class="t-foot">${why && why !== peek ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p></div>` : ''}`;
+    })()}
+    <div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a></div></div>`;
 }
 
 // ── Muscles: main ones bold, secondary ones lighter; tap for the body map.
@@ -399,6 +406,7 @@ export const workout = {
     },
     'undo-set'(el) { const s = cur().sets[+el.dataset.set]; s.done = false; s.rpe = null; touch(); app.toast(`Set ${+el.dataset.set + 1} reopened`); },
     how() { howSheet(getExercise(cur().exId)); },
+    'coach-more'() { COACH_OPEN = !COACH_OPEN; app.render({ keepScroll: true }); },
     'adapt-why'() {
       const a = W().adapt, inp = a.inputs;
       const ctx = [inp.readiness && `Check-in: ${inp.readiness.toLowerCase()} readiness`, inp.sore.length && `Sore: ${inp.sore.join(', ').replace(/_/g, ' ')}`, inp.padelTomorrow && 'Padel tomorrow'].filter(Boolean).join(' · ');
@@ -416,6 +424,7 @@ export const workout = {
           + (partnerIndex(W(), W().index) >= 0 ? row({ title: 'Unpair superset', sub: `Do ${esc(W().exercises[partnerIndex(W(), W().index)].name)} on its own`, icon: 'swap', color: 'gray', action: 'unpair' })
             : nextFree() >= 0 ? row({ title: `Superset with ${esc(W().exercises[nextFree()].name)}`, sub: 'Alternate sets, rest after each pair', icon: 'bolt', color: 'orange', action: 'pair' }) : '')
           + row({ title: 'Replace exercise', sub: 'Busy equipment or something feels off', icon: 'swap', color: 'indigo', action: 'swap' })
+          + (W().exercises.length > 1 ? row({ title: 'Change order', sub: 'Do this one earlier or later today', icon: 'up', color: 'gray', action: 'order-sheet' }) : '')
           + row({ title: e.skipped ? 'Don’t skip' : 'Skip exercise', icon: 'skip', color: 'orange', action: 'skip' })
           + row({ title: 'Remove exercise', sub: W().routineId ? 'Just from this workout' : 'Added by mistake? Take it out', icon: 'trash', color: 'red', action: 'remove-ex' })
           + row({ title: 'My notes', sub: note ? esc(note.slice(0, 40)) : 'Seat height, grip, reminders', icon: 'note', color: 'gray', action: 'notes' })
@@ -448,6 +457,15 @@ export const workout = {
       if (n && !(await app.confirm(`Remove ${esc(e.name)}? Its ${n} logged set${n > 1 ? 's' : ''} will be lost.`, { ok: 'Remove', danger: true }))) return;
       removeExercise(w, w.index); touch(false); app.toast(`${esc(e.name)} removed`);
     },
+    'order-sheet'() {
+      const w = W(), n = w.exercises.length;
+      app.sheet(`<h2 class="sheet-title">Today’s order</h2><p class="sheet-sub">Just for this workout. To change it for good, use Change order on the workout in Plan.</p>
+        ${group(w.exercises.map((x, i) => `<div class="row nw-row"><span class="nw-num">${i + 1}</span><span class="row-main"><span class="row-title">${esc(x.name)}${i === w.index ? ' <span class="t-foot">· now</span>' : ''}</span>${doneSets(x).length ? `<span class="row-sub">${doneSets(x).length} set${doneSets(x).length > 1 ? 's' : ''} done</span>` : ''}</span>
+          <button class="nw-btn" data-action="wk-move" data-i="${i}" data-to="${i - 1}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(x.name)} up">${icon('up')}</button>
+          <button class="nw-btn down" data-action="wk-move" data-i="${i}" data-to="${i + 1}" ${i === n - 1 ? 'disabled' : ''} aria-label="Move ${esc(x.name)} down">${icon('down')}</button></div>`).join(''))}
+        <button class="btn filled" data-action="close-sheet">Done</button>`);
+    },
+    'wk-move'(el) { if (moveExercise(W(), +el.dataset.i, +el.dataset.to)) { app.saveActive(); app.render({ keepScroll: true }); workout.actions['order-sheet'](); } },
     'add-set'() { const e = cur(); e.sets.push({ w: null, reps: null, sec: null, m: null, rpe: null, done: false }); app.closeSheet(); touch(); },
     'remove-set'() { const e = cur(); if (e.sets.length > 1) { const i = e.sets.map(s => s.done).lastIndexOf(false); e.sets.splice(i >= 0 ? i : e.sets.length - 1, 1); } app.closeSheet(); touch(); },
     skip() { const e = cur(); e.skipped = !e.skipped; app.closeSheet(); touch(); },

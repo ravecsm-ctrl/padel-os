@@ -225,6 +225,11 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .how { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-size: 15px; margin-top: 10px; min-height: 32px; }
 .how svg.i { width: 18px; height: 18px; }
 .how-row { display: flex; flex-wrap: wrap; column-gap: 20px; }
+.coach-peek { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 0; background: none; text-align: left; font-size: 13px; line-height: 18px; color: var(--label-2); }
+.coach-peek span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach-peek.blue span { color: var(--blue); }
+.coach-peek b { flex: none; font-weight: 600; color: var(--blue); }
+.coach-more { margin-top: 6px; }
 .setcard { margin-top: 18px; padding: 18px 16px 16px; }
 .setcard-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
 .setcard-h b { font-size: 17px; font-weight: 600; }

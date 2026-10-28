@@ -1,7 +1,7 @@
 // Plan: the week at a glance, the schedule, and each workout's exercises.
 import { app, S } from './core-app.js';
 import { esc, icon, pageHead, navBar, group, row, routineLook } from './ui-kit.js';
-import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
+import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, moveBlock, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
 import { prescriptionFor } from './domain-builder.js';
 import { exercisePicker } from './ui-picker.js';
 import { allExercises } from './domain-catalog.js';
@@ -34,6 +34,7 @@ function overview() {
 // ── New workout: name it, pick exercises, set the order. Sets and reps come from sensible
 // defaults for each exercise and can be changed afterwards like any workout.
 let NEW = null;
+let ORDER = null;   // the workout whose exercise order you're changing
 function newView() {
   if (!NEW) NEW = { title: '', blocks: [] };
   const n = NEW.blocks.length;
@@ -54,10 +55,15 @@ function routineView(id) {
   return `${navBar({ back: 'Plan', backTo: 'plan', title: '' })}
     <div class="hero-top" style="padding:8px 4px 16px">${icon(look.icon) && `<span class="tile ${look.color} lg">${icon(look.icon)}</span>`}<div><h1 class="t-title">${esc(r.title)}</h1><p class="t-sub">${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min</p></div></div>
     <p class="t-sub" style="padding:0 4px 20px">${esc(r.focus)}</p>
-    ${group(r.blocks.map(blk => { const ex = getExercise(blk.ex), rx = prescribe(blk, wk);
+    ${ORDER === id ? group(r.blocks.map((blk, i) => { const ex = getExercise(blk.ex);
+      return `<div class="row nw-row"><span class="nw-num">${i + 1}</span><span class="row-main"><span class="row-title">${esc(ex.name)}</span></span>
+        <button class="nw-btn" data-action="ord-move" data-r="${esc(id)}" data-i="${i}" data-to="${i - 1}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(ex.name)} up">${icon('up')}</button>
+        <button class="nw-btn down" data-action="ord-move" data-r="${esc(id)}" data-i="${i}" data-to="${i + 1}" ${i === r.blocks.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(ex.name)} down">${icon('down')}</button></div>`; }).join(''),
+      { header: 'Exercise order', footer: 'Saved as you go. Tap Done when you’re finished.' }) + `<button class="btn filled" data-action="ord-done" style="margin-bottom:20px">Done</button>` : ''}
+    ${ORDER === id ? '' : group(r.blocks.map(blk => { const ex = getExercise(blk.ex), rx = prescribe(blk, wk);
       if (blk.extra) return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))} · added by you`, action: 'extra-sheet', data: { r: id, k: String(blk.index).slice(1) } });
       return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
-      { header: 'Exercises', footer: `${r.dropped.length ? `Left out to fit ${S.profile.minutes} minutes: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}. ` : ''}Tap an exercise to change it.` })}
+      { header: 'Exercises', footer: `${r.dropped.length ? `Left out to fit ${S.profile.minutes} minutes: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}. ` : ''}Tap an exercise to change it.${r.blocks.length > 1 ? ` <button class="link" data-action="ord-start" data-r="${esc(id)}">Change order</button>` : ''}` })}
     <div class="btns">${S.active ? '<button class="btn tinted" data-action="resume">Continue Current Workout</button>' : `<button class="btn filled" data-action="start" data-routine="${id}">${icon('play')}Start Workout</button>`}
     ${edited ? `<button class="btn plain" data-action="reset-routine" data-r="${id}">Restore Original Exercises</button>` : ''}
     ${isCustomRoutine(id) ? `<button class="btn destructive" data-action="delete-routine" data-r="${id}">Delete Workout</button>` : ''}</div>`;
@@ -112,6 +118,13 @@ export const plan = {
           + row({ title: '4-week cycles', sub: 'Three weeks build up, then a lighter recovery week with fewer sets.' })
           + row({ title: 'Your setup', sub: 'Exercises are swapped to match your equipment and the time you have.' })
           + row({ title: 'Warm-up', sub: 'Before your first heavy exercise, do 5 minutes of easy movement and 2–3 lighter practice sets.' }))}`);
+    },
+    'ord-start'(el) { ORDER = el.dataset.r; app.render({ keepScroll: true }); },
+    'ord-done'() { ORDER = null; app.render({ keepScroll: true }); app.toast('Order saved'); },
+    async 'ord-move'(el) {
+      const id = el.dataset.r;
+      S.overrides = moveBlock(S.overrides, id, app.routine(id).blocks, +el.dataset.i, +el.dataset.to);
+      await app.save('overrides'); app.render({ keepScroll: true });
     },
     async 'delete-routine'(el) {
       if (!(await app.confirm(`Delete “${esc(getRoutine(el.dataset.r).title)}”? Logged sessions stay in Progress.`, { ok: 'Delete', danger: true }))) return;

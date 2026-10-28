@@ -47,7 +47,7 @@ export const ranked = map => Object.entries(map).filter(([, v]) => v > 0).sort((
 
 // Rough weekly guidance. ~10–20 hard sets per muscle per week is a common range for
 // building strength; fewer usually maintains it. Small muscles need less.
-export const SMALL = new Set(['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'upper_chest', 'lower_chest', 'traps', 'biceps', 'triceps', 'forearms',
+export const SMALL = new Set(['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serratus', 'upper_chest', 'lower_chest', 'traps', 'biceps', 'triceps', 'forearms',
   'obliques', 'hip_flexors', 'glute_med', 'calves', 'soleus', 'shins']);
 export function weeklyStatus(muscle, sets) {
   const [lo, hi] = SMALL.has(muscle) ? [6, 16] : [10, 20];

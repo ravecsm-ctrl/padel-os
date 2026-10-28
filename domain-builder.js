@@ -14,7 +14,7 @@ export const FOCUS = {
   prevention: { label: 'Stay injury-free', sub: 'Elbows, shoulders, knees, calves', muscles: { rotator_cuff: 0.8, forearms: 0.8, adductors: 0.8, glute_med: 0.6, calves: 0.9, soleus: 0.4, shins: 0.9 }, categories: ['prevention'], movements: ['calf-ankle'] },
 };
 // Injury areas shift the prevention focus toward the muscles that protect them.
-const AREA_MUSCLES = { elbow: ['forearms'], shoulder: ['rotator_cuff', 'rear_delts'], back: ['abs', 'lower_back', 'glutes'], knee: ['quads', 'adductors', 'glutes', 'glute_med'], calf: ['calves', 'soleus'], ankle: ['shins', 'calves', 'soleus'] };
+const AREA_MUSCLES = { elbow: ['forearms'], shoulder: ['rotator_cuff', 'rear_delts', 'serratus'], back: ['abs', 'lower_back', 'glutes'], knee: ['quads', 'adductors', 'glutes', 'glute_med'], calf: ['calves', 'soleus'], ankle: ['shins', 'calves', 'soleus'] };
 const PADEL = new Set(['lateral', 'single-leg', 'power', 'rotation', 'anti-rotation', 'calf-ankle']);
 const ORDER = { power: 0, squat: 1, hinge: 1, 'single-leg': 2, push: 2, pull: 2, lateral: 3, rotation: 3, carry: 4, 'anti-rotation': 4, 'calf-ankle': 5, mobility: 6 };
 export const PER_SESSION = { 20: 4, 40: 6, 70: 8 };

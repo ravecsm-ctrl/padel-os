@@ -13,12 +13,12 @@ export const STANDARD_DOSE = 6;   // "a solid session" for one muscle, in weight
 const BASE_HOURS = {
   quads: 60, hamstrings: 60, glutes: 60, adductors: 54, lower_back: 54, glute_med: 48, hip_flexors: 36,
   upper_chest: 48, chest: 48, lower_chest: 48, mid_back: 48, lats: 48, traps: 40, front_delts: 44, side_delts: 40, rear_delts: 40,
-  biceps: 36, triceps: 36, forearms: 36, calves: 36, soleus: 36, shins: 30, rotator_cuff: 36, abs: 30, obliques: 30,
+  biceps: 36, triceps: 36, forearms: 36, calves: 36, soleus: 36, shins: 30, rotator_cuff: 36, serratus: 36, abs: 30, obliques: 30,
 };
 // Padel: weighted "sets" per 30 minutes at a moderate effort. Lots of lunging, lateral
 // pushing and push-offs; overheads and volleys load the front of the shoulder and grip.
 const PADEL_LOAD = { calves: 1.2, soleus: 1.0, quads: 1.1, adductors: 1.1, glutes: 0.8, glute_med: 0.9, hip_flexors: 0.5, front_delts: 0.6, side_delts: 0.3, rear_delts: 0.3,
-  forearms: 0.9, rotator_cuff: 0.6, obliques: 0.7, abs: 0.5, shins: 0.6 };
+  forearms: 0.9, rotator_cuff: 0.6, serratus: 0.4, obliques: 0.7, abs: 0.5, shins: 0.6 };
 export const READY_BELOW = 0.2;     // fatigue level under which a muscle counts as ready
 export const TIRED_FROM = 0.6;
 
