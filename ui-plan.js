@@ -1,7 +1,9 @@
 // Plan: the week at a glance, the schedule, and each workout's exercises.
 import { app, S } from './core-app.js';
 import { esc, icon, pageHead, navBar, group, row, routineLook } from './ui-kit.js';
-import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra } from './domain-program.js';
+import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
+import { prescriptionFor } from './domain-builder.js';
+import { exercisePicker } from './ui-picker.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { getExercise } from './domain-catalog.js';
@@ -20,12 +22,29 @@ function overview() {
       { header: 'This cycle', footer: 'Each cycle is 4 weeks. Weeks move forward on their own every Monday.' })}
     ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(optLabel(S.schedule[d])), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'teal', to: 'body' }), { header: 'Body' })}
-    ${group(row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
+    ${group(row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
+      + row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
     ${group(allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id);
       return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')
       + row({ title: 'Exercise library', sub: 'Browse, filter by equipment, import your own', icon: 'dumbbell', color: 'gray', to: 'library' }), { header: 'Workouts' })}
     ${group(row({ title: 'Your setup', sub: esc(setup), icon: 'sliders', color: 'gray', to: 'welcome' })
       + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' }), { header: 'About your plan' })}`;
+}
+
+// ── New workout: name it, pick exercises, set the order. Sets and reps come from sensible
+// defaults for each exercise and can be changed afterwards like any workout.
+let NEW = null;
+function newView() {
+  if (!NEW) NEW = { title: '', blocks: [] };
+  const n = NEW.blocks.length;
+  const rows = NEW.blocks.map((b, i) => { const ex = getExercise(b.ex);
+    return `<div class="row nw-row"><span class="nw-num">${i + 1}</span><span class="row-main"><span class="row-title">${esc(ex.name)}</span><span class="row-sub">${b.sets} sets × ${esc(rangeLabel(b))}</span></span>
+      <button class="nw-btn" data-action="nw-up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${icon('up')}</button>
+      <button class="nw-btn down" data-action="nw-down" data-i="${i}" ${i === n - 1 ? 'disabled' : ''} aria-label="Move down">${icon('down')}</button>
+      <button class="nw-btn del" data-action="nw-del" data-i="${i}" aria-label="Remove">${icon('minus')}</button></div>`; }).join('');
+  return `${navBar({ back: 'Cancel', backAction: 'nw-cancel', title: 'New Workout', right: '<button class="nav-btn right" data-action="nw-save">Save</button>' })}<div style="height:12px"></div>
+    ${group(`<label class="row"><span class="row-main"><input class="input" id="nwName" value="${esc(NEW.title)}" placeholder="Name, e.g. Upper body at home" maxlength="40" style="padding:0;background:none;min-height:22px" aria-label="Workout name"></span></label>`, { header: 'Name' })}
+    ${group(rows + row({ title: 'Add Exercise', icon: 'plus', color: 'green', action: 'nw-add', chevron: false, cls: 'action' }), { header: n ? `Exercises · about ${estimateRoutineMinutes(NEW.blocks)} min` : 'Exercises', footer: n ? 'Big lifts first, smaller and prevention work last. You can change sets and reps after saving.' : 'Add the exercises in the order you want to do them.' })}`;
 }
 
 function routineView(id) {
@@ -46,8 +65,30 @@ function routineView(id) {
 
 export const plan = {
   tab: 'plan',
-  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : overview(); },
+  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : overview(); },
+  mounted() { const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; },
   actions: {
+    'new-workout'() { NEW = { title: '', blocks: [] }; app.go('plan/new'); },
+    'nw-add'() {
+      exercisePicker({ title: 'Add to workout', sub: 'Sets and reps are set for you; change them after saving.', inUse: NEW.blocks.map(b => b.ex), pick: id => {
+        if (NEW.blocks.some(b => b.ex === id)) return app.toast('Already in this workout');
+        NEW.blocks.push({ ex: id, ...prescriptionFor(getExercise(id)) }); app.render({ keepScroll: true });
+      } });
+    },
+    'nw-up'(el) { const i = +el.dataset.i, b = NEW.blocks; [b[i - 1], b[i]] = [b[i], b[i - 1]]; app.render({ keepScroll: true }); },
+    'nw-down'(el) { const i = +el.dataset.i, b = NEW.blocks; [b[i + 1], b[i]] = [b[i], b[i + 1]]; app.render({ keepScroll: true }); },
+    'nw-del'(el) { NEW.blocks.splice(+el.dataset.i, 1); app.render({ keepScroll: true }); },
+    async 'nw-cancel'() {
+      if (NEW?.blocks.length && !(await app.confirm('Discard this workout?', { ok: 'Discard', danger: true }))) return;
+      NEW = null; app.go('plan');
+    },
+    async 'nw-save'() {
+      if (!NEW.title.trim()) { document.querySelector('#nwName')?.focus(); return app.toast('Give it a name'); }
+      if (!NEW.blocks.length) return app.toast('Add at least one exercise');
+      const r = routineFromBlocks(NEW.title, NEW.blocks);
+      S.customRoutines = { ...S.customRoutines, [r.id]: r }; setCustomRoutines(S.customRoutines); await app.save('customRoutines');
+      NEW = null; app.go(`plan/routine/${r.id}`); app.toast(`“${esc(r.title)}” saved. Set a day for it in the schedule.`);
+    },
     'week-sheet'() {
       const pos = app.position();
       app.sheet(`<h2 class="sheet-title">Which week are you in?</h2><p class="sheet-sub">Change this if you missed time, for example after illness or travel.</p>

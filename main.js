@@ -20,6 +20,7 @@ import { stats } from './ui-stats.js';
 import { body } from './ui-body.js';
 import { review } from './ui-review.js';
 import { feedback } from './ui-feedback.js';
+import { pickerActions } from './ui-picker.js';
 import { overview } from './ui-overview.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
@@ -42,6 +43,7 @@ app.register('locations', locations);
 
 const GLOBAL = {
   ...today.actions,
+  ...pickerActions,
   go: el => app.go(el.dataset.to),
   'close-sheet': () => app.closeSheet(),
   'set-location': el => setLocation(el.dataset.id),

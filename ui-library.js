@@ -20,6 +20,50 @@ function download(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// ── Add your own exercise
+const MEASURES = [['wreps', 'Weight'], ['reps', 'Reps'], ['time', 'Time'], ['dist', 'Distance']];
+const toggleChip = (attr, k, label, on) => `<button type="button" class="chip-btn ${on ? 'on' : ''}" data-${attr}="${esc(k)}" aria-pressed="${on}">${esc(label)}</button>`;
+function newExerciseView() {
+  const f = S.form;
+  const gear = { ...EQUIPMENT, ...S.customEquipment };
+  return `${navBar({ back: 'Cancel', backTo: 'library', title: 'New Exercise', right: '<button class="nav-btn right" data-action="nx-save">Save</button>' })}<div style="height:12px"></div>
+    ${group(`<label class="row"><span class="row-main"><input class="input" id="nxName" value="${esc(f.name)}" placeholder="e.g. Bulgarian split squat jump" maxlength="60" style="padding:0;background:none;min-height:22px" aria-label="Exercise name"></span></label>`, { header: 'Name' })}
+    <label class="field-l">How do you log it? <small>(weight = weight and reps)</small></label>${seg('measure', MEASURES, f.measure)}
+    ${f.measure === 'wreps' ? `<label class="field-l">Weight is</label>${seg('weightType', [['total', 'Total'], ['per_hand', 'Per hand']], f.weightType)}` : ''}
+    <div style="height:16px"></div>
+    ${group(row({ title: 'Each side separately', sub: 'For single-arm or single-leg work', right: `<input type="checkbox" class="switch" id="nxSide" ${f.perSide ? 'checked' : ''} aria-label="Each side separately">` }))}
+    <label class="field-l">Main muscles <small>(pick 1–3)</small></label><div class="chipset">${Object.entries(MUSCLES).map(([k, v]) => toggleChip('nx-m', k, v, f.primary.includes(k))).join('')}</div>
+    <label class="field-l">Type</label><div class="chipset">${Object.entries(CATEGORIES).map(([k, v]) => toggleChip('nx-c', k, v, f.category === k)).join('')}</div>
+    <label class="field-l">Movement <small>(optional, helps pain flags and swaps)</small></label><div class="chipset">${Object.entries(MOVEMENTS).map(([k, v]) => toggleChip('nx-mv', k, v, f.movement === k)).join('')}</div>
+    <label class="field-l">Equipment <small>(none = bodyweight)</small></label><div class="chipset">${Object.entries(gear).map(([k, v]) => toggleChip('nx-g', k, v, f.needs.includes(k))).join('')}</div>
+    <label class="field-l" for="nxUrl">Video link <small>(optional)</small></label><input class="input" id="nxUrl" type="url" value="${esc(f.url)}" placeholder="https://…">
+    <label class="field-l" for="nxCues">How to do it <small>(optional)</small></label><textarea class="input" id="nxCues" rows="2" placeholder="Cues you want to see during the set">${esc(f.cues)}</textarea>
+    <div style="height:20px"></div><button class="btn filled" data-action="nx-save">Save Exercise</button>`;
+}
+function bindNewExercise() {
+  const f = S.form, rer = () => app.render({ keepScroll: true });
+  const bind = (id, key, ev = 'oninput') => { const el = document.querySelector(id); if (el) el[ev] = () => { f[key] = el.value; }; };
+  bind('#nxName', 'name'); bind('#nxUrl', 'url'); bind('#nxCues', 'cues');
+  const side = document.querySelector('#nxSide'); if (side) side.onchange = () => { f.perSide = side.checked; };
+  document.querySelectorAll('[data-nx-m]').forEach(b => b.onclick = () => { const k = b.dataset.nxM; f.primary = f.primary.includes(k) ? f.primary.filter(x => x !== k) : [...f.primary, k].slice(-3); rer(); });
+  document.querySelectorAll('[data-nx-c]').forEach(b => b.onclick = () => { f.category = b.dataset.nxC; rer(); });
+  document.querySelectorAll('[data-nx-mv]').forEach(b => b.onclick = () => { f.movement = f.movement === b.dataset.nxMv ? null : b.dataset.nxMv; rer(); });
+  document.querySelectorAll('[data-nx-g]').forEach(b => b.onclick = () => { const k = b.dataset.nxG; f.needs = f.needs.includes(k) ? f.needs.filter(x => x !== k) : [...f.needs, k]; rer(); });
+}
+async function saveNewExercise() {
+  const f = S.form, name = (f.name || '').trim();
+  if (!name) { document.querySelector('#nxName')?.focus(); return app.toast('Give it a name'); }
+  if (!f.primary.length) return app.toast('Pick at least one main muscle');
+  const same = matchExercise(name);
+  if (same && same.score >= 0.9 && !(await app.confirm(`“${esc(getExercise(same.id).name)}” is already in the library. Add yours anyway?`, { ok: 'Add Anyway' }))) return;
+  const item = { name, unit: f.measure === 'time' ? 'seconds' : f.measure === 'dist' ? 'metres' : 'reps', weight: null, weightType: f.measure === 'wreps' ? f.weightType : 'bodyweight',
+    perSide: f.perSide, primary: f.primary, secondary: [], movement: f.movement || null, category: f.category, needs: f.needs, level: 'intermediate',
+    cues: (f.cues || '').trim(), notes: '', url: (f.url || '').trim() || null, sets: null, min: null, max: null, rest: null };
+  const ex = buildCustomExercise(item, { customEquipment: S.customEquipment });
+  S.customExercises = { ...S.customExercises, [ex.id]: ex }; setCustomExercises(S.customExercises); await app.save('customExercises');
+  app.go('library'); app.toast(`“${esc(ex.name)}” added. Find it under ${esc(CATEGORIES[ex.category] || 'your exercises')}.`);
+}
+
 // ── Library list
 function libraryView() {
   const owned = app.owned(), loc = app.location();
@@ -41,7 +85,8 @@ function libraryView() {
     <input class="input" id="libSearch" type="search" placeholder="Search by name or muscle" value="${esc(query)}" aria-label="Search exercises" style="margin-bottom:12px">
     ${seg('lib-filter', [['here', `Can do here`], ['all', `Show all (${hiddenTotal} more)`]], showAll ? 'all' : 'here')}
     <div style="height:20px"></div>
-    ${group(row({ title: 'Import exercises', sub: 'From a CSV file or a pasted list', icon: 'download', color: 'blue', to: 'library/import' }))}
+    ${group(row({ title: 'Add Your Own Exercise', sub: 'Name it, say what it works and how you log it', icon: 'plus', color: 'green', action: 'nx-start' })
+      + row({ title: 'Import exercises', sub: 'From a CSV file or a pasted list', icon: 'download', color: 'blue', to: 'library/import' }))}
     ${groups || '<p class="t-sub" style="text-align:center;padding:24px">No exercises match.</p>'}`;
 }
 
@@ -194,15 +239,18 @@ async function commit() {
 
 export const library = {
   tab: 'plan',
-  render() { const p = S.params[0]; return p === 'import' ? importView() : p === 'review' ? reviewView() : libraryView(); },
+  render() { const p = S.params[0]; return p === 'import' ? importView() : p === 'review' ? reviewView() : p === 'new' && S.form?.nx ? newExerciseView() : libraryView(); },
   mounted() {
+    if (S.params[0] === 'new') bindNewExercise();
     const s = document.querySelector('#libSearch');
     if (s) s.oninput = () => { query = s.value; clearTimeout(this._q); this._q = setTimeout(() => { app.render({ keepScroll: true }); const el = document.querySelector('#libSearch'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
     const p = document.querySelector('#pasteIn'); if (p) p.oninput = () => { draft = p.value; };
     const f = document.querySelector('#csvIn'); if (f) f.onchange = async () => { const file = f.files[0]; if (!file) return; if (file.size > 2e6) return app.toast('That file is too large'); startReview(await file.text()); };
   },
-  onPick(name, value) { if (name === 'lib-filter') { showAll = value === 'all'; app.render({ keepScroll: true }); } },
+  onPick(name, value) { if (name === 'lib-filter') { showAll = value === 'all'; app.render({ keepScroll: true }); } if (name === 'measure') app.render({ keepScroll: true }); },
   actions: {
+    'nx-start'() { S.form = { nx: true, name: '', measure: 'wreps', weightType: 'total', perSide: false, primary: [], category: 'lower-strength', movement: null, needs: [], url: '', cues: '' }; app.go('library/new'); },
+    'nx-save'() { saveNewExercise(); },
     'lib-toggle'() { showAll = !showAll; app.render({ keepScroll: true }); },
     'ex-sheet'(el) { exerciseSheet(el.dataset.id); },
     async 'delete-custom'(el) {

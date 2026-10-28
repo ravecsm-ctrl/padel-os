@@ -1,7 +1,7 @@
 // Program: routines (templates of blocks referencing catalog ids), phases and the
 // rules that turn a block + week + readiness into today's prescription.
 import { getExercise } from './domain-catalog.js';
-import { adaptBlocks } from './domain-personalize.js';
+import { adaptBlocks, estimateMinutes } from './domain-personalize.js';
 
 export const PHASES = [
   { week: 1, name: 'Base', rpe: 7, rir: 3, setMult: 1, loadMult: 1, note: 'Learn the movements and find comfortable weights.' },
@@ -105,6 +105,13 @@ export function removeExtra(overrides, id, k) {
 export function routineFromWorkout(w, title, id = `q-${Date.now().toString(36)}`) {
   const blocks = w.exercises.filter(e => !e.skipped && (e.sets || []).some(s => s.done))
     .map((e, k) => ({ ex: e.exId, sets: Math.max(2, e.target?.sets || 3), min: e.target?.min ?? 8, max: e.target?.max ?? 12, rest: e.target?.rest ?? 90, pri: k + 1 }));
-  const minutes = Math.max(15, Math.round(blocks.reduce((n, b) => n + b.sets * (1 + b.rest / 60), 0) / 5) * 5);
-  return { id, title: title || 'My workout', custom: true, minutes, focus: 'Saved from a workout you did.', blocks };
+  return routineFromBlocks(title, blocks, { id, focus: 'Saved from a workout you did.' });
+}
+
+// A workout of your own from a list of blocks; time estimated from sets and rest.
+// Same estimate the app uses everywhere else (sets, reps, rest, plus a short warm-up).
+export const estimateRoutineMinutes = blocks => Math.max(10, estimateMinutes(blocks));
+export function routineFromBlocks(title, blocks, { id = `w-${Date.now().toString(36)}`, focus = 'A workout you put together.' } = {}) {
+  const bs = blocks.map((b, k) => ({ ...b, pri: k + 1 }));
+  return { id, title: (title || '').trim() || 'My workout', custom: true, minutes: estimateRoutineMinutes(bs), focus, blocks: bs };
 }

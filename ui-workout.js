@@ -7,6 +7,7 @@ import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { keepExercise, routineFromWorkout, setCustomRoutines, getRoutine } from './domain-program.js';
 import { prescriptionFor } from './domain-builder.js';
 import { feedbackSheet } from './ui-feedback.js';
+import { exercisePicker } from './ui-picker.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
@@ -186,24 +187,12 @@ function setArea(e) {
   return `${card}${doneRows ? `<div class="done-list">${group(doneRows, { footer: 'Tap a set to change it.' })}</div>` : ''}`;
 }
 
-// ── Exercise picker: search, what you can do here first (by category), the rest after.
-function pickList(q) {
-  const owned = app.owned(), used = new Set(W().exercises.map(e => e.exId)), norm = s => (s || '').toLowerCase();
-  const list = allExercises().filter(x => !q || norm(`${x.name} ${x.muscles} ${x.equipment}`).includes(norm(q.trim())));
-  if (!list.length) return `<p class="t-sub" style="text-align:center;margin:20px 0">No exercises match “${esc(q)}”.</p>`;
-  const item = x => row({ title: `${esc(x.name)}${used.has(x.id) ? ' <span class="t-foot">· in this workout</span>' : ''}`, sub: esc(x.muscles || CATEGORIES[x.category] || ''), action: 'add-ex', data: { id: x.id }, chevron: false, right: `<span class="blue">${icon('plus')}</span>` });
-  const here = list.filter(x => canDoWith(x.needs || [], owned)), other = list.filter(x => !here.includes(x));
-  const byCat = xs => Object.keys(CATEGORIES).map(c => [c, xs.filter(x => x.category === c)]).filter(([, xs2]) => xs2.length);
-  const groups = q ? group(here.map(item).join('')) : byCat(here).map(([c, xs]) => group(xs.map(item).join(''), { header: CATEGORIES[c] })).join('');
-  return `${groups}${other.length ? group(other.map(item).join(''), { header: `Needs other equipment${app.location() ? ` than ${esc(app.location().name)}` : ''}` }) : ''}`;
-}
 function pickerSheet() {
-  app.sheet(`<h2 class="sheet-title">Add an exercise</h2><p class="sheet-sub">Sets, reps and weight are suggested for you.</p>
-    <input class="input" id="pickQ" type="search" placeholder="Search, e.g. row, calf, dumbbell" autocomplete="off" style="margin-bottom:16px">
-    <div id="pickList">${pickList('')}</div>`, body => {
-    const q = body.querySelector('#pickQ'), out = body.querySelector('#pickList');
-    q.oninput = () => { out.innerHTML = pickList(q.value); };
-  });
+  exercisePicker({ inUse: W().exercises.map(e => e.exId), pick: id => {
+    const w = W(), at = w.exercises.length ? w.index + 1 : 0, i = addExercise(w, id, app.strength, unit(), at);
+    if (i < 0) return;
+    w.index = i; touch(false); app.toast(`${esc(w.exercises[i].name)} added`);
+  } });
 }
 
 function emptyRunner() {
@@ -394,12 +383,6 @@ export const workout = {
     },
     async 'awake-retry'() { app.closeSheet(); wakeLock = null; awake = null; await keepAwake(); app.render({ keepScroll: true }); app.toast(awake === 'on' ? 'Screen will stay on' : 'Still blocked: set Auto-Lock as shown'); },
     'feels-off'() { app.closeSheet(); setTimeout(() => feedbackSheet(), 250); },
-    'add-ex'(el) {
-      const w = W(), at = w.exercises.length ? w.index + 1 : 0;
-      const i = addExercise(w, el.dataset.id, app.strength, unit(), at);
-      if (i < 0) return;
-      w.index = i; app.closeSheet(); touch(false); app.toast(`${esc(w.exercises[i].name)} added`);
-    },
     async pair() { const w = W(), j = nextFree(); pairExercises(w, w.index, j); await rememberPairs(); app.closeSheet(); touch(); app.toast(`Paired with ${esc(w.exercises[j].name)}. Remembered for next time.`); },
     async unpair() { unpairExercise(W(), W().index); await rememberPairs(); app.closeSheet(); touch(); app.toast('Superset removed'); },
     notes() {

@@ -437,3 +437,11 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .awake.off i { background: var(--orange); }
 .awake.off { color: var(--orange); }
 .awake button { color: inherit; text-decoration: underline; font-size: inherit; background: none; padding: 0; }
+
+/* New workout editor */
+.nw-row { gap: 8px; }
+.nw-num { flex: 0 0 18px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+.nw-btn { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--fill); color: var(--blue); display: grid; place-items: center; }
+.nw-btn .i { width: 16px; height: 16px; }
+.nw-btn.del { color: var(--red); }
+.nw-btn:disabled { opacity: .3; }
