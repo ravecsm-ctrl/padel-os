@@ -96,14 +96,14 @@ export function adaptBlocks(blocks, profile = DEFAULT_PROFILE, overridden = new 
 }
 
 // Gym days avoid padel days and, where possible, the day right before one.
-export function generateSchedule(days, padelDays = []) {
+export function generateSchedule(days, padelDays = [], ids = null) {
   const sched = Object.fromEntries(DAYS.map(d => [d, padelDays.includes(d) ? 'Padel' : 'Rest']));
-  const routines = days >= 3 ? ['A', 'B', 'C'] : days === 2 ? ['A', 'B'] : ['A'];
+  const routines = ids ? ids.slice(0, Math.max(1, days)) : days >= 3 ? ['A', 'B', 'C'] : days === 2 ? ['A', 'B'] : ['A'];
   const free = DAYS.filter(d => !padelDays.includes(d));
   const beforePadel = d => padelDays.includes(DAYS[(DAYS.indexOf(d) + 1) % 7]);
   // Score spreads sessions out: prefer days not before padel, then spacing.
   const chosen = [];
-  const ideal = { 1: [0], 2: [0, 3], 3: [0, 2, 4] }[Math.min(3, routines.length)];
+  const ideal = { 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4] }[Math.min(4, routines.length)];
   for (const target of ideal) {
     const best = free.filter(d => !chosen.includes(d))
       .map(d => ({ d, score: Math.abs(DAYS.indexOf(d) - target) + (beforePadel(d) ? 2.5 : 0) + (chosen.some(c => Math.abs(DAYS.indexOf(c) - DAYS.indexOf(d)) === 1) ? 1.5 : 0) }))

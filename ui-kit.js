@@ -11,6 +11,7 @@ const P = {
   chart: '<path d="M4 20.5h16"/><rect x="5" y="11" width="3.2" height="7" rx="1"/><rect x="10.4" y="6" width="3.2" height="12" rx="1"/><rect x="15.8" y="13.5" width="3.2" height="4.5" rx="1"/>',
   person: '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 19.5c1.4-3.3 4-5 7-5s5.6 1.7 7 5"/>',
   chevR: '<path d="M9 5l7 7-7 7"/>', chevL: '<path d="M15 5l-7 7 7 7"/>',
+  up: '<path d="M5 15l7-7 7 7"/>', down: '<path d="M5 9l7 7 7-7"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
   more: '<circle cx="5.5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   play: '<path d="M8 5.5v13l10.5-6.5z"/>', pause: '<path d="M8.5 5.5v13M15.5 5.5v13"/>', back: '<path d="M18 6l-8 6 8 6zM6 6v12"/>', fwd: '<path d="M6 6l8 6-8 6zM18 6v12"/>',

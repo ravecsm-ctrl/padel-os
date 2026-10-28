@@ -14,6 +14,7 @@ import { setCustomExercises, setStartWeights } from './domain-catalog.js';
 import { setCustomRoutines } from './domain-program.js';
 import { PRESET_GEAR } from './domain-taxonomy.js';
 import { library } from './ui-library.js';
+import { builder } from './ui-builder.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
 app.register('today', today);
@@ -24,6 +25,7 @@ app.register('settings', settings);
 app.register('court', court);
 app.register('welcome', welcome);
 app.register('library', library);
+app.register('builder', builder);
 app.register('locations', locations);
 
 const GLOBAL = {
