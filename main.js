@@ -1,4 +1,4 @@
-import { app, S, DEFAULT_SETTINGS, parseHash } from './core-app.js';
+import { app, S, DEFAULT_SETTINGS, parseHash, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
 import { DEFAULT_SCHEDULE } from './domain-program.js';
@@ -22,6 +22,7 @@ app.register('welcome', welcome);
 const GLOBAL = {
   ...today.actions,
   go: el => app.go(el.dataset.to),
+  'close-sheet': () => app.closeSheet(),
 };
 
 // One delegated listener for every [data-action] in the app and in sheets.
@@ -31,7 +32,7 @@ document.addEventListener('click', async e => {
   const name = el.dataset.action;
   if (name === 'pick') {
     const v = el.dataset.value, value = v !== '' && !isNaN(v) ? Number(v) : v;
-    el.parentElement.querySelectorAll('.chip-btn').forEach(b => { const on = b === el; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    el.parentElement.querySelectorAll('button').forEach(b => { const on = b === el; if (b.classList.contains('chip-btn')) { b.classList.toggle('on', on); b.setAttribute('aria-checked', on); } else b.setAttribute('aria-selected', on); });
     S.form[el.dataset.name] = value;
     // A sheet that owns its own picker re-draws itself; otherwise the view handles it.
     if (el.closest('#sheet')) app.onPick?.(el.dataset.name, value);
@@ -70,8 +71,8 @@ async function boot() {
     console.error(err);
     S.storageOk = false;
   }
+  applyTheme();
   await timer.initTimer(document.querySelector('#restbar'), S.settings);
-  document.querySelector('#weekBtn').onclick = () => app.go('plan');
   document.querySelector('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') app.closeSheet(); });
   parseHash();
   // First run: onboarding. Existing users keep their data and get a prompt on Today instead.

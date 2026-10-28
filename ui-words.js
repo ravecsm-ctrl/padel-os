@@ -1,7 +1,7 @@
 // Simple mode: plain language over training jargon. The data underneath is identical
 // (RPE numbers are still stored), so switching modes never changes history.
 import { S } from './core-app.js';
-import { chips } from './ui-kit.js';
+import { chips, seg } from './ui-kit.js';
 import { fmtNum } from './domain-units.js';
 
 export const simple = () => S.profile?.simple !== false;
@@ -24,3 +24,7 @@ export function sessionEffortChips(name, current) {
 export const effortWord = rpe => rpe == null ? '—' : simple() ? (rpe <= 4 ? 'Easy' : rpe <= 6 ? 'Moderate' : rpe <= 7 ? 'Hard' : rpe <= 8 ? 'Very hard' : 'All-out') : `RPE ${fmtNum(rpe)}`;
 export const loadUnit = () => simple() ? 'pts' : 'AU';
 export const e1rmLabel = () => simple() ? 'Estimated max' : 'Estimated 1RM';
+export const setEffortSeg = (name, current) => simple()
+  ? seg(name, SET_EFFORT.map(([v, l]) => [v, l]), current)
+  : seg(name, [6, 7, 8, 9, 10].map(v => [v, `RPE ${v}`]), current);
+export const setEffortWord = rpe => rpe == null ? '' : simple() ? (SET_EFFORT.find(e => e[0] === rpe)?.[1] || `RPE ${rpe}`) : `RPE ${fmtNum(rpe)}`;

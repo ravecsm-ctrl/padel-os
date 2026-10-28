@@ -90,10 +90,9 @@ function draw() {
   document.body.classList.toggle('resting', on);
   if (!on) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="rest-fill"></div>
-    <div class="rest-main"><span class="eyebrow">REST${t.label ? ` · NEXT: ${t.label.toUpperCase()}` : ''}</span><b class="rest-time">${fmt(remaining())}</b></div>
-    <button data-timer="-15" aria-label="Subtract 15 seconds">−15</button>
+    <div class="rest-main"><span class="lbl-rest">Rest${t.label ? ` · next: ${t.label}` : ''}</span><b class="rest-time">${fmt(remaining())}</b></div>
     <button data-timer="15" aria-label="Add 15 seconds">+15</button>
-    <button data-timer="toggle" aria-label="${t.paused != null ? 'Resume' : 'Pause'} timer">${t.paused != null ? '▶' : 'Ⅱ'}</button>
+    <button data-timer="toggle" aria-label="${t.paused != null ? 'Resume' : 'Pause'} timer">${t.paused != null ? 'Resume' : 'Pause'}</button>
     <button data-timer="skip" class="rest-skip">Skip</button>`;
   tick();
 }

@@ -1,102 +1,103 @@
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
-import { esc, title, stat, chips } from './ui-kit.js';
-import { ROUTINES, phaseFor, readinessScore } from './domain-program.js';
-import { dayKey, weekDates, isoDate, relDay, parseISO } from './domain-calendar.js';
-import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-analytics.js';
+import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } from './ui-kit.js';
+import { ROUTINES, readinessScore } from './domain-program.js';
+import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf } from './domain-calendar.js';
+import { weeklySeries, loadTrend, trainingDays } from './domain-analytics.js';
 import { createWorkout, createActivity, workoutStats } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
-import { prehabFor, PADEL_TYPES, SIDES } from './domain-padel.js';
+import { prehabFor, PADEL_TYPES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
-import { effortTarget, sessionEffortChips, loadUnit } from './ui-words.js';
+import { sessionEffortChips } from './ui-words.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
-function resumeCard() {
-  const w = S.active, st = workoutStats(w);
-  return `<section class="card resume"><span class="eyebrow">IN PROGRESS · STARTED ${esc(relDay(w.startedAt).toUpperCase())}</span>
-    <h3>${esc(w.title)}</h3><p>${st.sets} of ${st.planned} sets logged · exercise ${w.index + 1} of ${w.exercises.length}</p>
-    <div class="row gap"><button class="btn secondary" data-action="discard-active">Discard</button><button class="btn primary" data-action="resume">Resume workout</button></div></section>`;
+function banners() {
+  let out = '';
+  if (S.active) {
+    const st = workoutStats(S.active);
+    out += `<button class="banner" data-action="resume">${tile('play', 'blue')}<span><b>Continue your workout</b><small>${esc(S.active.title)} · ${st.sets} of ${st.planned} sets done</small></span>${chev}</button>`;
+  }
+  if (!S.profile.onboarded) out += `<button class="banner" data-action="go" data-to="welcome">${tile('sliders', 'blue')}<span><b>Personalise your plan</b><small>Takes 30 seconds. Your history is kept.</small></span>${chev}</button>`;
+  const tr = loadTrend(weeklySeries(S.sessions, 5));
+  if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
+  if (S.sessions.length >= 3) {
+    const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
+    if (days == null || days >= 14) out += `<button class="banner" data-action="go" data-to="settings">${tile('download', 'gray')}<span><b>Back up your data</b><small>${days == null ? 'You haven’t made a backup yet.' : `Last backup ${days} days ago.`}</small></span>${chev}</button>`;
+  }
+  return out;
 }
 
 function hero() {
-  const pos = app.position(), ph = phaseFor(pos.week), key = dayKey(), plan = S.schedule[key];
-  const r = ROUTINES[plan] ? app.routine(plan) : null;
+  const plan = S.schedule[dayKey()];
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
-  const eyebrow = `${key.toUpperCase()} · CYCLE ${pos.cycle} · WEEK ${pos.week} ${ph.name.toUpperCase()}`;
   if (doneToday.length && !S.active) {
-    return `<section class="hero done"><span class="eyebrow">${eyebrow}</span><h2>Done for today ✓</h2>
-      <p>${doneToday.map(s => esc(s.title)).join(' + ')} logged. Recovery is where adaptation happens.</p>
-      <div class="row gap"><button class="btn secondary" data-action="go" data-to="history/session/${esc(doneToday[0].id)}">View session</button><button class="btn secondary" data-action="log-activity">Log activity</button></div></section>`;
+    return `<section class="card hero"><div class="hero-top">${tile('check', 'green', true)}<div><h2>Done for today</h2><p class="t-sub">${doneToday.map(s => esc(s.title)).join(' and ')}</p></div></div>
+      <p class="hero-note">Nice work. Rest and sleep are when your body gets stronger.</p>
+      <button class="btn tinted" data-action="go" data-to="history/session/${esc(doneToday[0].id)}">See Summary</button></section>`;
   }
-  if (r) {
-    const last = lastDone(plan);
-    return `<section class="hero"><span class="eyebrow">${eyebrow}</span><h2><span class="badge">${plan}</span> ${esc(r.title)}</h2><p>${esc(r.focus)}</p>
-      <div class="stats">${stat(r.blocks.length, 'Exercises')}${stat(`~${r.minutes}`, 'Minutes')}${stat({ gym: 'Gym', db: 'Dumbbells', bw: 'Home' }[S.profile.equipment], 'Setup')}</div>
-      <p class="meta">${last ? `Last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'Not done yet — first session sets your baselines.'} Effort: ${esc(effortTarget(ph.rpe))}.</p>
-      ${S.active ? '' : `<button class="btn primary big" data-action="start" data-routine="${plan}">Start Routine ${plan}</button>`}</section>`;
+  if (ROUTINES[plan]) {
+    const r = app.routine(plan), look = routineLook(plan), last = lastDone(plan);
+    return `<section class="card hero"><div class="hero-top">${tile(look.icon, look.color, true)}<div><p class="t-foot">Up next</p><h2>${esc(r.title)}</h2><p class="t-sub">${plural(r.blocks.length, 'exercise')} · about ${r.minutes} min</p></div></div>
+      <p class="hero-note">${esc(r.focus)}${last ? '' : ' Your first session sets your starting weights.'}</p>
+      ${S.active ? '' : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>`}</section>`;
   }
-  if (plan === 'Padel') return `<section class="hero calm"><span class="eyebrow">${eyebrow}</span><h2>Padel day</h2><p>Warm up before you play, then log the match so your load and body check are tracked.</p>
-    <button class="btn primary big" data-action="go" data-to="court/warmup">Warm up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button>
-    <div class="row gap"><button class="btn secondary" data-action="log-activity" data-kind="padel">Log match</button><button class="btn secondary" data-action="go" data-to="court/cooldown">Cool-down</button></div></section>`;
-  const copy = { Padel: ['Padel day', ''], Recovery: ['Recovery day', 'Easy movement, mobility, a walk. Keep it light.'], Rest: ['Rest day', 'Full rest. Sleep and food are training too.'] }[plan] || ['Open day', 'Pick whatever fits your readiness.'];
-  return `<section class="hero calm"><span class="eyebrow">${eyebrow}</span><h2>${copy[0]}</h2><p>${copy[1]}</p>
-    <button class="btn ${plan === 'Padel' ? 'primary big' : 'secondary'}" data-action="log-activity" data-kind="${plan === 'Padel' ? 'padel' : plan === 'Recovery' ? 'mobility' : ''}">${plan === 'Padel' ? 'Log padel session' : 'Log an activity'}</button></section>`;
+  if (plan === 'Padel') {
+    return `<section class="card hero"><div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">Warm up, play, then log it</p></div></div>
+      <div class="btns"><button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button>
+      <button class="btn tinted" data-action="log-activity" data-kind="padel">Log Match</button></div></section>`;
+  }
+  const rec = plan === 'Recovery';
+  return `<section class="card hero"><div class="hero-top">${tile(rec ? 'heart' : 'snow', rec ? 'pink' : 'gray', true)}<div><p class="t-foot">Today</p><h2>${rec ? 'Recovery day' : 'Rest day'}</h2><p class="t-sub">${rec ? 'Light movement only' : 'Take it easy'}</p></div></div>
+    <p class="hero-note">${rec ? 'A walk, some mobility or an injury-prevention routine is perfect today.' : 'Full rest helps you come back stronger.'}</p>
+    <button class="btn tinted" data-action="${rec ? 'go' : 'log-activity'}" ${rec ? 'data-to="court"' : 'data-kind="mobility"'}>${rec ? 'Browse Routines' : 'Log an Activity'}</button></section>`;
 }
 
-function weekStrip() {
+function weekCard() {
   const days = trainingDays(S.sessions), today = isoDate();
-  return `<div class="week-strip">${weekDates().map(d => {
-    const done = days.get(d.iso) || [], plan = S.schedule[d.key];
-    return `<div class="day ${d.iso === today ? 'today' : ''} ${done.length ? 'done' : ''}"><small>${d.key[0]}</small><b>${ROUTINES[plan] ? plan : plan === 'Padel' ? 'P' : '·'}</b><i>${done.length ? '✓' : ''}</i></div>`;
-  }).join('')}</div>`;
+  const planned = Object.values(S.schedule).filter(v => ROUTINES[v]).length;
+  const mon = mondayOf().getTime();
+  const done = app.strength.filter(s => s.startedAt >= mon).length;
+  return `<section class="grp"><h2 class="grp-h big">This week</h2><div class="card"><div class="week">${weekDates().map(d => {
+    const did = days.get(d.iso) || [], plan = S.schedule[d.key];
+    const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : ROUTINES[plan] ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : '';
+    return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(plan)}">${did.length ? icon('check') : ''}</span></div>`;
+  }).join('')}</div>
+  <p class="week-foot">${planned ? `${done} of ${plural(planned, 'workout')} done` : `${plural(done, 'workout')} done`}</p></div>
+  <p class="grp-f"><span class="blue">●</span> Workout day &nbsp; <span style="color:var(--teal)">●</span> Padel day</p></section>`;
 }
 
-function weekSummary() {
-  const series = weeklySeries(S.sessions, 5), cur = series[series.length - 1], tr = loadTrend(series);
-  let note = '';
-  if (tr.ratio != null && tr.ratio > 1.5) note = `<p class="warn">Load is ${tr.ratio}× your 4-week average. Consider trimming accessories or an easier padel day.</p>`;
-  else if (tr.ratio != null && tr.ratio < 0.5 && cur.sessions) note = `<p class="meta">Lighter week so far (${tr.ratio}× average).</p>`;
-  return `<div class="stats four">${stat(cur.sessions, 'Sessions')}${stat(cur.sets, 'Sets')}${stat(tr.current, `Load ${loadUnit()}`)}${stat(weekStreak(S.sessions), 'Streak (wk)')}</div>${note}`;
-}
-
-function prehabCard() {
+function stayHealthy() {
   const pre = prehabFor(S.profile, S.sessions);
   if (!pre.ids.length) return '';
-  return `${title('Stay healthy', 'RECOMMENDED FOR YOU · 2–3× A WEEK')}${pre.ids.map(id => { const r = COURT_ROUTINES[id]; return `<button class="card routine-card" data-action="go" data-to="court/${id}"><span class="badge alt">✚</span><span><b>${esc(r.title)}</b><small>${routineMinutes(r)} min · ${pre.flagged[r.areas[0]] >= 2 ? `flagged ${pre.flagged[r.areas[0]]}× in recent matches` : 'from your profile'}</small></span><span aria-hidden="true">›</span></button>`; }).join('')}`;
-}
-
-function personalizeCard() {
-  if (S.profile.onboarded) return '';
-  return `<button class="card nudge" data-action="go" data-to="welcome"><b>Personalise your plan · 30 s</b><small>Set your equipment, time per session and padel days. Your history is kept.</small></button>`;
-}
-
-function backupNudge() {
-  if (S.sessions.length < 3) return '';
-  const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
-  if (days != null && days < 14) return '';
-  return `<button class="card nudge" data-action="go" data-to="settings"><b>Back up your training data</b><small>${days == null ? 'You have never exported a backup.' : `Last backup ${days} days ago.`} Data lives only in this browser.</small></button>`;
+  return group(pre.ids.map(id => { const r = COURT_ROUTINES[id]; const n = pre.flagged[r.areas[0]];
+    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${n >= 2 ? `you flagged this ${n}× recently` : 'from your profile'}`, icon: 'heart', color: 'pink', to: `court/${id}` }); }).join(''),
+  { header: 'Stay healthy', big: true });
 }
 
 export const today = {
   render() {
-    const routineList = Object.keys(ROUTINES).map(id => {
-      const r = app.routine(id), last = lastDone(id);
-      return `<button class="card routine-card" data-action="start" data-routine="${id}" ${S.active ? 'disabled' : ''}><span class="badge">${id}</span><span><b>${esc(r.title)}</b><small>~${r.minutes} min · ${r.blocks.length} exercises · ${last ? esc(relDay(last.startedAt)) : 'never done'}</small></span><span aria-hidden="true">›</span></button>`;
-    }).join('');
-    return `${S.active ? resumeCard() : ''}${personalizeCard()}${hero()}
-      ${title('This week', '')}${weekStrip()}${weekSummary()}
-      ${backupNudge()}${prehabCard()}
-      ${title('Train', 'ANY SESSION, ANY DAY')}<div class="routine-grid">${routineList}</div>
-      <div class="row gap"><button class="btn secondary" data-action="log-activity">＋ Log match / activity</button><button class="btn secondary" data-action="go" data-to="court/warmup">◎ Warm-up</button></div>
-      <p class="fine">General training information, not medical advice. Stop for sharp or worsening pain.</p>`;
+    const date = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+    const initial = (S.settings.name || '').trim()[0];
+    const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
+    const todays = S.schedule[dayKey()];
+    const others = Object.keys(ROUTINES).filter(id => id !== todays || S.active);
+    return `${pageHead('Today', { eyebrow: date, right: avatar })}
+      ${banners()}${hero()}
+      <div style="height:28px"></div>${weekCard()}${stayHealthy()}
+      ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
+        return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
+        + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
+        + row({ title: 'Warm up before playing', sub: `${routineMinutes(COURT_ROUTINES.warmup)} min, guided`, icon: 'flame', color: 'orange', to: 'court/warmup' }),
+        { header: 'More', big: true })}`;
   },
   actions: {
     start(el) { startFlow(el.dataset.routine); },
     resume() { app.go('workout'); },
     async 'discard-active'() {
-      if (!(await app.confirm('Discard the in-progress workout? Logged sets will be lost.', { ok: 'Discard', danger: true }))) return;
+      if (!(await app.confirm('Discard the workout in progress?', { ok: 'Discard', danger: true }))) return;
       const old = S.active; S.active = null; await app.saveActive(true); app.render();
       app.toast('Workout discarded', async () => { S.active = old; await app.saveActive(true); app.render(); });
     },
@@ -104,21 +105,24 @@ export const today = {
   },
 };
 
-// ── Start flow with optional readiness check-in
+// ── Start flow with an optional 10-second check-in
+const SCALE = {
+  sleep: ['How did you sleep?', ['Badly', 'So-so', 'OK', 'Well', 'Great']],
+  energy: ['Energy level', ['Empty', 'Low', 'OK', 'Good', 'High']],
+  soreness: ['Muscle soreness', ['None', 'A little', 'Some', 'Sore', 'Very']],
+};
 function startFlow(routineId) {
   if (S.active) return app.go('workout');
   if (!S.settings.readinessPrompt) return begin(routineId, null, false);
-  S.form = { sleep: 3, energy: 3, soreness: 2, light: null };
+  S.form = { sleep: 4, energy: 3, soreness: 2, light: null };
   const draw = () => {
     const sc = readinessScore(S.form), low = sc.label === 'Low';
     const light = S.form.light ?? low;
-    return `<span class="eyebrow">READINESS CHECK-IN · 10 SECONDS</span><h3>How are you today?</h3>
-      <label class="lbl">Sleep quality</label>${chips('sleep', [1, 2, 3, 4, 5], S.form.sleep, v => ['', 'Poor', 'Meh', 'OK', 'Good', 'Great'][v])}
-      <label class="lbl">Energy</label>${chips('energy', [1, 2, 3, 4, 5], S.form.energy, v => ['', 'Drained', 'Low', 'OK', 'Good', 'Fired up'][v])}
-      <label class="lbl">Soreness</label>${chips('soreness', [1, 2, 3, 4, 5], S.form.soreness, v => ['', 'None', 'Mild', 'Some', 'Sore', 'Very'][v])}
-      <div class="readiness ${sc.label.toLowerCase()}"><b>${sc.label} readiness · ${sc.score}/5</b><span>${low ? 'Suggest the lighter version: one fewer set on bigger lifts, and keep a few reps in the tank.' : sc.label === 'Moderate' ? 'Train as planned; skip the last set if it feels heavy.' : 'Good to go — train as planned.'}</span></div>
-      <label class="toggle"><input type="checkbox" id="lightToggle" ${light ? 'checked' : ''}> Use lighter version today</label>
-      <div class="row gap"><button class="btn secondary" id="skipCheck">Skip</button><button class="btn primary" id="go">Start workout</button></div>`;
+    return `<h2 class="sheet-title">How do you feel today?</h2><p class="sheet-sub">We’ll adjust today’s workout if you need a lighter day.</p>
+      ${Object.entries(SCALE).map(([k, [q, opts]]) => `<label class="field-l">${q}</label>${seg(k, opts.map((o, i) => [i + 1, o]), S.form[k])}`).join('')}
+      <div style="height:20px"></div>
+      ${group(row({ title: 'Lighter workout today', sub: low ? 'Recommended: one fewer set and easier effort.' : sc.label === 'Moderate' ? 'Optional. You seem OK to train.' : 'You seem ready to train as planned.', right: `<input type="checkbox" class="switch" id="lightToggle" ${light ? 'checked' : ''} aria-label="Lighter workout today">` }))}
+      <div class="btns"><button class="btn filled" id="go">${icon('play')}Start Workout</button><button class="btn plain" id="skipCheck">Skip check-in</button></div>`;
   };
   const mount = body => {
     body.querySelector('#lightToggle').onchange = e => { S.form.light = e.target.checked; };
@@ -142,24 +146,23 @@ export function activitySheet(kind = 'padel', existing = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
     ptype: pd.type || 'match', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
-    : { activity: kind, duration: 90, rpe: 7, date: isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: S.form?.lastPartner || '', side: S.profile.side || '', sore: [] };
+    : { activity: kind, duration: 90, rpe: 7, date: isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: '', side: '', sore: [] };
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);
-    return `<span class="eyebrow">${existing ? 'EDIT' : 'LOG'}</span><h3>${padel ? 'Log padel' : 'What did you do?'}</h3>
-    ${chips('activity', ACTIVITIES.map(a => a[0]), f().activity, v => ACTIVITIES.find(a => a[0] === v)[1])}
-    ${padel ? `<label class="lbl">Type</label>${chips('ptype', Object.keys(PADEL_TYPES), f().ptype, v => PADEL_TYPES[v])}` : ''}
-    ${match ? `<label class="lbl">Result</label>${chips('result', ['won', 'lost', 'none'], f().result, v => ({ won: 'Won', lost: 'Lost', none: 'Not tracked' })[v])}
-      <div class="grid2"><input class="input" id="scoreIn" placeholder="Score e.g. 6-4 3-6 6-2" value="${esc(f().score)}" aria-label="Score"><input class="input" id="partnerIn" placeholder="Partner" value="${esc(f().partner)}" aria-label="Partner"></div>` : ''}
-    ${padel ? `<label class="lbl">Side you played</label>${chips('side', Object.keys(SIDES), f().side, v => SIDES[v])}` : ''}
-    <label class="lbl">Duration (minutes)</label>${chips('duration', [30, 45, 60, 90, 120], f().duration)}
-    <input class="input" id="durIn" type="number" inputmode="numeric" min="1" max="600" value="${esc(f().duration)}" aria-label="Duration in minutes">
-    <label class="lbl">How hard overall?</label>${sessionEffortChips('rpe', f().rpe)}
-    <p class="meta">Training load: <b>${(+f().duration || 0) * (+f().rpe || 0)} ${loadUnit()}</b> (minutes × effort)</p>
-    ${padel ? `<label class="lbl">Body check: anything sore or niggly?</label><div class="chipset">${Object.entries(AREAS).map(([k, v]) => `<button type="button" class="chip-btn ${f().sore.includes(k) ? 'on warn-on' : ''}" data-sore="${k}" aria-pressed="${f().sore.includes(k)}">${esc(v)}</button>`).join('')}</div>` : ''}
-    <label class="lbl" for="dateIn">Date</label><input class="input" id="dateIn" type="date" value="${esc(f().date)}" max="${isoDate()}">
-    <label class="lbl" for="notesIn">Notes</label><textarea class="input" id="notesIn" rows="2" placeholder="${padel ? 'What worked, what to practise…' : 'Notes'}">${esc(f().notes)}</textarea>
-    <button class="btn primary big" id="saveAct">${existing ? 'Save changes' : 'Save'}</button>`;
+    return `<h2 class="sheet-title">${existing ? 'Edit' : padel ? 'Log Padel' : 'Log Activity'}</h2>
+    <div style="height:8px"></div>${seg('activity', ACTIVITIES, f().activity)}
+    ${padel ? `<label class="field-l">Type</label>${seg('ptype', Object.entries(PADEL_TYPES), f().ptype)}` : ''}
+    ${match ? `<label class="field-l">Result</label>${seg('result', [['won', 'Won'], ['lost', 'Lost'], ['none', 'Skip']], f().result)}
+      <div class="grid2"><input class="input" id="scoreIn" placeholder="Score (optional)" value="${esc(f().score)}" aria-label="Score"><input class="input" id="partnerIn" placeholder="Partner (optional)" value="${esc(f().partner)}" aria-label="Partner"></div>` : ''}
+    ${padel ? `<label class="field-l">Side you played</label>${seg('side', [['drive', 'Right'], ['reves', 'Left'], ['both', 'Both']], f().side)}` : ''}
+    <label class="field-l">How long?</label>${chips('duration', [30, 45, 60, 90, 120], f().duration, v => `${v} min`)}
+    <input class="input" id="durIn" type="number" inputmode="numeric" min="1" max="600" value="${esc(f().duration)}" aria-label="Minutes" style="margin-top:8px">
+    <label class="field-l">How hard was it?</label>${sessionEffortChips('rpe', f().rpe)}
+    ${padel ? `<label class="field-l">Anything sore afterwards?</label><div class="chipset">${Object.entries(AREAS).map(([k, v]) => `<button type="button" class="chip-btn ${f().sore.includes(k) ? 'warn-on' : ''}" data-sore="${k}" aria-pressed="${f().sore.includes(k)}">${esc(v)}</button>`).join('')}</div>` : ''}
+    <label class="field-l" for="dateIn">Date</label><input class="input" id="dateIn" type="date" value="${esc(f().date)}" max="${isoDate()}">
+    <label class="field-l" for="notesIn">Notes</label><textarea class="input" id="notesIn" rows="2" placeholder="Optional">${esc(f().notes)}</textarea>
+    <div style="height:20px"></div><button class="btn filled" id="saveAct">${existing ? 'Save Changes' : 'Save'}</button>`;
   };
   const mount = body => {
     const bind = (id, key, ev = 'oninput') => { const el = body.querySelector(id); if (el) el[ev] = e => { f()[key] = e.target.value; }; };
@@ -168,18 +171,17 @@ export function activitySheet(kind = 'padel', existing = null) {
     body.querySelectorAll('[data-sore]').forEach(b => b.onclick = () => { const k = b.dataset.sore; f().sore = f().sore.includes(k) ? f().sore.filter(x => x !== k) : [...f().sore, k]; app.sheet(draw(), mount); });
     body.querySelector('#saveAct').onclick = async () => {
       const dur = +f().duration;
-      if (!(dur > 0)) return app.toast('Enter a duration');
+      if (!(dur > 0)) return app.toast('Add how many minutes');
       const d = parseISO(f().date || isoDate()), now = new Date();
       if (isoDate(d) === isoDate(now)) d.setHours(now.getHours(), now.getMinutes());
       else d.setHours(12);
       const padel = f().activity === 'padel' ? { type: f().ptype, result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().side, sore: f().sore } : undefined;
-      const titleFor = () => padel ? PADEL_TYPES[padel.type] === 'Match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}` : ACTIVITIES.find(a => a[0] === f().activity)[1];
+      const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];
       const base = existing ? { ...existing, activity: f().activity, durationMin: dur, rpe: +f().rpe, notes: f().notes, startedAt: d.getTime(), endedAt: d.getTime() + dur * 60000 }
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });
       const rec = { ...base, title: titleFor(), padel };
       await db.putSession(rec); await app.reloadSessions(); app.closeSheet();
-      const sore = padel?.sore?.length ? ` · ${padel.sore.length} area${padel.sore.length > 1 ? 's' : ''} flagged` : '';
-      app.toast(existing ? 'Updated' : `${rec.title} logged · ${dur * rec.rpe} ${loadUnit()}${sore}`);
+      app.toast(existing ? 'Saved' : `${rec.title} saved`);
       app.render({ keepScroll: true });
     };
   };

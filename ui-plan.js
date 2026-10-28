@@ -1,52 +1,71 @@
+// Plan: the week at a glance, the schedule, and each workout's exercises.
 import { app, S } from './core-app.js';
-import { esc, title } from './ui-kit.js';
+import { esc, icon, pageHead, navBar, group, row, routineLook } from './ui-kit.js';
 import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { startForWeek, dayKey } from './domain-calendar.js';
-import { EQUIPMENT, LEVELS, AREAS } from './domain-personalize.js';
-import { effortTarget } from './ui-words.js';
+import { EQUIPMENT, AREAS } from './domain-personalize.js';
 
-function routineCard(id) {
-  const r = app.routine(id), wk = app.position().week;
-  const custom = Object.keys(S.overrides[id] || {}).length;
-  return `<section class="card"><div class="row between"><span class="eyebrow">ROUTINE ${id} · ~${r.minutes} MIN${custom ? ' · EDITED' : ''}</span>${custom ? `<button class="link" data-action="reset-routine" data-r="${id}">Reset</button>` : ''}</div>
-    <h3>${esc(r.title)}</h3><p class="meta">${esc(r.focus)}</p>
-    <div class="list">${r.blocks.map(blk => {
-      const ex = getExercise(blk.ex), rx = prescribe(blk, wk), changed = S.overrides[id]?.[blk.index];
-      return `<button class="list-item block" data-action="edit-block" data-r="${id}" data-i="${blk.index}"><span><b>${esc(ex.name)}${changed ? ' <small class="tag">edited</small>' : blk.adaptedFrom ? ' <small class="tag">fits your setup</small>' : ''}</b><small>${rx.sets} × ${esc(rangeLabel(blk))} · rest ${blk.rest}s</small></span><span aria-hidden="true">✎</span></button>`;
-    }).join('')}</div>
-    ${r.dropped.length ? `<p class="meta">Left out to fit ${S.profile.minutes} min: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}.</p>` : ''}
-    <button class="btn primary" data-action="start" data-routine="${id}" ${S.active ? 'disabled' : ''}>Start Routine ${id}</button></section>`;
+const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+const optLabel = v => ROUTINES[v] ? ROUTINES[v].title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
+
+function overview() {
+  const pos = app.position(), ph = phaseFor(pos.week), today = dayKey();
+  const setup = `${EQUIPMENT[S.profile.equipment]} · ${S.profile.minutes} min · ${S.profile.days}× a week`;
+  return `${pageHead('Plan', { sub: `Week ${pos.week} of 4 · ${esc(ph.name)}` })}
+    ${group(row({ title: `Week ${pos.week}: ${esc(ph.name)}`, sub: esc(ph.note), icon: 'target', color: 'indigo', action: 'week-sheet' }),
+      { header: 'This cycle', footer: 'Each cycle is 4 weeks. Weeks move forward on their own every Monday.' })}
+    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(optLabel(S.schedule[d])), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
+    ${group(Object.keys(ROUTINES).map(id => { const r = app.routine(id), look = routineLook(id);
+      return row({ title: esc(r.title), sub: `${r.blocks.length} exercises · about ${r.minutes} min`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join(''), { header: 'Workouts' })}
+    ${group(row({ title: 'Your setup', sub: esc(setup), icon: 'sliders', color: 'gray', to: 'welcome' })
+      + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' }), { header: 'About your plan' })}`;
+}
+
+function routineView(id) {
+  const r = app.routine(id), wk = app.position().week, look = routineLook(id);
+  if (!r) return navBar({ back: 'Plan', backTo: 'plan' });
+  const edited = Object.keys(S.overrides[id] || {}).length;
+  return `${navBar({ back: 'Plan', backTo: 'plan', title: '' })}
+    <div class="hero-top" style="padding:8px 4px 16px">${icon(look.icon) && `<span class="tile ${look.color} lg">${icon(look.icon)}</span>`}<div><h1 class="t-title">${esc(r.title)}</h1><p class="t-sub">${r.blocks.length} exercises · about ${r.minutes} min</p></div></div>
+    <p class="t-sub" style="padding:0 4px 20px">${esc(r.focus)}</p>
+    ${group(r.blocks.map(blk => { const ex = getExercise(blk.ex), rx = prescribe(blk, wk);
+      return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
+      { header: 'Exercises', footer: `${r.dropped.length ? `Left out to fit ${S.profile.minutes} minutes: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}. ` : ''}Tap an exercise to change it.` })}
+    <div class="btns">${S.active ? '<button class="btn tinted" data-action="resume">Continue Current Workout</button>' : `<button class="btn filled" data-action="start" data-routine="${id}">${icon('play')}Start Workout</button>`}
+    ${edited ? `<button class="btn plain" data-action="reset-routine" data-r="${id}">Restore Original Exercises</button>` : ''}</div>`;
 }
 
 export const plan = {
-  render() {
-    const pos = app.position(), ph = phaseFor(pos.week), today = dayKey();
-    return `${title('Program', `CYCLE ${pos.cycle} · PROGRAM WEEK ${pos.weeksIn + 1}`)}
-      <section class="card"><span class="eyebrow">4-WEEK WAVE · AUTO-ADVANCES EVERY MONDAY</span>
-        <div class="seg four">${PHASES.map(p => `<button aria-selected="${p.week === pos.week}" data-action="set-week" data-w="${p.week}"><b>W${p.week}</b><small>${p.name}</small></button>`).join('')}</div>
-        <h3>Week ${pos.week} · ${ph.name}</h3><p>Effort: ${esc(effortTarget(ph.rpe))}. ${esc(ph.note)}</p>
-        <p class="meta">Tap a week if you need to shift the cycle (e.g. after illness or travel). Suggested loads and set counts update automatically.</p></section>
-      <section class="card"><div class="row between"><h3>Your setup</h3><button class="link" data-action="go" data-to="welcome">Change</button></div>
-        <p class="meta">${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week · ${esc(S.profile.level)}${S.profile.injuries.length ? ` · watching: ${S.profile.injuries.map(a => esc(AREAS[a].toLowerCase())).join(', ')}` : ''}</p></section>
-      ${title('Weekly schedule', 'TAP TO CHANGE')}
-      <section class="card schedule">${DAYS.map(d => `<label for="day-${d}" class="${d === today ? 'today' : ''}">${d}</label><select id="day-${d}" class="input" data-day="${d}">${DAY_OPTIONS.map(v => `<option value="${v}" ${S.schedule[d] === v ? 'selected' : ''}>${ROUTINES[v] ? `${v} · ${ROUTINES[v].title}` : v}</option>`).join('')}</select>`).join('')}
-        <p class="meta">Keep the heaviest lower-body day away from the day before an important match, and keep at least one true rest day.</p></section>
-      ${title('Routines', 'TAP AN EXERCISE TO CUSTOMISE')}
-      ${Object.keys(ROUTINES).map(routineCard).join('')}
-      <section class="card"><h3>Warm-up (8–10 min)</h3><p>5 min easy cardio → ankle rocks, adductor rock-backs, thoracic rotations, scapular wall slides → 2–4 ramp-up sets for the first big lift (e.g. 50% × 5, 70% × 3, 85% × 1).</p></section>
-      <section class="card"><h3>How progression works</h3><p>Each exercise has a rep range. Stay at a load until you hit the top of the range on every set without grinding (RPE ≤ 9), then the app suggests the next increment and you restart at the bottom. Miss the bottom of the range twice in a row and it backs off one step. Deload weeks automatically drop sets and load. Power work (jumps, throws) never chases reps — quality first.</p></section>`;
-  },
-  mounted() {
-    document.querySelectorAll('[data-day]').forEach(s => s.onchange = async () => { S.schedule[s.dataset.day] = s.value; await app.save('schedule'); app.toast('Schedule saved'); });
-  },
+  tab: 'plan',
+  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : overview(); },
   actions: {
+    'week-sheet'() {
+      const pos = app.position();
+      app.sheet(`<h2 class="sheet-title">Which week are you in?</h2><p class="sheet-sub">Change this if you missed time, for example after illness or travel.</p>
+        ${group(PHASES.map(p => row({ title: `Week ${p.week}: ${esc(p.name)}`, sub: esc(p.note), action: 'set-week', data: { w: p.week }, chevron: false, right: p.week === pos.week ? icon('check', 'check-mark') : '' })).join(''))}`);
+    },
     async 'set-week'(el) {
       S.settings.programStart = startForWeek(+el.dataset.w, S.settings.programStart);
-      await app.save('settings'); app.render({ keepScroll: true }); app.toast(`Now in week ${el.dataset.w}`);
+      await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(`Now in week ${el.dataset.w}`);
+    },
+    'day-sheet'(el) {
+      const d = el.dataset.day;
+      app.sheet(`<h2 class="sheet-title">${DAY_NAME[d]}</h2><div style="height:12px"></div>
+        ${group(DAY_OPTIONS.map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
+          { footer: 'Tip: avoid your hardest leg workout the day before an important match.' })}`);
+    },
+    async 'set-day'(el) { S.schedule[el.dataset.day] = el.dataset.v; await app.save('schedule'); app.closeSheet(); app.render({ keepScroll: true }); },
+    'how-sheet'() {
+      app.sheet(`<h2 class="sheet-title">How your plan adapts</h2><div style="height:12px"></div>
+        ${group(row({ title: 'Getting stronger', sub: 'Each exercise has a target range, like 8–10 reps. When you reach the top on every set, the app suggests a little more weight next time.' })
+          + row({ title: 'Bad days', sub: 'Miss the bottom of the range twice and it suggests a bit less, so you can rebuild.' })
+          + row({ title: '4-week cycles', sub: 'Three weeks build up, then a lighter recovery week with fewer sets.' })
+          + row({ title: 'Your setup', sub: 'Exercises are swapped to match your equipment and the time you have.' })
+          + row({ title: 'Warm-up', sub: 'Before your first heavy exercise, do 5 minutes of easy movement and 2–3 lighter practice sets.' }))}`);
     },
     async 'reset-routine'(el) {
-      if (!(await app.confirm(`Reset Routine ${el.dataset.r} to the default exercises and numbers?`, { ok: 'Reset' }))) return;
+      if (!(await app.confirm('Restore the original exercises for this workout?', { ok: 'Restore' }))) return;
       delete S.overrides[el.dataset.r]; await app.save('overrides'); app.render({ keepScroll: true });
     },
     'edit-block'(el) {
@@ -55,15 +74,14 @@ export const plan = {
       const baseEx = getExercise(base.ex);
       const options = [base.ex, ...baseEx.subs].filter(getExercise);
       const tf = baseEx.fields[baseEx.fields.length - 1];
-      const unitLbl = tf === 'sec' ? 'seconds' : tf === 'm' ? 'meters' : 'reps';
-      app.sheet(`<span class="eyebrow">ROUTINE ${rid} · SLOT ${i + 1}</span><h3>Customise exercise</h3>
-        <label class="lbl" for="bEx">Exercise</label><select class="input" id="bEx">${options.map(id => `<option value="${id}" ${id === blk.ex ? 'selected' : ''}>${esc(getExercise(id).name)}${id === base.ex ? ' (default)' : ''}</option>`).join('')}</select>
-        <div class="grid3"><div><label class="lbl" for="bSets">Sets</label><input class="input" id="bSets" type="number" inputmode="numeric" min="1" max="10" value="${blk.sets}"></div>
-        <div><label class="lbl" for="bMin">Min ${unitLbl}</label><input class="input" id="bMin" type="number" inputmode="numeric" min="1" value="${blk.min}"></div>
-        <div><label class="lbl" for="bMax">Max ${unitLbl}</label><input class="input" id="bMax" type="number" inputmode="numeric" min="1" value="${blk.max}"></div></div>
-        <label class="lbl" for="bRest">Rest (seconds)</label><input class="input" id="bRest" type="number" inputmode="numeric" min="0" step="15" value="${blk.rest}">
-        <p class="meta">Deload weeks still scale sets automatically. Alternatives share the same movement pattern and units.</p>
-        <div class="row gap"><button class="btn secondary" id="bReset">Default</button><button class="btn primary" id="bSave">Save</button></div>`, body => {
+      const unitLbl = tf === 'sec' ? 'seconds' : tf === 'm' ? 'metres' : 'reps';
+      const num = (id, label, val, extra = '') => row({ title: label, right: `<input class="input num" id="${id}" type="number" inputmode="numeric" ${extra} value="${val}" style="width:80px;text-align:right;background:none;padding:0" aria-label="${label}">` });
+      app.sheet(`<h2 class="sheet-title">Change exercise</h2><div style="height:12px"></div>
+        <label class="field-l" for="bEx">Exercise</label><select class="input" id="bEx">${options.map(id => `<option value="${id}" ${id === blk.ex ? 'selected' : ''}>${esc(getExercise(id).name)}${id === base.ex ? ' (original)' : ''}</option>`).join('')}</select>
+        <div style="height:20px"></div>
+        ${group(num('bSets', 'Sets', blk.sets, 'min="1" max="10"') + num('bMin', `Fewest ${unitLbl}`, blk.min, 'min="1"') + num('bMax', `Most ${unitLbl}`, blk.max, 'min="1"') + num('bRest', 'Rest (seconds)', blk.rest, 'min="0" step="15"'),
+          { footer: 'Recovery weeks still reduce sets automatically.' })}
+        <div class="btns"><button class="btn filled" id="bSave">Save</button><button class="btn plain" id="bReset">Use Original</button></div>`, body => {
         const v = id => +body.querySelector(id).value;
         body.querySelector('#bSave').onclick = async () => {
           const o = { ex: body.querySelector('#bEx').value, sets: Math.max(1, v('#bSets')), min: Math.max(1, v('#bMin')), max: Math.max(1, v('#bMax')), rest: Math.max(0, v('#bRest')) };
@@ -73,7 +91,7 @@ export const plan = {
           S.overrides[rid] = { ...(S.overrides[rid] || {}) };
           if (Object.keys(diff).length) S.overrides[rid][i] = diff; else delete S.overrides[rid][i];
           if (!Object.keys(S.overrides[rid]).length) delete S.overrides[rid];
-          await app.save('overrides'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Routine updated');
+          await app.save('overrides'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Saved');
         };
         body.querySelector('#bReset').onclick = async () => {
           if (S.overrides[rid]) { delete S.overrides[rid][i]; if (!Object.keys(S.overrides[rid]).length) delete S.overrides[rid]; }
@@ -83,3 +101,5 @@ export const plan = {
     },
   },
 };
+
+export { AREAS };

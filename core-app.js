@@ -5,7 +5,7 @@ import { DEFAULT_SCHEDULE, resolveRoutine } from './domain-program.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition } from './domain-calendar.js';
 
-export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, programStart: isoDate(mondayOf()) };
+export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
 export const S = {
   route: 'today', params: [],
@@ -49,7 +49,6 @@ export const app = {
     $('#app').innerHTML = v.render();
     document.querySelectorAll('nav [data-route]').forEach(b => b.setAttribute('aria-current', b.dataset.route === (v.tab || S.route) ? 'page' : 'false'));
     document.body.dataset.route = S.route;
-    $('#weekBtn').innerHTML = weekPill();
     v.mounted?.();
     if (keepScroll) scrollTo(0, y); else scrollTo(0, 0);
   },
@@ -73,7 +72,7 @@ export const app = {
 
   confirm(message, { ok = 'Confirm', danger = false } = {}) {
     return new Promise(res => {
-      app.sheet(`<h3>${message}</h3><div class="row gap"><button class="btn secondary" data-c="0">Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" data-c="1">${ok}</button></div>`, body => {
+      app.sheet(`<div class="alert-text"><b>${message}</b></div><div class="btns"><button class="btn ${danger ? 'gray red' : 'filled'}" data-c="1">${ok}</button><button class="btn plain" data-c="0">Cancel</button></div>`, body => {
         body.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { app.closeSheet(); res(b.dataset.c === '1'); });
       });
       $('#sheet').addEventListener('close', () => res(false), { once: true });
@@ -81,9 +80,11 @@ export const app = {
   },
 };
 
-function weekPill() {
-  const p = app.position();
-  return `C${p.cycle} · <b>W${p.week}</b>`;
+// Light / dark / follow the system, like iOS.
+export function applyTheme() {
+  const a = S.settings.appearance;
+  if (a === 'light' || a === 'dark') document.documentElement.dataset.theme = a;
+  else delete document.documentElement.dataset.theme;
 }
 
 export function parseHash() {

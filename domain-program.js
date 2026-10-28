@@ -4,10 +4,10 @@ import { getExercise } from './domain-catalog.js';
 import { adaptBlocks } from './domain-personalize.js';
 
 export const PHASES = [
-  { week: 1, name: 'Foundation', rpe: 7, rir: 3, setMult: 1, loadMult: 1, note: 'Baseline load and listed volume.' },
-  { week: 2, name: 'Build', rpe: 7.5, rir: 2, setMult: 1, loadMult: 1, note: 'Add a rep per set or a small load jump — only with crisp technique.' },
-  { week: 3, name: 'Peak', rpe: 8, rir: 2, setMult: 1, loadMult: 1, note: 'Heaviest week. Never grind. Trim accessories if padel load is high.' },
-  { week: 4, name: 'Deload', rpe: 6, rir: 4, setMult: 0.6, loadMult: 0.88, note: '~40% fewer sets and ~12% less load. Recover, then start a new cycle.' },
+  { week: 1, name: 'Base', rpe: 7, rir: 3, setMult: 1, loadMult: 1, note: 'Learn the movements and find comfortable weights.' },
+  { week: 2, name: 'Build', rpe: 7.5, rir: 2, setMult: 1, loadMult: 1, note: 'Add a rep or a little weight when it feels smooth.' },
+  { week: 3, name: 'Push', rpe: 8, rir: 2, setMult: 1, loadMult: 1, note: 'Your hardest week. Push, but never to failure.' },
+  { week: 4, name: 'Recovery', rpe: 6, rir: 4, setMult: 0.6, loadMult: 0.88, note: 'Fewer sets and lighter weights so your body can recover.' },
 ];
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -18,13 +18,13 @@ export const DEFAULT_SCHEDULE = { Mon: 'A', Tue: 'Padel', Wed: 'B', Thu: 'Recove
 const b = (ex, sets, min, max, rest, pri) => ({ ex, sets, min, max, rest, pri });
 
 export const ROUTINES = {
-  A: { id: 'A', title: 'Lower Force & Deceleration', minutes: 75, focus: 'Braking strength, lateral control and a resilient trunk.', blocks: [
+  A: { id: 'A', title: 'Legs & Footwork', minutes: 75, focus: 'Strong legs for braking, lunging and changing direction.', blocks: [
     b('trap-bar-deadlift', 4, 4, 6, 150, 1), b('rfess', 3, 8, 10, 90, 2), b('lateral-lunge', 3, 8, 10, 75, 4), b('sl-rdl', 3, 8, 10, 75, 6),
     b('copenhagen-short', 3, 20, 30, 60, 3), b('pallof-press', 3, 10, 12, 45, 7), b('standing-calf-raise', 3, 12, 15, 60, 5), b('tibialis-raise', 3, 15, 20, 45, 8) ] },
-  B: { id: 'B', title: 'Upper Strength & Rotation', minutes: 70, focus: 'Shoulder-friendly pressing, pulling, rotation and grip.', blocks: [
+  B: { id: 'B', title: 'Upper Body & Shots', minutes: 70, focus: 'Healthy shoulders, a strong back and grip for every stroke.', blocks: [
     b('landmine-press', 4, 8, 10, 90, 1), b('chest-supported-row', 4, 8, 10, 90, 2), b('incline-db-press', 3, 8, 10, 90, 4), b('cable-row-rotation', 3, 10, 12, 60, 7),
     b('cable-er', 3, 12, 15, 45, 3), b('face-pull', 3, 15, 20, 45, 6), b('wrist-rotation', 2, 15, 20, 30, 8), b('farmer-carry', 3, 30, 40, 60, 5) ] },
-  C: { id: 'C', title: 'Power & Athletic Resilience', minutes: 65, focus: 'Convert strength into explosive, controlled court movement.', blocks: [
+  C: { id: 'C', title: 'Power & Agility', minutes: 65, focus: 'A faster first step and more explosive movement.', blocks: [
     b('cmj', 4, 3, 3, 90, 1), b('lateral-bound', 3, 5, 5, 75, 2), b('mb-scoop-toss', 4, 5, 5, 75, 3), b('goblet-squat', 3, 10, 12, 90, 6),
     b('step-up-knee-drive', 3, 8, 10, 75, 4), b('slider-curl', 3, 8, 12, 60, 5), b('seated-soleus-raise', 3, 15, 20, 45, 7), b('band-ankle', 2, 15, 15, 30, 8) ] },
 };

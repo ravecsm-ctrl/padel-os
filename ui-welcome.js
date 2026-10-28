@@ -1,6 +1,7 @@
 // First-run onboarding (also reachable from Settings to change the plan).
+// One question per screen, answered by tapping a row, like iOS setup.
 import { app, S } from './core-app.js';
-import { esc } from './ui-kit.js';
+import { esc, icon, group, row, routineLook } from './ui-kit.js';
 import { DAYS, ROUTINES, resolveRoutine } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { GOALS, LEVELS, EQUIPMENT, MINUTES, AREAS, generateSchedule } from './domain-personalize.js';
@@ -8,53 +9,50 @@ import { GOALS, LEVELS, EQUIPMENT, MINUTES, AREAS, generateSchedule } from './do
 let step = 0;
 const STEPS = 6;
 const F = () => S.form;
+const DAY_LONG = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 
-const card = (name, value, label, sub = '') => `<button type="button" class="opt ${F()[name] === value ? 'on' : ''}" data-action="w-pick" data-name="${name}" data-value="${esc(value)}" aria-pressed="${F()[name] === value}"><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
-const multi = (name, value, label) => { const on = F()[name].includes(value); return `<button type="button" class="chip-btn ${on ? 'on' : ''}" data-action="w-toggle" data-name="${name}" data-value="${esc(value)}" aria-pressed="${on}">${esc(label)}</button>`; };
+const pick = (name, value, title, sub = '') => row({ title: esc(title), sub: esc(sub), action: 'w-pick', data: { name, value }, chevron: false, right: F()[name] === value ? icon('check', 'check-mark') : '' });
+const multi = (name, value, title) => row({ title: esc(title), action: 'w-toggle', data: { name, value }, chevron: false, right: F()[name].includes(value) ? icon('check', 'check-mark') : '' });
+const q = (title, sub = '') => `<div class="wiz-q"><h1>${esc(title)}</h1>${sub ? `<p class="t-sub">${esc(sub)}</p>` : ''}</div>`;
 
 function body() {
   const f = F();
   switch (step) {
-    case 0: return `<div class="welcome-hero"><span class="eyebrow">PADEL OS</span><h2>Training built for padel.</h2>
-      <p>Strength, warm-ups and injury prevention that fit your equipment and your week. Private: everything stays on this phone.</p>
-      <ul class="ticks"><li>A plan that adapts as you get stronger</li><li>Guided court warm-ups &amp; injury prevention</li><li>Match log that spots overload early</li></ul></div>`;
-    case 1: return `<h2>What matters most?</h2><p class="meta">We’ll weigh your plan toward it.</p><div class="opts">${Object.entries(GOALS).map(([k, v]) => card('goal', k, v)).join('')}</div>`;
-    case 2: return `<h2>Your gym experience</h2><div class="opts">${Object.entries(LEVELS).map(([k, v]) => card('level', k, k[0].toUpperCase() + k.slice(1), v)).join('')}</div>`;
-    case 3: return `<h2>Where will you train?</h2><div class="opts">
-      ${card('equipment', 'gym', EQUIPMENT.gym, 'Machines, cables, barbells')}
-      ${card('equipment', 'db', EQUIPMENT.db, 'A pair of dumbbells or kettlebells, a bench or chair')}
-      ${card('equipment', 'bw', EQUIPMENT.bw, 'Bodyweight + a resistance band')}</div>`;
-    case 4: return `<h2>How much time?</h2><label class="lbl">Per gym session</label><div class="opts row3">${MINUTES.map(m => card('minutes', m, `${m} min`, m === 20 ? 'Essentials' : m === 40 ? 'Balanced' : 'Complete')).join('')}</div>
-      <label class="lbl">Gym sessions per week</label><div class="opts row3">${[1, 2, 3].map(d => card('days', d, `${d}×`, d === 1 ? 'Maintain' : d === 2 ? 'Improve' : 'Best results')).join('')}</div>`;
-    case 5: return `<h2>Your padel week</h2><label class="lbl">Which days do you usually play?</label><div class="chipset">${DAYS.map(d => multi('padelDays', d, d)).join('')}</div>
-      <label class="lbl">Anything that bothers you? <small>(optional)</small></label><div class="chipset">${Object.entries(AREAS).map(([k, v]) => multi('injuries', k, v)).join('')}</div>
-      <p class="meta">We’ll suggest short prevention routines for these. This isn’t medical advice; see a professional for pain that persists.</p>`;
+    case 0: return `<div class="welcome"><img class="app-icon" src="icon-180.png" alt="" width="92" height="92"><h1>Welcome to<br>PADEL OS</h1>
+      <div class="features">
+        <div class="feature">${icon('dumbbell')}<div><b>A plan that fits you</b><span>Workouts for your equipment and your schedule, and they get harder as you get stronger.</span></div></div>
+        <div class="feature">${icon('flame')}<div><b>Ready for match day</b><span>Guided warm-ups and cool-downs you can follow on court.</span></div></div>
+        <div class="feature">${icon('heart')}<div><b>Stay injury-free</b><span>Short routines for elbows, shoulders, knees and calves.</span></div></div>
+      </div></div>`;
+    case 1: return `${q('What’s your main goal?')}${group(Object.entries(GOALS).map(([k, v]) => pick('goal', k, v)).join(''))}`;
+    case 2: return `${q('How much have you lifted weights before?')}${group([['beginner', 'Never or rarely', 'We’ll start gently'], ['intermediate', 'Now and then', 'A few times a month'], ['advanced', 'Regularly', 'Most weeks']].map(([k, t, s]) => pick('level', k, t, s)).join(''))}`;
+    case 3: return `${q('Where will you work out?')}${group(pick('equipment', 'gym', EQUIPMENT.gym, 'Machines, cables and barbells') + pick('equipment', 'db', EQUIPMENT.db, 'A pair of dumbbells and a bench or chair') + pick('equipment', 'bw', EQUIPMENT.bw, 'Just your body and a resistance band'))}`;
+    case 4: return `${q('How much time do you have?')}${group(MINUTES.map(m => pick('minutes', m, `${m} minutes`, m === 20 ? 'Just the essentials' : m === 40 ? 'A balanced workout' : 'The complete workout')).join(''), { header: 'Each workout' })}
+      ${group([1, 2, 3].map(d => pick('days', d, `${d} ${d === 1 ? 'day' : 'days'} a week`, d === 1 ? 'Keep what you have' : d === 2 ? 'Steady progress' : 'Best results')).join(''), { header: 'Workouts per week' })}`;
+    case 5: return `${q('When do you play padel?', 'We’ll keep hard workouts away from match days.')}${group(DAYS.map(d => multi('padelDays', d, DAY_LONG[d])).join(''), { header: 'Usual padel days' })}
+      ${group(Object.entries(AREAS).map(([k, v]) => multi('injuries', k, v)).join(''), { header: 'Anything that bothers you? (optional)', footer: 'We’ll suggest short routines for these. This isn’t medical advice.' })}`;
     case 6: {
       const sched = generateSchedule(f.days, f.padelDays);
-      const prof = { ...f };
       const ids = [...new Set(Object.values(sched).filter(v => ROUTINES[v]))];
-      return `<h2>Your plan</h2>
-        <div class="week-strip">${DAYS.map(d => `<div class="day"><small>${d[0]}</small><b>${ROUTINES[sched[d]] ? sched[d] : sched[d] === 'Padel' ? 'P' : sched[d] === 'Recovery' ? 'R' : '·'}</b></div>`).join('')}</div>
-        ${ids.map(id => { const r = resolveRoutine(id, {}, prof); return `<div class="card"><div class="row between"><b><span class="badge sm">${id}</span> ${esc(r.title)}</b><small class="meta">~${r.minutes} min</small></div><p class="meta">${r.blocks.map(b => esc(getExercise(b.ex).name)).join(' · ')}</p></div>`; }).join('')}
-        <label class="toggle"><input type="checkbox" id="wSimple" ${f.simple ? 'checked' : ''}> <span>Simple mode<small>Plain words instead of RPE and training jargon. Change anytime.</small></span></label>
-        ${S.profile.onboarded ? `<label class="toggle"><input type="checkbox" id="wSched" checked> <span>Replace my weekly schedule<small>Untick to keep your current days.</small></span></label>` : ''}`;
+      return `${q('Your plan is ready', 'You can change any of this later.')}
+        <div class="plan-week" style="margin-bottom:28px">${DAYS.map(d => `<div>${d[0]}<b>${ROUTINES[sched[d]] ? '●' : sched[d] === 'Padel' ? '<span style="color:var(--teal)">●</span>' : '–'}</b></div>`).join('')}</div>
+        ${group(ids.map(id => { const r = resolveRoutine(id, {}, f), look = routineLook(id);
+          return row({ title: esc(r.title), sub: `${r.blocks.length} exercises · about ${r.minutes} min · ${DAYS.filter(d => sched[d] === id).map(d => DAY_LONG[d]).join(', ')}`, icon: look.icon, color: look.color }); }).join(''), { header: 'Your workouts' })}
+        ${group(row({ title: 'Simple mode', sub: 'Plain words instead of training terms', right: `<input type="checkbox" class="switch" id="wSimple" ${f.simple ? 'checked' : ''} aria-label="Simple mode">` })
+          + (S.profile.onboarded ? row({ title: 'Update my weekly schedule', right: '<input type="checkbox" class="switch" id="wSched" checked aria-label="Update my weekly schedule">' }) : ''))}`;
     }
   }
   return '';
 }
 
-const canNext = () => ({ 1: 'goal', 2: 'level', 3: 'equipment' }[step] ? F()[{ 1: 'goal', 2: 'level', 3: 'equipment' }[step]] != null : true);
-
 export const welcome = {
   render() {
     if (!S.form || S.form._wizard !== true) { S.form = { _wizard: true, ...structuredClone(S.profile) }; step = S.profile.onboarded ? 1 : 0; }
-    return `<div class="wizard">
-      <div class="wiz-top">${step > 0 ? `<button class="icon-btn" data-action="w-back" aria-label="Back">‹</button>` : '<span></span>'}
-        <div class="dots">${Array.from({ length: STEPS }, (_, i) => `<i class="${i < step ? 'on' : ''}"></i>`).join('')}</div>
-        ${S.profile.onboarded ? `<button class="link" data-action="w-cancel">Cancel</button>` : '<span></span>'}</div>
-      <div class="wiz-body">${body()}</div>
-      <div class="wiz-bottom"><button class="btn primary big" data-action="w-next" ${canNext() ? '' : 'disabled'}>${step === 0 ? 'Set up my plan' : step === STEPS ? 'Start training' : 'Continue'}</button>
-      ${step === 0 ? '<button class="btn ghost wide" data-action="w-skip">Skip — use the full gym plan</button>' : ''}</div></div>`;
+    const left = step > (S.profile.onboarded ? 1 : 0) ? `<button class="nav-btn" data-action="w-back">${icon('chevL')}Back</button>` : S.profile.onboarded ? '<button class="nav-btn" data-action="w-cancel">Cancel</button>' : '<span></span>';
+    return `<div class="wiz-top">${left}<div class="dots">${step ? Array.from({ length: STEPS }, (_, i) => `<i class="${i < step ? 'on' : ''}"></i>`).join('') : ''}</div><span></span></div>
+      ${body()}
+      <div class="wiz-bottom"><div class="inner"><button class="btn filled" data-action="w-next">${step === 0 ? 'Get Started' : step === STEPS ? 'Start Training' : 'Continue'}</button>
+      ${step === 0 ? '<button class="btn plain" data-action="w-skip">Skip for now</button>' : ''}</div></div>`;
   },
   actions: {
     'w-pick'(el) { const v = el.dataset.value; F()[el.dataset.name] = isNaN(v) ? v : Number(v); app.render({ keepScroll: true }); },
@@ -76,3 +74,5 @@ export const welcome = {
     },
   },
 };
+
+export { getExercise };

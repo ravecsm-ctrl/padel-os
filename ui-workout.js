@@ -1,13 +1,13 @@
+// Workout runner in focus mode: one exercise, one set at a time.
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
-import { esc, chips } from './ui-kit.js';
+import { esc, icon, navBar, group, row, stat, tile } from './ui-kit.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
-import { rangeLabel } from './domain-program.js';
-import { toDisplay, fromDisplay, fmtW, fmtNum } from './domain-units.js';
+import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs } from './domain-progression.js';
 import { relDay } from './domain-calendar.js';
-import { simple, effortTarget, setEffortChips, sessionEffortChips } from './ui-words.js';
+import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
 import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
 
 const W = () => S.active;
@@ -21,108 +21,102 @@ async function keepAwake() {
 }
 document.addEventListener('visibilitychange', () => { if (S.route === 'workout' && S.active) keepAwake(); if (document.hidden && S.active) app.saveActive(true); });
 
-const clock = t => { const s = Math.floor((Date.now() - t) / 1000); return s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-export { clock };
-const fieldLabel = (f) => f === 'w' ? unit().toUpperCase() : f === 'reps' ? 'REPS' : f === 'sec' ? 'SEC' : 'METERS';
+export const clock = t => { const s = Math.floor((Date.now() - t) / 1000); return s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const entryState = e => e.skipped ? 'skip' : e.sets.length && e.sets.every(s => s.done) ? 'done' : e.sets.some(s => s.done) ? 'part' : '';
+const restLabel = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+const UNIT_WORD = { reps: 'reps', sec: 'seconds', m: 'metres' };
 
 function fmtSet(s, fields) {
   const tf = fields[fields.length - 1];
-  const v = `${fmtNum(s[tf])}${tf === 'reps' ? '' : FIELD_UNIT[tf]}`;
-  return fields.includes('w') && s.w ? `${fmtNum(toDisplay(s.w, unit()))}×${v}` : v;
+  const v = `${fmtNum(s[tf])}${tf === 'reps' ? ' reps' : ` ${FIELD_UNIT[tf]}`}`;
+  return fields.includes('w') && s.w ? `${fmtNum(toDisplay(s.w, unit()))} ${unit()} × ${v}` : v;
 }
 
-function suggestionBox(e) {
-  const sug = e.suggestion, ex = getExercise(e.exId), tf = targetField(ex);
+// What the field shows before the user touches it: previous set, else the suggestion.
+function defaultVal(e, i, f) {
+  const prev = e.sets.slice(0, i).reverse().find(x => x.done);
+  const tf = e.fields[e.fields.length - 1];
+  if (f === 'w') return prev?.w ?? e.suggestion.w;
+  return prev?.[f] ?? (f === tf ? (e.suggestion.target ?? e.target.min) : null);
+}
+
+function coach(e) {
+  const ex = getExercise(e.exId), tf = targetField(ex), sug = e.suggestion;
+  const range = e.target.min === e.target.max ? `${e.target.min}` : `${e.target.min}–${e.target.max}`;
+  const weight = sug.w != null ? ` at <b>${fmtW(sug.w, unit())}</b>` : e.fields.includes('w') && sug.kind === 'first' ? ', choosing a weight that feels manageable' : '';
   const last = lastPerformance(app.strength, e.exId);
-  const tgt = `${sug.target}${tf === 'reps' ? ' reps' : FIELD_UNIT[tf]}`;
-  const head = sug.w != null ? `${fmtW(sug.w, unit())} × ${tgt}` : e.fields.includes('w') && sug.kind === 'first' ? `Find your weight · ${tgt}` : tgt;
-  return `<div class="suggest ${sug.kind}"><div><span class="eyebrow">${sug.kind === 'up' ? '▲ PROGRESS' : sug.kind === 'down' ? '▼ BACK OFF' : sug.kind === 'deload' ? 'DELOAD' : 'TODAY'}</span><b>${head}</b></div><p>${esc(sug.reason)}</p>
-    ${last ? `<p class="last">Last · ${esc(relDay(last.session.startedAt))}: ${doneSets(last.entry).map(s => fmtSet(s, e.fields)).join(', ')}</p>` : ''}</div>`;
+  const tip = sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
+  return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
+    <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${esc(effortTarget(e.target.rpe))}.${last ? ` Last time: ${esc(doneSets(last.entry).map(s => fmtSet(s, e.fields)).join(', '))}.` : ''}</p>
+    <button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
 }
 
-function setRows(e) {
-  const ex = getExercise(e.exId);
-  const tf = targetField(ex);
-  const cols = e.fields;
-  const lastDoneIdx = e.sets.map(s => s.done).lastIndexOf(true);
-  const nextIdx = e.sets.findIndex(s => !s.done);
-  return `<div class="sets" style="--cols:${cols.length}">
-    <div class="set-row head"><span>SET</span>${cols.map(f => `<span>${fieldLabel(f)}${f === 'w' && ex.loadNote ? `<i>${esc(ex.loadNote)}</i>` : ''}</span>`).join('')}<span></span></div>
-    ${e.sets.map((s, i) => {
-      const prev = e.sets.slice(0, i).reverse().find(x => x.done);
-      const ph = f => f === 'w' ? (prev?.w ?? e.suggestion.w) : (prev?.[f] ?? (f === tf ? e.suggestion.target : null));
-      return `<div class="set-row ${s.done ? 'is-done' : ''} ${i === nextIdx ? 'is-next' : ''}">
-        <b class="set-n">${i + 1}${s.rpe ? `<i>@${fmtNum(s.rpe)}</i>` : ''}</b>
-        ${cols.map(f => {
-          const val = f === 'w' ? toDisplay(s.w, unit()) : s[f];
-          const p = ph(f), pv = f === 'w' ? toDisplay(p, unit()) : p;
-          return `<input class="set-in" type="number" inputmode="decimal" step="any" min="0" data-field="${f}" data-set="${i}" value="${val ?? ''}" placeholder="${pv ?? '–'}" aria-label="Set ${i + 1} ${fieldLabel(f)}">`;
-        }).join('')}
-        <button class="check" data-action="set-done" data-set="${i}" aria-pressed="${s.done}" aria-label="${s.done ? 'Undo' : 'Complete'} set ${i + 1}">✓</button>
-      </div>`;
-    }).join('')}
-    ${lastDoneIdx >= 0 ? `<div class="rpe-row"><span>How did set ${lastDoneIdx + 1} feel?</span>${setEffortChips('set-rpe', e.sets[lastDoneIdx].rpe ?? '')}</div>${simple() ? '' : `<p class="hint">RPE 8 ≈ 2 reps left · 9 ≈ 1 left · 10 = nothing left. Today's target: RPE ${fmtNum(e.target.rpe)}.</p>`}` : ''}
-  </div>`;
+function stepper(e, i, f) {
+  const s = e.sets[i];
+  const val = s[f] ?? defaultVal(e, i, f);
+  const shown = f === 'w' ? toDisplay(val, unit()) : val;
+  const label = f === 'w' ? (val == null ? `${unit()} · choose a weight` : `${unit()}${getExercise(e.exId).loadNote ? ` ${getExercise(e.exId).loadNote}` : ''}`) : UNIT_WORD[f];
+  return `<div class="stepper"><button data-action="step" data-field="${f}" data-dir="-1" aria-label="Less ${label}">${icon('minus')}</button>
+    <label><input type="number" inputmode="decimal" step="any" min="0" data-field="${f}" data-set="${i}" value="${s[f] != null ? shown : ''}" placeholder="${shown ?? '–'}" aria-label="${label}"><span class="unit">${esc(label)}</span></label>
+    <button data-action="step" data-field="${f}" data-dir="1" aria-label="More ${label}">${icon('plus')}</button></div>`;
 }
 
-function cues(ex) {
-  return `<details class="cues"><summary>How to do it</summary>
-    <dl><dt>Why</dt><dd>${esc(ex.why)}</dd><dt>Set up</dt><dd>${esc(ex.setup)}</dd><dt>Execute</dt><dd>${esc(ex.execute)}</dd><dt>Breathe</dt><dd>${esc(ex.breathe)}</dd><dt>Avoid</dt><dd>${esc(ex.avoid)}</dd></dl>
-    <a class="link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}" target="_blank" rel="noopener">Watch form demos ↗</a></details>`;
+function setArea(e) {
+  const next = e.sets.findIndex(s => !s.done);
+  const lastDone = e.sets.map(s => s.done).lastIndexOf(true);
+  const w = W(), isLast = w.index === w.exercises.length - 1;
+  const doneRows = e.sets.map((s, i) => s.done ? row({ title: `Set ${i + 1}`, sub: setEffortWord(s.rpe), value: esc(fmtSet(s, e.fields)), right: '', action: 'undo-set', data: { set: i }, chevron: false, aria: `Set ${i + 1} done. Tap to reopen.` }).replace('<span class="row-main">', `<span class="tick">${icon('check')}</span><span class="row-main">`) : '').join('');
+  const feel = lastDone >= 0 && e.sets[lastDone].rpe == null && next >= 0
+    ? `<div class="feel"><p>How did set ${lastDone + 1} feel?</p>${setEffortSeg('set-rpe', '')}</div>` : '';
+  const card = next < 0
+    ? `<section class="card all-done"><div class="big-tick">${icon('check')}</div><p class="t-title2">All sets done</p><p class="t-sub" style="margin:4px 0 16px">${lastDone >= 0 && e.sets[lastDone].rpe == null ? 'How did the last set feel?' : 'Great work.'}</p>
+        ${lastDone >= 0 && e.sets[lastDone].rpe == null ? `<div style="margin-bottom:16px">${setEffortSeg('set-rpe', '')}</div>` : ''}
+        <button class="btn filled" data-action="${isLast ? 'to-finish' : 'next'}">${isLast ? 'Finish Workout' : 'Next Exercise'}</button></section>`
+    : `<section class="card setcard">${feel}<div class="setcard-h"><b>Set ${next + 1} of ${e.sets.length}</b><span class="t-foot">${restLabel(e.target.rest)} rest after</span></div>
+        <div class="steppers">${e.fields.map(f => stepper(e, next, f)).join('')}</div>
+        <button class="btn filled" data-action="set-done" data-set="${next}">${icon('check')}Done</button></section>`;
+  return `${card}${doneRows ? `<div class="done-list">${group(doneRows, { footer: 'Tap a set to change it.' })}</div>` : ''}`;
 }
 
 function runner() {
-  const w = W(), e = cur(), ex = getExercise(e.exId), n = w.exercises.length, last = w.index === n - 1;
-  const st = workoutStats(w);
-  const note = S.exNotes[e.exId] || '';
-  return `<div class="wk-top">
-      <button class="icon-btn" data-action="leave" aria-label="Leave workout (progress is saved)">‹</button>
-      <div class="wk-title"><span class="eyebrow">ROUTINE ${esc(w.routineId)} · W${w.week}${w.light ? ' · LIGHT' : ''}</span><b><span class="elapsed" data-start="${w.startedAt}">${clock(w.startedAt)}</span> · ${st.sets}/${st.planned} sets</b></div>
-      <button class="btn small primary" data-action="to-finish">Finish</button>
-    </div>
-    <div class="ex-nav" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="pill ${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="${esc(x.name)}">${i + 1}</button>`).join('')}</div>
-    <article class="card ex-card ${e.skipped ? 'skipped' : ''}">
-      <span class="eyebrow">EXERCISE ${w.index + 1} OF ${n} · REST ${e.target.rest}s</span>
-      <h2>${esc(ex.name)}${e.swappedFrom ? ' <small class="tag">swapped</small>' : e.adaptedFrom ? ' <small class="tag">fits your setup</small>' : ''}</h2>
-      <p class="target">${e.target.sets} × ${esc(rangeLabel({ ex: e.exId, min: e.target.min, max: e.target.max }))} · ${esc(effortTarget(e.target.rpe))}</p>
-      <div class="tags"><span>${esc(!e.fields.includes('w') && ex.fields.includes('w') ? 'Bodyweight · weights optional' : ex.equipment)}</span><span>${esc(ex.muscles)}</span></div>
-      ${e.skipped ? `<p class="meta">Skipped. <button class="link" data-action="skip">Undo skip</button></p>` : `${suggestionBox(e)}${setRows(e)}`}
-      <div class="ex-tools">
-        <button class="tool" data-action="add-set">＋ Set</button>
-        <button class="tool" data-action="remove-set" ${e.sets.length <= 1 ? 'disabled' : ''}>− Set</button>
-        <button class="tool" data-action="swap">⇄ Swap</button>
-        ${e.skipped ? '' : `<button class="tool" data-action="skip">Skip</button>`}
-      </div>
-      ${cues(ex)}
-      <details class="cues" ${note ? 'open' : ''}><summary>My notes${note ? ' ·' : ''} <small>${esc(note.slice(0, 32))}</small></summary>
-        <textarea class="input" data-note="${esc(e.exId)}" rows="2" placeholder="Seat height, grip, cues that work for you… (kept for next time)">${esc(note)}</textarea></details>
-    </article>
-    <div class="wk-bottom">
-      <button class="btn secondary" data-action="prev" ${w.index === 0 ? 'disabled' : ''}>‹ Prev</button>
-      <button class="btn ${entryState(e) === 'done' || e.skipped ? 'primary' : 'secondary'}" data-action="${last ? 'to-finish' : 'next'}">${last ? 'Finish workout' : `Next: ${esc(getExercise(w.exercises[w.index + 1].exId).name)} ›`}</button>
-    </div>`;
+  const w = W(), e = cur(), ex = getExercise(e.exId), n = w.exercises.length, isLast = w.index === n - 1;
+  const nextName = isLast ? '' : getExercise(w.exercises[w.index + 1].exId).name;
+  const ready = entryState(e) === 'done' || e.skipped;
+  return `${navBar({ back: 'Today', backAction: 'leave', title: w.title, sub: `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
+    <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
+    <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p><h1>${esc(ex.name)}</h1></div>
+      <button class="icon-circle" data-action="more" aria-label="More options">${icon('more')}</button></div>
+    ${e.skipped ? `<section class="card setcard" style="text-align:center"><p class="t-head">Skipped</p><p class="t-sub" style="margin:4px 0 14px">This exercise won’t be counted.</p><button class="btn tinted" data-action="skip">Do It After All</button></section>` : `${coach(e)}${setArea(e)}`}
+    <div class="wk-bottom"><button class="btn gray square" data-action="prev" ${w.index === 0 ? 'disabled' : ''} aria-label="Previous exercise">${icon('chevL')}</button>
+      <button class="btn ${ready ? 'filled' : 'gray'}" data-action="${isLast ? 'to-finish' : 'next'}"><span>${isLast ? 'Finish Workout' : `Next: ${esc(nextName)}`}</span></button></div>`;
 }
 
 function finishView() {
   const w = W(), st = workoutStats(w);
-  const prs = w.exercises.flatMap(e => detectPRs({ ...e, sets: doneSets(e) }, app.strength).map(p => ({ ...p, name: e.name, ex: getExercise(e.exId) })));
+  const prs = w.exercises.flatMap(e => detectPRs({ ...e, sets: doneSets(e) }, app.strength).map(p => ({ ...p, name: e.name })));
   S.form.rpe ??= ''; S.form.pain ??= 'no';
-  const skippedOrEmpty = w.exercises.filter(e => !e.skipped && !doneSets(e).length).length;
-  return `<div class="wk-top"><button class="icon-btn" data-action="back-to-runner" aria-label="Back to workout">‹</button><div class="wk-title"><span class="eyebrow">FINISH</span><b>${esc(w.title)}</b></div><span></span></div>
-    <section class="hero"><span class="eyebrow">SESSION SUMMARY</span><h2>${st.sets} sets logged</h2>
-      <div class="stats">${`<div class="stat"><strong><input class="inline-num" id="durIn" type="number" inputmode="numeric" value="${st.minutes}" aria-label="Duration minutes"></strong><small>Minutes</small></div>`}<div class="stat"><strong>${st.sets}/${st.planned}</strong><small>Sets</small></div><div class="stat"><strong>${fmtW(st.volume, unit()).replace(/\.\d+/, '')}</strong><small>Volume</small></div></div>
-      ${prs.length ? `<div class="prs">${prs.map(p => `<span class="pr">🏆 ${esc(p.name)} · ${esc(p.type)} ${p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value)}</span>`).join('')}</div>` : ''}
-      ${skippedOrEmpty ? `<p class="meta">${skippedOrEmpty} exercise(s) have no completed sets — they’ll be saved as not done.</p>` : ''}
-    </section>
-    <section class="card">
-      <label class="lbl">How hard was the whole session?</label>${sessionEffortChips('rpe', S.form.rpe)}
-      <label class="lbl">Any pain?</label>${chips('pain', ['no', 'yes'], S.form.pain, v => v === 'no' ? 'No pain' : 'Yes, I felt pain')}
-      ${S.form.pain === 'yes' ? `<input class="input" id="painLoc" placeholder="Where? e.g. left knee, lateral elbow" value="${esc(S.form.painLoc || '')}"><p class="warn">Don’t train through sharp or worsening pain. If it persists, see a qualified professional.</p>` : ''}
-      <label class="lbl" for="notesIn">Notes</label><textarea class="input" id="notesIn" rows="3" placeholder="What went well, what to change next time…">${esc(S.form.notes || '')}</textarea>
-      <button class="btn primary big" data-action="save-workout">Save workout</button>
-      <button class="btn ghost wide" data-action="discard">Discard workout</button>
-    </section>`;
+  const missing = w.exercises.filter(e => !e.skipped && !doneSets(e).length).length;
+  const vol = Math.round(toDisplay(st.volume, unit()));
+  return `${navBar({ back: 'Workout', backAction: 'back-to-runner', title: 'Summary' })}
+    <div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">Workout complete</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}</p></div>
+    <div class="tiles three" style="margin-top:20px">${stat(`<span class="num">${S.form.duration || st.minutes}</span>`, 'Minutes')}${stat(`${st.sets}`, 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
+    ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
+    ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
+    <label class="field-l">How hard was it overall?</label>${sessionEffortChips('rpe', S.form.rpe)}
+    <div style="height:24px"></div>
+    ${group(row({ title: 'Anything hurt?', right: `<input type="checkbox" class="switch" id="painSw" ${S.form.pain === 'yes' ? 'checked' : ''} aria-label="Anything hurt">` })
+      + row({ title: 'Minutes', right: `<input class="input num" id="durIn" type="number" inputmode="numeric" value="${S.form.duration || st.minutes}" style="width:90px;text-align:right;background:none;padding:0" aria-label="Minutes">` }),
+      { footer: S.form.pain === 'yes' ? 'Don’t train through sharp or worsening pain. If it persists, see a professional.' : '' })}
+    ${S.form.pain === 'yes' ? `<input class="input" id="painLoc" placeholder="Where did it hurt?" value="${esc(S.form.painLoc || '')}" style="margin:-16px 0 24px">` : ''}
+    <textarea class="input" id="notesIn" rows="3" placeholder="Notes (optional)">${esc(S.form.notes || '')}</textarea>
+    <div style="height:20px"></div>
+    <div class="btns"><button class="btn filled" data-action="save-workout">Save Workout</button><button class="btn destructive" data-action="discard">Discard Workout</button></div>`;
+}
+
+function howSheet(ex) {
+  app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${esc(ex.muscles)} · ${esc(ex.equipment)}</p>
+    ${group([['Why it helps', ex.why], ['Get set up', ex.setup], ['Do it', ex.execute], ['Breathing', ex.breathe], ['Avoid', ex.avoid]].map(([t, d]) => row({ title: t, sub: esc(d) })).join(''))}
+    <a class="btn tinted" href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}" target="_blank" rel="noopener">${icon('play')}Watch a Video</a>`);
 }
 
 export const workout = {
@@ -134,11 +128,12 @@ export const workout = {
       const p = document.querySelector('#painLoc'); if (p) p.oninput = () => { S.form.painLoc = p.value; };
       document.querySelector('#notesIn').oninput = ev => { S.form.notes = ev.target.value; };
       document.querySelector('#durIn').oninput = ev => { S.form.duration = +ev.target.value; };
+      document.querySelector('#painSw').onchange = ev => { S.form.pain = ev.target.checked ? 'yes' : 'no'; app.render({ keepScroll: true }); };
     }
   },
   onInput(el) {
     if (el.dataset.note) { S.exNotes[el.dataset.note] = el.value; clearTimeout(this._n); this._n = setTimeout(() => app.save('exNotes'), 400); return; }
-    if (!el.dataset.field) return;
+    if (!el.dataset.field || el.dataset.set == null) return;
     const s = cur().sets[+el.dataset.set], f = el.dataset.field;
     const raw = el.value === '' ? null : Number(String(el.value).replace(',', '.'));
     s[f] = f === 'w' ? fromDisplay(raw, unit()) : raw;
@@ -147,60 +142,88 @@ export const workout = {
   onPick(name, value) {
     if (name === 'set-rpe') {
       const e = cur(), i = e.sets.map(s => s.done).lastIndexOf(true);
-      if (i >= 0) { e.sets[i].rpe = e.sets[i].rpe === value ? null : value; touch(); }
-    } else if (name === 'pain') app.render({ keepScroll: true });
+      if (i >= 0) { e.sets[i].rpe = value; touch(); }
+    }
   },
   actions: {
+    step(el) {
+      const e = cur(), i = e.sets.findIndex(s => !s.done), f = el.dataset.field, dir = +el.dataset.dir;
+      if (i < 0) return;
+      const s = e.sets[i], base = s[f] ?? defaultVal(e, i, f) ?? 0;
+      if (f === 'w') {
+        const stepD = displayStep(getExercise(e.exId).inc, unit());
+        s.w = Math.max(0, fromDisplay(Math.max(0, (toDisplay(base, unit()) || 0) + dir * stepD), unit()));
+      } else s[f] = Math.max(0, (base || 0) + dir * (f === 'reps' ? 1 : 5));
+      touch();
+    },
     'set-done'(el) {
       const w = W(), e = cur(), i = +el.dataset.set, s = e.sets[i];
-      if (s.done) { s.done = false; return touch(); }
       autofill(e, i);
-      const tf = targetField(getExercise(e.exId));
-      if (s[tf] == null) return app.toast('Enter a value first');
+      const tf = e.fields[e.fields.length - 1];
+      if (!s[tf]) return app.toast(`Add the ${UNIT_WORD[tf]} first`);
       s.done = true; s.ts = Date.now();
-      // Pre-fill the next set with what was just done so the next tap is a one-tap log.
       const moreHere = e.sets.some(x => !x.done);
       if (S.settings.autoRest) {
         const nextEx = w.exercises.slice(w.index + 1).find(x => !x.skipped);
-        const label = moreHere ? `${e.name} set ${e.sets.findIndex(x => !x.done) + 1}` : nextEx ? getExercise(nextEx.exId).name : '';
+        const label = moreHere ? `set ${e.sets.findIndex(x => !x.done) + 1}` : nextEx ? getExercise(nextEx.exId).name : '';
         if (moreHere || nextEx) timer.start(e.target.rest, label);
       }
       navigator.vibrate?.(20);
       touch();
     },
-    'add-set'() { const e = cur(); e.sets.push({ w: null, reps: null, sec: null, m: null, rpe: null, done: false }); touch(); },
-    'remove-set'() { const e = cur(); if (e.sets.length > 1) { const i = e.sets.map(s => s.done).lastIndexOf(false); e.sets.splice(i >= 0 ? i : e.sets.length - 1, 1); touch(); } },
-    skip() { const e = cur(); e.skipped = !e.skipped; touch(); },
+    'undo-set'(el) { const s = cur().sets[+el.dataset.set]; s.done = false; s.rpe = null; touch(); app.toast(`Set ${+el.dataset.set + 1} reopened`); },
+    how() { howSheet(getExercise(cur().exId)); },
+    more() {
+      const e = cur(), note = S.exNotes[e.exId] || '';
+      app.sheet(`<h2 class="sheet-title">${esc(getExercise(e.exId).name)}</h2><div style="height:12px"></div>
+        ${group(row({ title: 'Add a set', icon: 'plus', action: 'add-set' }) + row({ title: 'Remove a set', icon: 'minus', color: 'gray', action: 'remove-set' })
+          + row({ title: 'Replace exercise', sub: 'Busy equipment or something feels off', icon: 'swap', color: 'indigo', action: 'swap' })
+          + row({ title: e.skipped ? 'Don’t skip' : 'Skip exercise', icon: 'skip', color: 'orange', action: 'skip' })
+          + row({ title: 'My notes', sub: note ? esc(note.slice(0, 40)) : 'Seat height, grip, reminders', icon: 'note', color: 'gray', action: 'notes' }))}
+        <button class="btn gray" data-action="close-sheet">Cancel</button>`);
+    },
+    'close-sheet'() { app.closeSheet(); },
+    notes() {
+      const e = cur();
+      app.sheet(`<h2 class="sheet-title">My notes</h2><p class="sheet-sub">Saved with ${esc(getExercise(e.exId).name)} and shown next time.</p>
+        <textarea class="input" data-note="${esc(e.exId)}" rows="4" placeholder="e.g. seat on 4, narrow grip">${esc(S.exNotes[e.exId] || '')}</textarea>
+        <div style="height:16px"></div><button class="btn filled" data-action="close-sheet">Done</button>`);
+    },
+    'add-set'() { const e = cur(); e.sets.push({ w: null, reps: null, sec: null, m: null, rpe: null, done: false }); app.closeSheet(); touch(); },
+    'remove-set'() { const e = cur(); if (e.sets.length > 1) { const i = e.sets.map(s => s.done).lastIndexOf(false); e.sets.splice(i >= 0 ? i : e.sets.length - 1, 1); } app.closeSheet(); touch(); },
+    skip() { const e = cur(); e.skipped = !e.skipped; app.closeSheet(); touch(); },
     swap() {
       const e = cur(), ex = getExercise(e.exId);
       const base = e.swappedFrom ? getExercise(e.swappedFrom) : ex;
       const ids = [...new Set([base.id, ...base.subs, ...ex.subs])].filter(id => id !== e.exId && getExercise(id));
-      app.sheet(`<span class="eyebrow">SWAP FOR TODAY</span><h3>Replace ${esc(ex.name)}</h3><p class="meta">Equipment busy or something doesn’t feel right? Pick an alternative. To change it permanently, edit the routine in Plan.</p>
-        <div class="list">${ids.map(id => { const x = getExercise(id); return `<button class="list-item" data-swap="${id}"><b>${esc(x.name)}</b><small>${esc(x.equipment)} · ${esc(x.muscles)}</small></button>`; }).join('') || '<p>No alternatives listed.</p>'}</div>`,
-        body => body.querySelectorAll('[data-swap]').forEach(b => b.onclick = () => {
-          if (doneSets(e).length) app.toast('Logged sets on the old exercise were cleared');
-          swapExercise(W(), W().index, b.dataset.swap, app.strength, unit()); app.closeSheet(); touch();
-        }));
+      app.sheet(`<h2 class="sheet-title">Replace exercise</h2><p class="sheet-sub">Just for today. To change it permanently, edit the workout in Plan.</p>
+        ${ids.length ? group(ids.map(id => { const x = getExercise(id); return row({ title: esc(x.name), sub: esc(x.equipment), action: 'do-swap', data: { id } }); }).join('')) : '<p class="t-sub">No alternatives for this one.</p>'}
+        <button class="btn gray" data-action="close-sheet">Cancel</button>`);
+    },
+    'do-swap'(el) {
+      if (doneSets(cur()).length) app.toast('Sets you’d logged for the old exercise were cleared');
+      swapExercise(W(), W().index, el.dataset.id, app.strength, unit()); app.closeSheet(); touch(false);
     },
     jump(el) { W().index = +el.dataset.i; touch(false); },
     prev() { W().index = Math.max(0, W().index - 1); touch(false); },
     next() { W().index = Math.min(W().exercises.length - 1, W().index + 1); touch(false); },
-    leave() { app.saveActive(true); app.go('today'); app.toast('Workout saved — resume any time'); },
+    leave() { app.saveActive(true); app.go('today'); app.toast('Workout paused. Continue from Today.'); },
     'to-finish'() { S.form = {}; app.saveActive(true); app.go('workout/finish'); },
     'back-to-runner'() { app.go('workout'); },
     async discard() {
-      if (!(await app.confirm('Discard this workout? Nothing will be saved.', { ok: 'Discard', danger: true }))) return;
+      if (!(await app.confirm('Discard this workout? Nothing will be saved.', { ok: 'Discard Workout', danger: true }))) return;
       S.active = null; await app.saveActive(true); timer.stop(); app.go('today');
     },
     async 'save-workout'() {
       const pain = S.form.pain === 'yes' ? { flag: true, location: S.form.painLoc || '' } : { flag: false, location: '' };
       const session = finalizeWorkout(W(), { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, app.strength);
-      try { await db.putSession(session); } catch { return app.toast('Save failed — export a backup from Settings'); }
+      try { await db.putSession(session); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }
       S.active = null; await app.saveActive(true); timer.stop(); wakeLock?.release?.();
       await app.reloadSessions();
       app.go(`history/session/${session.id}`);
-      app.toast(session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''} 🏆` : 'Workout saved');
+      app.toast(session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''}` : 'Workout saved');
     },
   },
 };
 
+export { tile };

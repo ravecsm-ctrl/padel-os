@@ -1,13 +1,14 @@
-import { app, S, DEFAULT_SETTINGS } from './core-app.js';
+// Settings, laid out like iOS Settings: grouped rows, switches, values.
+import { app, S, DEFAULT_SETTINGS, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
-import { esc, title, chips } from './ui-kit.js';
+import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
 import { buildBackup, validateBackup, normalizeBackup, toCSV } from './domain-backup.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
 
 let persist = '…';
-const toggle = (key, label, sub) => `<label class="toggle row between"><span>${label}<small>${sub}</small></span><input type="checkbox" data-setting="${key}" ${S.settings[key] ? 'checked' : ''}></label>`;
+const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
 
 function download(name, text, type) {
   const a = document.createElement('a');
@@ -17,46 +18,48 @@ function download(name, text, type) {
 }
 
 export const settings = {
+  tab: 'today',
   render() {
     const notif = globalThis.Notification ? Notification.permission : 'unsupported';
-    const lb = S.lastBackup ? new Date(S.lastBackup).toLocaleDateString() : 'never';
-    return `${title('Settings', 'PRIVATE · OFFLINE · NO ACCOUNT')}
-      <section class="card"><label class="lbl" for="nameIn">Name</label><input class="input" id="nameIn" value="${esc(S.settings.name)}" placeholder="Optional">
-        <label class="lbl">Weight unit</label>${chips('unit', ['kg', 'lb'], S.settings.unit)}
-        <p class="meta">Loads are stored in kg and converted for display, so switching never corrupts history.</p></section>
-      <section class="card"><div class="row between"><h3>Your plan</h3><button class="btn small secondary" data-action="go" data-to="welcome">Change</button></div>
-        <p class="meta">${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min sessions · ${S.profile.days}× a week · plays ${S.profile.padelDays.join(', ') || '—'}</p>
-        <label class="toggle row between"><span>Simple mode<small>Plain words instead of RPE, AU and e1RM. Your data is the same either way.</small></span><input type="checkbox" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''}></label></section>
-      <section class="card"><h3>Workout</h3>
-        ${toggle('autoRest', 'Auto-start rest timer', 'Starts when you tick a set')}
-        ${toggle('sound', 'Timer sound', 'Beep when rest is over')}
-        ${toggle('vibrate', 'Vibration', 'Where supported (not iOS Safari)')}
-        ${toggle('readinessPrompt', 'Readiness check-in', '10-second sleep/energy/soreness check before workouts')}
-        <div class="row between toggle"><span>Notifications<small>Alert when rest ends while the app is in the background · ${esc(notif)}</small></span>${notif === 'default' ? '<button class="btn small secondary" data-action="notif">Enable</button>' : ''}</div></section>
-      <section class="card"><h3>Your data</h3>
-        <p class="meta">Everything is stored only in this browser (IndexedDB${db.persistent ? '' : ' unavailable — using memory, data will be lost on reload'}). Persistent storage: <b>${esc(persist)}</b>. Last backup: <b>${esc(lb)}</b>. ${S.sessions.length} sessions.</p>
-        ${persist !== 'granted' ? '<button class="btn secondary wide" data-action="persist">Protect data from browser clean-up</button>' : ''}
-        <div class="row gap"><button class="btn primary" data-action="export-json">Export backup</button><button class="btn secondary" data-action="export-csv">Export CSV</button></div>
-        <label class="btn secondary wide file-btn">Import backup (.json)<input id="importIn" type="file" accept="application/json,.json" hidden></label>
-        <p class="meta">Imports accept this app’s backups and original PADEL OS backups (auto-migrated). You’ll choose merge or replace before anything changes.</p></section>
-      <section class="card"><h3>Install on iPhone</h3><p>Open in Safari → Share → <b>Add to Home Screen</b>. Launch once online; afterwards it works fully offline. Installed apps also get more durable storage.</p></section>
-      <section class="card"><h3>Safety</h3><p>General training information, not medical advice. Use loads you can control. Stop for sharp or worsening pain and consult a qualified professional when needed.</p></section>
-      <button class="btn danger wide" data-action="reset">Erase all data on this device</button>
-      <p class="fine">PADEL OS Pro · data schema v2</p>`;
+    const lb = S.lastBackup ? new Date(S.lastBackup).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'Never';
+    return `${navBar({ back: 'Today', backTo: 'today', title: 'Settings' })}
+      <div style="height:12px"></div>
+      ${group(row({ title: '<input class="input" id="nameIn" value="' + esc(S.settings.name) + '" placeholder="Your name" style="padding:0;background:none;min-height:22px" aria-label="Your name">', icon: 'person', color: 'gray' }), { footer: 'Optional. Shown on Today.' })}
+      ${group(row({ title: 'Your plan', sub: `${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week`, icon: 'sliders', color: 'blue', to: 'welcome' })
+        + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Training' })}
+      ${group(row({ title: 'Start rest timer automatically', icon: 'clock', color: 'orange', right: sw('autoRest', S.settings.autoRest, 'Start rest timer automatically') })
+        + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
+        + row({ title: 'Vibration', icon: 'phone', color: 'gray', right: sw('vibrate', S.settings.vibrate, 'Vibration') })
+        + row({ title: 'Check-in before workouts', icon: 'heart', color: 'red', right: sw('readinessPrompt', S.settings.readinessPrompt, 'Check-in before workouts') })
+        + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'During workouts' })}
+      <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>
+      <section class="grp"><h2 class="grp-h">Appearance</h2>${seg('appearance', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.settings.appearance || 'system')}</section>
+      ${group(row({ title: 'Back up now', sub: `Last backup: ${esc(lb)}`, icon: 'download', color: 'blue', action: 'export-json' })
+        + row({ title: 'Export for spreadsheets', sub: 'CSV file of every set', icon: 'share', color: 'green', action: 'export-csv' })
+        + `<label class="row has-icon" style="cursor:pointer"><span class="tile teal">${icon('plus')}</span><span class="row-main"><span class="row-title">Restore from backup</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg><input id="importIn" type="file" accept="application/json,.json" hidden></label>`
+        + (persist !== 'granted' ? row({ title: 'Protect my data', sub: 'Ask the browser not to clear it', icon: 'shield', color: 'indigo', action: 'persist' }) : ''),
+        { header: 'Your data', footer: `Everything stays on this device. Nothing is uploaded.${db.persistent ? '' : ' <b class="red">Storage is unavailable, so data won’t be kept.</b>'}` })}
+      ${group(row({ title: 'Add to Home Screen', sub: 'In Safari, tap Share, then Add to Home Screen. It then works offline.', icon: 'phone', color: 'gray' })
+        + row({ title: 'Health notice', sub: 'General training guidance, not medical advice. Stop if you feel sharp or worsening pain.', icon: 'heart', color: 'red' }), { header: 'About' })}
+      ${group(`<button class="row danger" data-action="reset">Erase All Data</button>`)}
+      <p class="fine">PADEL OS · ${S.sessions.length} sessions saved</p>`;
   },
   async mounted() {
     const n = document.querySelector('#nameIn');
-    n.onchange = async () => { S.settings.name = n.value.trim(); await app.save('settings'); app.toast('Saved'); };
+    n.onchange = async () => { S.settings.name = n.value.trim(); await app.save('settings'); };
     document.querySelectorAll('[data-setting]').forEach(c => c.onchange = async () => { S.settings[c.dataset.setting] = c.checked; timer.configure(S.settings); await app.save('settings'); });
-    document.querySelector('#simpleIn').onchange = async e => { S.profile.simple = e.target.checked; await app.save('profile'); app.toast(e.target.checked ? 'Simple mode on' : 'Detailed mode on'); };
+    document.querySelector('#simpleIn').onchange = async e => { S.profile.simple = e.target.checked; await app.save('profile'); };
     document.querySelector('#importIn').onchange = e => importFile(e.target.files[0]);
     const p = await db.persistenceStatus();
     if (p !== persist) { persist = p; if (S.route === 'settings') app.render({ keepScroll: true }); }
   },
-  async onPick(name, value) { if (name === 'unit') { S.settings.unit = value; await app.save('settings'); app.toast(`Showing loads in ${value}`); app.render({ keepScroll: true }); } },
+  async onPick(name, value) {
+    if (name === 'unit') { S.settings.unit = value; await app.save('settings'); }
+    if (name === 'appearance') { S.settings.appearance = value; applyTheme(); await app.save('settings'); }
+  },
   actions: {
     async notif() { try { await Notification.requestPermission(); } catch {} app.render({ keepScroll: true }); },
-    async persist() { persist = await db.requestPersistence(); app.toast(persist === 'granted' ? 'Storage protected' : 'Browser declined — install to Home Screen and back up regularly'); app.render({ keepScroll: true }); },
+    async persist() { persist = await db.requestPersistence(); app.toast(persist === 'granted' ? 'Your data is protected' : 'Not allowed. Add to Home Screen and back up regularly.'); app.render({ keepScroll: true }); },
     async 'export-json'() {
       const meta = await db.allMeta(); delete meta.timer;
       download(`padel-os-backup-${isoDate()}.json`, JSON.stringify(buildBackup(meta, S.sessions), null, 2), 'application/json');
@@ -64,8 +67,8 @@ export const settings = {
     },
     'export-csv'() { download(`padel-os-sets-${isoDate()}.csv`, toCSV(S.sessions), 'text/csv'); },
     async reset() {
-      if (!(await app.confirm('Erase all sessions, settings and the in-progress workout on this device?', { ok: 'Continue', danger: true }))) return;
-      if (!(await app.confirm('This cannot be undone without a backup. Erase everything?', { ok: 'Erase everything', danger: true }))) return;
+      if (!(await app.confirm('Erase all workouts, matches and settings on this device?', { ok: 'Continue', danger: true }))) return;
+      if (!(await app.confirm('This can’t be undone without a backup. Erase everything?', { ok: 'Erase Everything', danger: true }))) return;
       await db.clearAll(); location.hash = ''; location.reload();
     },
   },
@@ -74,16 +77,16 @@ export const settings = {
 async function importFile(file) {
   if (!file) return;
   let data;
-  try { data = JSON.parse(await file.text()); } catch { return app.toast('That file is not valid JSON'); }
+  try { data = JSON.parse(await file.text()); } catch { return app.toast('That file isn’t a backup'); }
   const v = validateBackup(data);
   if (!v.ok) return app.toast(v.errors.join(' '));
   const norm = normalizeBackup(data);
   const existing = new Set(S.sessions.map(s => s.id));
   const fresh = norm.sessions.filter(s => !existing.has(s.id)).length;
-  app.sheet(`<span class="eyebrow">VALID BACKUP · SCHEMA V${v.version}${v.version === 1 ? ' (WILL BE MIGRATED)' : ''}</span><h3>${norm.sessions.length} sessions found</h3>
-    <p class="meta">${fresh} are new to this device. ${v.errors.map(esc).join(' ')}</p>
-    <p><b>Merge</b> adds new sessions and keeps yours. <b>Replace</b> erases this device’s data first.</p>
-    <div class="row gap"><button class="btn secondary" data-mode="merge">Merge</button><button class="btn danger" data-mode="replace">Replace</button></div>`, body => {
+  app.sheet(`<h2 class="sheet-title">Restore backup</h2><p class="sheet-sub">${norm.sessions.length} sessions found, ${fresh} new to this device.${v.version === 1 ? ' It’s from the original PADEL OS and will be converted.' : ''} ${v.errors.map(esc).join(' ')}</p>
+    ${group(row({ title: 'Add to what’s here', sub: 'Keeps your current data and settings', action: 'noop', data: { mode: 'merge' }, chevron: false }).replace('data-action="noop"', '')
+      + row({ title: 'Replace everything', sub: 'Erases this device first', action: 'noop', data: { mode: 'replace' }, chevron: false, cls: 'red' }).replace('data-action="noop"', ''))}
+    <button class="btn gray" data-action="close-sheet">Cancel</button>`, body => {
     body.querySelectorAll('[data-mode]').forEach(b => b.onclick = async () => {
       if (b.dataset.mode === 'replace') { await db.clearAll(); }
       const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
@@ -95,7 +98,8 @@ async function importFile(file) {
         await app.save(k);
       }
       if (b.dataset.mode === 'replace' && S.active) await app.saveActive(true);
-      await app.reloadSessions(); app.closeSheet(); app.toast('Backup imported'); app.render();
+      applyTheme();
+      await app.reloadSessions(); app.closeSheet(); app.toast('Backup restored'); app.render();
     });
   });
 }
