@@ -3,10 +3,16 @@
 // free text from CSVs is normalised onto these ids.
 
 export const MUSCLES = {
-  quads: 'Quads', hamstrings: 'Hamstrings', glutes: 'Glutes', adductors: 'Adductors', calves: 'Calves', shins: 'Shins',
-  core: 'Core', obliques: 'Obliques', lower_back: 'Lower back', chest: 'Chest', upper_back: 'Upper back', lats: 'Lats',
-  shoulders: 'Shoulders', rotator_cuff: 'Rotator cuff', arms: 'Biceps & triceps', forearms: 'Forearms',
+  front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts', rotator_cuff: 'Rotator cuff',
+  upper_chest: 'Upper chest', chest: 'Chest', lower_chest: 'Lower chest',
+  traps: 'Traps', mid_back: 'Mid back', lats: 'Lats', lower_back: 'Lower back',
+  biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms',
+  abs: 'Abs', obliques: 'Obliques', hip_flexors: 'Hip flexors',
+  glutes: 'Glutes', glute_med: 'Glute med', adductors: 'Adductors', quads: 'Quads', hamstrings: 'Hamstrings',
+  calves: 'Calves', soleus: 'Soleus', shins: 'Shins',
 };
+// Muscle groups before the finer split (2026-10). Saved data and old imports may still use them.
+export const LEGACY_MUSCLES = { shoulders: ['front_delts', 'side_delts', 'rear_delts'], upper_back: ['traps', 'mid_back'], arms: ['biceps', 'triceps'], core: ['abs'] };
 export const MOVEMENTS = {
   squat: 'Squat', hinge: 'Hinge', 'single-leg': 'Single-leg', lateral: 'Lateral', push: 'Push', pull: 'Pull',
   rotation: 'Rotation', 'anti-rotation': 'Anti-rotation', carry: 'Carry', power: 'Jump / power', 'calf-ankle': 'Calf / ankle', mobility: 'Mobility',
@@ -59,12 +65,23 @@ export const needsLabel = (needs = [], custom = {}) => needs.length ? needs.map(
 export const norm = s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const ALIAS = {
   muscle: {
-    quad: 'quads', quadriceps: 'quads', thighs: 'quads', hamstring: 'hamstrings', hammies: 'hamstrings', glute: 'glutes', 'glute max': 'glutes', 'glutes max': 'glutes', 'glute med': 'glutes', gluteus: 'glutes', butt: 'glutes', hips: 'glutes',
-    adductor: 'adductors', groin: 'adductors', 'inner thigh': 'adductors', calf: 'calves', soleus: 'calves', gastrocnemius: 'calves', shin: 'shins', tibialis: 'shins', 'tibialis anterior': 'shins', ankles: 'shins', ankle: 'shins',
-    abs: 'core', abdominals: 'core', 'deep trunk': 'core', trunk: 'core', oblique: 'obliques', 'low back': 'lower_back', 'lower back': 'lower_back', 'erector spinae': 'lower_back', erectors: 'lower_back',
-    pecs: 'chest', pec: 'chest', 'upper back': 'upper_back', traps: 'upper_back', rhomboids: 'upper_back', 'mid back': 'upper_back', 'rear delts': 'shoulders', 'rear delt': 'shoulders', back: 'upper_back',
-    lat: 'lats', latissimus: 'lats', delts: 'shoulders', deltoids: 'shoulders', deltoid: 'shoulders', shoulder: 'shoulders', 'rotator cuff': 'rotator_cuff', cuff: 'rotator_cuff', 'external rotators': 'rotator_cuff',
-    biceps: 'arms', triceps: 'arms', arms: 'arms', bicep: 'arms', tricep: 'arms', forearm: 'forearms', grip: 'forearms', wrist: 'forearms', wrists: 'forearms',
+    quad: 'quads', quadriceps: 'quads', thighs: 'quads', hamstring: 'hamstrings', hammies: 'hamstrings', glute: 'glutes', 'glute max': 'glutes', 'glutes max': 'glutes', 'gluteus maximus': 'glutes', gluteus: 'glutes', butt: 'glutes', hips: 'glutes',
+    'glute med': 'glute_med', 'glute medius': 'glute_med', 'gluteus medius': 'glute_med', 'side glutes': 'glute_med', abductors: 'glute_med', 'hip abductors': 'glute_med',
+    'hip flexor': 'hip_flexors', 'hip flexors': 'hip_flexors', psoas: 'hip_flexors', iliopsoas: 'hip_flexors',
+    adductor: 'adductors', groin: 'adductors', 'inner thigh': 'adductors', calf: 'calves', gastrocnemius: 'calves', gastroc: 'calves', 'deep calf': 'soleus',
+    shin: 'shins', tibialis: 'shins', 'tibialis anterior': 'shins', ankles: 'shins', ankle: 'shins',
+    core: 'abs', abdominals: 'abs', 'deep trunk': 'abs', trunk: 'abs', 'rectus abdominis': 'abs', six: 'abs', oblique: 'obliques',
+    'low back': 'lower_back', 'lower back': 'lower_back', 'erector spinae': 'lower_back', erectors: 'lower_back',
+    pecs: 'chest', pec: 'chest', 'mid chest': 'chest', 'middle chest': 'chest', 'upper pecs': 'upper_chest', 'upper pec': 'upper_chest', 'clavicular pec': 'upper_chest', 'lower pecs': 'lower_chest', 'lower pec': 'lower_chest',
+    'upper back': 'mid_back', 'mid back': 'mid_back', 'middle back': 'mid_back', rhomboids: 'mid_back', 'mid traps': 'mid_back', 'middle traps': 'mid_back', 'lower traps': 'mid_back', back: 'mid_back',
+    trap: 'traps', trapezius: 'traps', 'upper traps': 'traps',
+    lat: 'lats', latissimus: 'lats', 'latissimus dorsi': 'lats',
+    delts: 'front_delts', deltoids: 'front_delts', deltoid: 'front_delts', shoulder: 'front_delts', shoulders: 'front_delts', 'front delt': 'front_delts', 'anterior delts': 'front_delts', 'anterior deltoid': 'front_delts',
+    'side delt': 'side_delts', 'lateral delts': 'side_delts', 'lateral delt': 'side_delts', 'medial delts': 'side_delts', 'middle delts': 'side_delts',
+    'rear delt': 'rear_delts', 'posterior delts': 'rear_delts', 'posterior deltoid': 'rear_delts',
+    'rotator cuff': 'rotator_cuff', cuff: 'rotator_cuff', 'external rotators': 'rotator_cuff',
+    bicep: 'biceps', tricep: 'triceps', arms: 'biceps', arm: 'biceps',
+    forearm: 'forearms', grip: 'forearms', wrist: 'forearms', wrists: 'forearms',
   },
   equipment: {
     dumbbell: 'dumbbells', db: 'dumbbells', dbs: 'dumbbells', kettlebells: 'kettlebell', kb: 'kettlebell', barbell: 'barbell', bar: 'barbell', plates: 'barbell', 'trap bar': 'trap_bar', 'hex bar': 'trap_bar',

@@ -16,7 +16,7 @@ import { feedbackSheet } from './ui-feedback.js';
 import { COURT_ROUTINES, stretchFor, routineMinutes as rMin } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
-import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor } from './domain-muscles.js';
+import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor, SMALL } from './domain-muscles.js';
 import { MUSCLES } from './domain-taxonomy.js';
 
 const unit = () => S.settings.unit;
@@ -85,7 +85,7 @@ function weekMusclesCard() {
 
 function musclesView() {
   const map = lastDays(app.strength, 7);
-  const zone = m => ['rotator_cuff', 'forearms', 'shins', 'calves', 'obliques', 'arms'].includes(m) ? [6, 16] : [10, 20];
+  const zone = m => SMALL.has(m) ? [6, 16] : [10, 20];
   const scale = 24;
   const rows = Object.keys(MUSCLES).map(id => ({ id, label: MUSCLES[id], sets: map[id] || 0 })).sort((a, b) => b.sets - a.sets).map(m => {
     const st = weeklyStatus(m.id, m.sets), [lo, hi] = zone(m.id);

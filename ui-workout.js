@@ -15,7 +15,9 @@ import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips }
 import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel, CATEGORIES } from './domain-taxonomy.js';
-import { bodyMap } from './ui-bodymap.js';
+import { bodyMap, exerciseMap } from './ui-bodymap.js';
+import { startEdit } from './ui-library.js';
+import { MUSCLES } from './domain-taxonomy.js';
 import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
 import { recentPain, painHits, gentlerFor, areaName } from './domain-pain.js';
@@ -105,6 +107,20 @@ function coach(e) {
     ${baseline(e, last)}${warmupLine(e)}
     <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${why ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p>
     ${missingHere(ex)}${painNote(e)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+}
+
+// ── Muscles: main ones bold, secondary ones lighter; tap for the body map.
+function muscleLine(ex) {
+  const p = (ex.primary || []).map(m => MUSCLES[m]).filter(Boolean), s = (ex.secondary || []).map(m => MUSCLES[m]).filter(Boolean);
+  if (!p.length && !s.length) return '';
+  return `<button class="mline" data-action="muscle-map" aria-label="Muscles worked: ${esc([...p, ...s].join(', '))}. Show on body map."><b>${esc(p.join(' · '))}</b>${s.length ? `<span>${esc(s.join(' · '))}</span>` : ''}</button>`;
+}
+export function muscleSheet(ex, { editable = true } = {}) {
+  const list = (ids, label) => ids?.length ? row({ title: label, value: esc(ids.map(m => MUSCLES[m]).join(', ')) }) : '';
+  app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">Muscles this exercise works</p>
+    <div class="card">${exerciseMap(ex)}<div class="bm-legend"><span><i class="lg main"></i>Main</span><span><i class="lg sec"></i>Secondary</span></div></div>
+    <div style="height:16px"></div>${group(list(ex.primary, 'Main') + list(ex.secondary, 'Secondary'))}
+    ${editable ? `<button class="btn gray" data-action="muscle-edit" data-id="${esc(ex.id)}">Edit Muscles</button>` : ''}`);
 }
 
 // ── Supersets: pair with the next unpaired exercise; remembered per workout.
@@ -213,7 +229,7 @@ function runner() {
     ${w.index === 0 || w.adapt?.applied === false ? adaptBanner(w) : ''}
     <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''} ${x.pair ? 'ss' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
     ${awakeLine()}
-    <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p>${partnerIndex(w, w.index) >= 0 ? `<p class="ss-tag">Superset with ${esc(w.exercises[partnerIndex(w, w.index)].name)}</p>` : ''}<h1>${esc(ex.name)}</h1></div>
+    <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p>${partnerIndex(w, w.index) >= 0 ? `<p class="ss-tag">Superset with ${esc(w.exercises[partnerIndex(w, w.index)].name)}</p>` : ''}<h1>${esc(ex.name)}</h1>${muscleLine(ex)}</div>
       <button class="icon-circle" data-action="more" aria-label="More options">${icon('more')}</button></div>
     ${e.skipped ? `<section class="card setcard" style="text-align:center"><p class="t-head">Skipped</p><p class="t-sub" style="margin:4px 0 14px">This exercise won’t be counted.</p><button class="btn tinted" data-action="skip">Do It After All</button></section>` : `${coach(e)}${setArea(e)}`}
     <div class="wk-bottom"><button class="btn gray square" data-action="prev" ${w.index === 0 ? 'disabled' : ''} aria-label="Previous exercise">${icon('chevL')}</button>
@@ -375,6 +391,8 @@ export const workout = {
     },
     'close-sheet'() { app.closeSheet(); },
     'pick-ex'() { pickerSheet(); },
+    'muscle-map'() { muscleSheet(getExercise(cur().exId)); },
+    'muscle-edit'(el) { startEdit(el.dataset.id, { returnTo: 'workout' }); },
     'awake-help'() {
       app.sheet(`<h2 class="sheet-title">Keep the screen on</h2><p class="sheet-sub">iPhone didn’t let the app keep the screen on, so it may lock during rests. A locked phone can’t play the rest beep.</p>
         ${group(row({ title: '1. Open Settings', chevron: false }) + row({ title: '2. Display & Brightness → Auto-Lock', chevron: false }) + row({ title: '3. Choose 5 minutes or Never while you train', chevron: false }))}

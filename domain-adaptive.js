@@ -6,7 +6,7 @@ import { performances, doneSets } from './domain-progression.js';
 import { roundLoad } from './domain-units.js';
 import { TIRED_FROM } from './domain-recovery.js';
 
-const LEGS = ['quads', 'hamstrings', 'glutes', 'calves', 'adductors'];
+const LEGS = ['quads', 'hamstrings', 'glutes', 'glute_med', 'calves', 'soleus', 'adductors'];
 const lower = s => s.charAt(0).toLowerCase() + s.slice(1);
 
 // How tired the muscles this exercise relies on are (main muscles count fully).

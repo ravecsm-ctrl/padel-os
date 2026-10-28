@@ -175,7 +175,7 @@ export const TEMPLATE_CSV = [
   COLUMNS.join(','),
   'Bulgarian split squat,Legs A,1,3,8-10,reps,20,per_hand,yes,90,"quads, glutes",adductors,single-leg,lower-strength,"dumbbells, bench",intermediate,https://www.youtube.com/results?search_query=bulgarian+split+squat,"Front foot flat, drop straight down",',
   'Copenhagen plank,Legs A,2,3,20-30,seconds,,bodyweight,yes,60,adductors,obliques,lateral,prevention,bench,intermediate,,"Top leg on bench, hips in line",Short lever to start',
-  'Landmine press,Upper A,1,4,8-10,reps,15,total,yes,90,"shoulders, chest",arms,push,upper-strength,landmine,intermediate,,"Half kneeling, ribs down",',
+  'Landmine press,Upper A,1,4,8-10,reps,15,total,yes,90,"front_delts, upper_chest",triceps,push,upper-strength,landmine,intermediate,,"Half kneeling, ribs down",',
 ].join('\n');
 
 export const ALLOWED_VALUES = {

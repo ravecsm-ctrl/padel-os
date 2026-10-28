@@ -22,6 +22,7 @@ import { review } from './ui-review.js';
 import { feedback } from './ui-feedback.js';
 import { pickerActions } from './ui-picker.js';
 import './domain-pack.js'; // expansion pack: adds its exercises to the library
+import { upgradeSaved } from './domain-muscles.js';
 import { overview } from './ui-overview.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
@@ -99,7 +100,10 @@ async function boot() {
     S.feedback = Array.isArray(meta.feedback) ? meta.feedback : [];
     S.supersets = meta.supersets || {};
     setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
-    S.exerciseEdits = meta.exerciseEdits || {}; applyExerciseEdits(S.exerciseEdits);
+    S.exerciseEdits = meta.exerciseEdits || {};
+    // Data saved before the finer muscle split is upgraded once (and again after an old backup is restored).
+    for (const k of upgradeSaved(S)) await db.setMeta(k, S[k]);
+    setCustomExercises(S.customExercises); applyExerciseEdits(S.exerciseEdits);
     // Locations: first run (or upgrade) creates two editable examples from the old tier setting.
     if (Array.isArray(meta.locations) && meta.locations.length) { S.locations = meta.locations; S.activeLocation = meta.activeLocation || meta.locations[0].id; }
     else {

@@ -16,28 +16,40 @@ const BASE = [E(60, 17, 11, 12.5), R(54, 28, 12, 9, 3),
   ...both(E, 30, 92, 7, 32),                    // arms
   ...both(E, 24, 128, 4.5, 6), ...both(E, 48, 246, 7, 4)];
 
+// 25 muscle groups. Order matters: later shapes are drawn on top.
 const FRONT = {
-  shoulders: both(E, 37, 50, 10, 8.5),
-  chest: bothR(41, 45, 18, 22, 7),
-  arms: both(E, 30, 79, 6.5, 14),
+  traps: both(E, 49, 38, 6, 3),
+  side_delts: both(E, 30.5, 52, 4, 8.5),
+  front_delts: both(E, 38, 50.5, 6.5, 8),
+  upper_chest: bothR(44, 53, 15, 7, 4),
+  chest: bothR(43, 60.5, 16, 7, 4),
+  lower_chest: bothR(44, 68, 15, 5.5, 3),
+  biceps: both(E, 30, 79, 6, 13),
   forearms: both(E, 26, 107, 5.5, 14),
-  core: [R(51, 70, 18, 44, 7)],
-  obliques: both(E, 44, 92, 5, 17),
-  quads: both(E, 47, 152, 9.5, 27),
-  adductors: both(E, 56, 144, 3.6, 17),
+  abs: [R(51, 75, 18, 32, 7)],
+  obliques: both(E, 44, 93, 5, 14),
+  glute_med: both(E, 39.5, 117, 3.5, 7),
+  hip_flexors: both(E, 51, 113, 4.5, 6.5),
+  quads: both(E, 47, 152, 9.5, 26),
+  adductors: both(E, 56, 145, 3.6, 16),
   shins: both(E, 48, 212, 6, 21),
 };
 const BACK = {
-  upper_back: [R(43, 42, 34, 26, 8)],
-  shoulders: both(E, 37, 50, 10, 8.5),
-  rotator_cuff: both(E, 47, 58, 6, 4.5),
+  traps: [R(48, 35, 24, 14, 6)],
+  mid_back: [R(44, 50, 32, 17, 7)],
+  side_delts: both(E, 30.5, 52, 4, 8.5),
+  rear_delts: both(E, 38, 50.5, 6.5, 8),
+  rotator_cuff: both(E, 47.5, 60, 5, 4),
   lats: both(E, 45, 85, 8.5, 15),
-  lower_back: [R(52, 90, 16, 24, 6)],
-  arms: both(E, 30, 79, 6.5, 14),
+  lower_back: [R(52, 90, 16, 23, 6)],
+  triceps: both(E, 30, 79, 6, 13),
   forearms: both(E, 26, 107, 5.5, 14),
-  glutes: both(E, 50, 126, 10.5, 10),
+  glute_med: both(E, 42.5, 113.5, 6, 5),
+  glutes: both(E, 50, 127, 10.5, 9.5),
   hamstrings: both(E, 48, 163, 8.5, 22),
-  calves: both(E, 48, 211, 7, 19),
+  adductors: both(E, 56.5, 152, 3, 13),
+  calves: both(E, 48, 204, 7, 14),
+  soleus: both(E, 48, 224, 5.5, 9),
 };
 
 const shape = (s, attrs) => s.t === 'e'
@@ -67,4 +79,13 @@ export function bodyMap(values = {}, { color = blueScale, max = null, title = 'M
   const worked = Object.entries(values).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k]) => MUSCLES[k]).join(', ');
   return `<svg class="bodymap" viewBox="0 0 250 268" role="img" aria-label="${esc(title)}: ${esc(worked || 'none')}">
     ${figure(FRONT, values, 0, color, m, 'Front', tip)}${figure(BACK, values, 130, color, m, 'Back', tip)}</svg>`;
+}
+
+// One exercise: main muscles strong, secondary ones pale.
+const exColor = v => !v ? { fill: 'var(--fill-2)', opacity: 1 } : { fill: 'var(--blue)', opacity: v >= 1 ? 1 : 0.38 };
+export function exerciseMap(ex) {
+  const values = {};
+  for (const m of ex?.secondary || []) values[m] = 0.5;
+  for (const m of ex?.primary || []) values[m] = 1;
+  return bodyMap(values, { color: exColor, max: 1, title: `${ex?.name || 'Exercise'}: muscles worked`, tip: (m, v) => `${MUSCLES[m]}${v >= 1 ? ' (main)' : v ? ' (secondary)' : ''}` });
 }

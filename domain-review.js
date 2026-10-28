@@ -32,7 +32,8 @@ export function suggestionAccuracy(workouts) {
 }
 
 const DAY = 86400000;
-const BIG = ['quads', 'hamstrings', 'glutes', 'chest', 'upper_back', 'lats', 'shoulders'];
+// Groups worth at least some work every week (padel-relevant ones included).
+const BIG = ['quads', 'hamstrings', 'glutes', 'glute_med', 'chest', 'mid_back', 'lats', 'front_delts', 'rear_delts'];
 
 // The week to review by default: this week on Sunday, otherwise last week.
 export function reviewWeekStart(now = new Date()) {

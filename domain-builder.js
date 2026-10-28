@@ -6,15 +6,15 @@ import { MUSCLES, canDoWith } from './domain-taxonomy.js';
 import { blockSeconds } from './domain-personalize.js';
 
 export const FOCUS = {
-  legs: { label: 'Strong legs', sub: 'Braking, lunging and changing direction', muscles: { quads: 1, glutes: 1, hamstrings: 1, adductors: 0.8, calves: 0.4 }, categories: ['lower-strength'], movements: ['squat', 'hinge', 'single-leg', 'lateral'] },
-  upper: { label: 'Upper-body strength', sub: 'Pressing, pulling and grip', muscles: { chest: 1, upper_back: 1, lats: 1, shoulders: 0.8, arms: 0.6, forearms: 0.4 }, categories: ['upper-strength'], movements: ['push', 'pull'] },
-  shoulders: { label: 'Healthy shoulders', sub: 'For bandejas, viboras and smashes', muscles: { rotator_cuff: 1, shoulders: 0.9, upper_back: 0.8 }, categories: ['prevention'], movements: ['pull'] },
+  legs: { label: 'Strong legs', sub: 'Braking, lunging and changing direction', muscles: { quads: 1, glutes: 1, hamstrings: 1, adductors: 0.8, glute_med: 0.6, calves: 0.4, soleus: 0.2 }, categories: ['lower-strength'], movements: ['squat', 'hinge', 'single-leg', 'lateral'] },
+  upper: { label: 'Upper-body strength', sub: 'Pressing, pulling and grip', muscles: { chest: 1, upper_chest: 0.6, mid_back: 1, lats: 1, front_delts: 0.6, side_delts: 0.5, rear_delts: 0.6, biceps: 0.4, triceps: 0.4, forearms: 0.4 }, categories: ['upper-strength'], movements: ['push', 'pull'] },
+  shoulders: { label: 'Healthy shoulders', sub: 'For bandejas, viboras and smashes', muscles: { rotator_cuff: 1, rear_delts: 1, side_delts: 0.5, mid_back: 0.8 }, categories: ['prevention'], movements: ['pull'] },
   power: { label: 'Power & agility', sub: 'Faster first step, explosive shots', muscles: { glutes: 0.5, quads: 0.4, obliques: 0.5 }, categories: ['power'], movements: ['power', 'rotation', 'lateral'] },
-  core: { label: 'Core & rotation', sub: 'Stable trunk, powerful rotation', muscles: { core: 1, obliques: 1, lower_back: 0.6 }, categories: ['core'], movements: ['anti-rotation', 'rotation', 'carry'] },
-  prevention: { label: 'Stay injury-free', sub: 'Elbows, shoulders, knees, calves', muscles: { rotator_cuff: 0.8, forearms: 0.8, adductors: 0.8, calves: 0.9, shins: 0.9 }, categories: ['prevention'], movements: ['calf-ankle'] },
+  core: { label: 'Core & rotation', sub: 'Stable trunk, powerful rotation', muscles: { abs: 1, obliques: 1, lower_back: 0.6, hip_flexors: 0.3 }, categories: ['core'], movements: ['anti-rotation', 'rotation', 'carry'] },
+  prevention: { label: 'Stay injury-free', sub: 'Elbows, shoulders, knees, calves', muscles: { rotator_cuff: 0.8, forearms: 0.8, adductors: 0.8, glute_med: 0.6, calves: 0.9, soleus: 0.4, shins: 0.9 }, categories: ['prevention'], movements: ['calf-ankle'] },
 };
 // Injury areas shift the prevention focus toward the muscles that protect them.
-const AREA_MUSCLES = { elbow: ['forearms'], shoulder: ['rotator_cuff', 'shoulders'], back: ['core', 'lower_back', 'glutes'], knee: ['quads', 'adductors', 'glutes'], calf: ['calves'], ankle: ['shins', 'calves'] };
+const AREA_MUSCLES = { elbow: ['forearms'], shoulder: ['rotator_cuff', 'rear_delts'], back: ['abs', 'lower_back', 'glutes'], knee: ['quads', 'adductors', 'glutes', 'glute_med'], calf: ['calves', 'soleus'], ankle: ['shins', 'calves', 'soleus'] };
 const PADEL = new Set(['lateral', 'single-leg', 'power', 'rotation', 'anti-rotation', 'calf-ankle']);
 const ORDER = { power: 0, squat: 1, hinge: 1, 'single-leg': 2, push: 2, pull: 2, lateral: 3, rotation: 3, carry: 4, 'anti-rotation': 4, 'calf-ankle': 5, mobility: 6 };
 export const PER_SESSION = { 20: 4, 40: 6, 70: 8 };
@@ -25,7 +25,7 @@ const hits = (ex, ms) => (ex.primary || []).some(m => ms.includes(m));
 const ANCHORS = {
   legs: [ex => ['squat', 'hinge'].includes(ex.movement) && ex.category === 'lower-strength' && loaded(ex), ex => ex.movement === 'single-leg'],
   upper: [ex => ex.movement === 'push' && ex.category === 'upper-strength', ex => ex.movement === 'pull' && ex.category === 'upper-strength'],
-  shoulders: [ex => hits(ex, ['rotator_cuff']), ex => ex.movement === 'pull' && hits(ex, ['shoulders', 'upper_back'])],
+  shoulders: [ex => hits(ex, ['rotator_cuff']), ex => ex.movement === 'pull' && hits(ex, ['rear_delts', 'mid_back'])],
   power: [ex => ex.movement === 'power'],
   core: [ex => ex.movement === 'anti-rotation', ex => ex.movement === 'rotation' || ex.movement === 'carry'],
   prevention: [ex => ex.movement === 'calf-ankle', ex => hits(ex, ['rotator_cuff', 'forearms', 'adductors'])],
@@ -49,7 +49,10 @@ export function scoreExercise(ex, { focuses, owned = null, level = 'intermediate
   let best = { s: 0, f: null }, total = 0;
   for (const f of fw) {
     let s = 0;
-    for (const m of ex.primary || []) s += f.muscles[m] || 0;
+    // Best-matching main muscle counts fully, extra ones half: finer muscle groups shouldn't
+    // reward exercises just for listing more of them.
+    const pm = (ex.primary || []).map(m => f.muscles[m] || 0).sort((a, b) => b - a);
+    s += (pm[0] || 0) + 0.5 * pm.slice(1).reduce((a, b) => a + b, 0);
     for (const m of ex.secondary || []) s += (f.muscles[m] || 0) * 0.35;
     if (f.def.categories.includes(ex.category)) s += 0.9;
     if (f.def.movements.includes(ex.movement)) s += 0.5;
@@ -63,6 +66,9 @@ export function scoreExercise(ex, { focuses, owned = null, level = 'intermediate
     reasons.push(`${best.f.def.label}${hits.length ? `: works ${hits.slice(0, 2).join(' and ')}` : ''}`);
   }
   if (PADEL.has(ex.movement)) { total += 0.35; if (reasons.length < 2) reasons.push('Padel-specific movement'); }
+  // An injury you flagged: controlled strength and prevention work for the muscles that
+  // protect that area comes first (not sprints or conditioning drills).
+  if (focuses.includes('prevention') && ['prevention', 'lower-strength', 'upper-strength', 'core'].includes(ex.category) && injuries.some(a => (AREA_MUSCLES[a] || []).some(m => (ex.primary || []).includes(m)))) { total += 0.6; reasons.unshift('Protects an area you flagged'); }
   const available = owned ? canDoWith(ex.needs || [], owned) : true;
   if (level === 'beginner' && ex.level === 'advanced') { total -= 1; reasons.push('Advanced, may be hard to start with'); }
   if (level === 'advanced' && ex.level === 'beginner' && ex.category !== 'prevention') total -= 0.25;

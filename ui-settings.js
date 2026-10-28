@@ -8,6 +8,7 @@ import { saveBackup, saveFile } from './ui-backup.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
 import { setCustomExercises, setStartWeights, applyExerciseEdits } from './domain-catalog.js';
+import { upgradeSaved } from './domain-muscles.js';
 import { setCustomRoutines } from './domain-program.js';
 
 let persist = '…';
@@ -90,6 +91,7 @@ async function importFile(file) {
       await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
       for (const [k, v] of Object.entries(restoreMeta(S, norm.meta, b.dataset.mode, DEFAULT_SETTINGS))) { S[k] = v; await app.save(k); }
       if (b.dataset.mode === 'replace' && S.active) await app.saveActive(true);
+      for (const k of upgradeSaved(S)) await app.save(k);
       applyTheme(); setCustomExercises(S.customExercises); applyExerciseEdits(S.exerciseEdits); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
       await app.reloadSessions(); app.closeSheet(); app.toast('Backup restored'); app.render();
     });

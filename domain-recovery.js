@@ -9,13 +9,16 @@ import { SECONDARY_WEIGHT } from './domain-muscles.js';
 
 const HOUR = 3600000;
 export const STANDARD_DOSE = 6;   // "a solid session" for one muscle, in weighted sets
+// Bigger muscles take longer; small ones bounce back faster.
 const BASE_HOURS = {
-  quads: 60, hamstrings: 60, glutes: 60, adductors: 54, lower_back: 54,
-  chest: 48, upper_back: 48, lats: 48, shoulders: 48,
-  arms: 36, forearms: 36, calves: 36, shins: 30, rotator_cuff: 36, core: 30, obliques: 30,
+  quads: 60, hamstrings: 60, glutes: 60, adductors: 54, lower_back: 54, glute_med: 48, hip_flexors: 36,
+  upper_chest: 48, chest: 48, lower_chest: 48, mid_back: 48, lats: 48, traps: 40, front_delts: 44, side_delts: 40, rear_delts: 40,
+  biceps: 36, triceps: 36, forearms: 36, calves: 36, soleus: 36, shins: 30, rotator_cuff: 36, abs: 30, obliques: 30,
 };
-// Padel: weighted "sets" per 30 minutes at a moderate effort.
-const PADEL_LOAD = { calves: 1.4, quads: 1.1, adductors: 1.1, glutes: 0.9, shoulders: 0.9, forearms: 0.9, rotator_cuff: 0.6, obliques: 0.7, core: 0.5, shins: 0.6 };
+// Padel: weighted "sets" per 30 minutes at a moderate effort. Lots of lunging, lateral
+// pushing and push-offs; overheads and volleys load the front of the shoulder and grip.
+const PADEL_LOAD = { calves: 1.2, soleus: 1.0, quads: 1.1, adductors: 1.1, glutes: 0.8, glute_med: 0.9, hip_flexors: 0.5, front_delts: 0.6, side_delts: 0.3, rear_delts: 0.3,
+  forearms: 0.9, rotator_cuff: 0.6, obliques: 0.7, abs: 0.5, shins: 0.6 };
 export const READY_BELOW = 0.2;     // fatigue level under which a muscle counts as ready
 export const TIRED_FROM = 0.6;
 
@@ -42,7 +45,7 @@ export function events(sessions, since) {
       for (const [m, dose] of Object.entries(by)) out.push({ t, muscle: m, dose });
     } else if (s.kind === 'activity' && (s.activity === 'padel' || s.activity === 'cardio')) {
       const k = (s.durationMin || 0) / 30 * effort(s.rpe) * (s.activity === 'cardio' ? 0.5 : 1);
-      for (const [m, w] of Object.entries(PADEL_LOAD)) if (s.activity === 'padel' || ['calves', 'quads', 'glutes'].includes(m)) out.push({ t, muscle: m, dose: w * k });
+      for (const [m, w] of Object.entries(PADEL_LOAD)) if (s.activity === 'padel' || ['calves', 'soleus', 'quads', 'glutes'].includes(m)) out.push({ t, muscle: m, dose: w * k });
     }
   }
   return out;

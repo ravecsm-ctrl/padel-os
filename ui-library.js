@@ -6,6 +6,7 @@ import { setCustomRoutines } from './domain-program.js';
 import { MUSCLES, MOVEMENTS, CATEGORIES, EQUIPMENT, LEVELS, WEIGHT_TYPES, canDoWith, missingFor, equipLabel, norm } from './domain-taxonomy.js';
 import { rowsFrom, normalizeRow, matchExercise, buildCustomExercise, buildWorkouts, TEMPLATE_CSV, ALLOWED_VALUES, chatgptPrompt, libraryCSV } from './domain-importer.js';
 import { saveFile } from './ui-backup.js';
+import { exerciseMap } from './ui-bodymap.js';
 import { isoDate } from './domain-calendar.js';
 
 let showAll = false, query = '';
@@ -59,13 +60,13 @@ function bindNewExercise() {
 }
 // Edit an existing exercise: library ones keep your changes separately (resettable),
 // your own exercises are updated directly.
-function startEdit(id) {
+export function startEdit(id, { returnTo = 'library' } = {}) {
   const e = getExercise(id);
   if (!e) return;
   const tf = e.fields[e.fields.length - 1];
   S.form = { nx: true, editId: id, builtIn: !e.custom, name: e.name, primary: [...(e.primary || [])], secondary: [...(e.secondary || [])], category: e.category || 'lower-strength',
     movement: e.movement || null, needs: [...(e.needs || [])].map(n => n.split('|')[0]), url: e.url || '', cues: e.execute || '',
-    loggedAs: `${e.fields.includes('w') ? 'weight × ' : ''}${tf === 'sec' ? 'time' : tf === 'm' ? 'distance' : 'reps'}${e.perSide ? ', each side' : ''}` };
+    loggedAs: `${e.fields.includes('w') ? 'weight × ' : ''}${tf === 'sec' ? 'time' : tf === 'm' ? 'distance' : 'reps'}${e.perSide ? ', each side' : ''}`, returnTo };
   app.closeSheet(); app.go('library/new');
 }
 async function saveEdit() {
@@ -81,7 +82,7 @@ async function saveEdit() {
     equipment: needs.length ? needs.map(n => n.split('|').map(a => gear[a] || a).join(' or ')).join(' + ') : 'Bodyweight' };
   if (f.builtIn) { S.exerciseEdits = { ...S.exerciseEdits, [id]: ed }; await app.save('exerciseEdits'); applyExerciseEdits(S.exerciseEdits); }
   else { S.customExercises = { ...S.customExercises, [id]: { ...S.customExercises[id], ...ed } }; setCustomExercises(S.customExercises); await app.save('customExercises'); }
-  app.go('library'); app.toast(`“${esc(name)}” updated`);
+  app.go(f.returnTo || 'library'); app.toast(`“${esc(name)}” updated`);
 }
 
 async function saveNewExercise() {
@@ -138,6 +139,7 @@ function exerciseSheet(id) {
     ['Weight', WEIGHT_TYPES[e.weightType] || '—'],
   ];
   app.sheet(`<h2 class="sheet-title">${esc(e.name)}</h2><p class="sheet-sub">${miss.length ? `<span class="orange">Not available at ${esc(app.location()?.name || 'this location')}: needs ${esc(missingText(e))}</span>` : `Available at ${esc(app.location()?.name || 'this location')}`}</p>
+    <div class="card" style="margin-bottom:16px">${exerciseMap(e)}<div class="bm-legend"><span><i class="lg main"></i>Main</span><span><i class="lg sec"></i>Secondary</span></div></div>
     ${group(info.map(([k, v]) => row({ title: k, value: esc(v) })).join(''))}
     ${e.execute ? group(row({ title: esc(e.execute) }), { header: 'How to do it' }) : ''}
     <div class="btns">${e.url ? `<a class="btn tinted" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch Video</a>` : `<a class="btn tinted" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.name + ' exercise form')}" target="_blank" rel="noopener noreferrer">${icon('play')}Find a Video</a>`}

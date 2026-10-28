@@ -156,8 +156,8 @@ export const routineSeconds = r => expandSteps(r).reduce((n, st) => n + st.sec, 
 export const routineMinutes = r => Math.round(routineSeconds(r) / 60);
 
 // Which stretch suits a workout: upper, lower, or full body if it hit both.
-const UPPER = ['chest', 'upper_back', 'lats', 'shoulders', 'rotator_cuff', 'arms', 'forearms'];
-const LOWER = ['quads', 'hamstrings', 'glutes', 'adductors', 'calves', 'shins'];
+const UPPER = ['upper_chest', 'chest', 'lower_chest', 'traps', 'mid_back', 'lats', 'front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'biceps', 'triceps', 'forearms'];
+const LOWER = ['quads', 'hamstrings', 'glutes', 'glute_med', 'adductors', 'hip_flexors', 'calves', 'soleus', 'shins'];
 export function stretchFor(exIds) {
   let up = 0, low = 0;
   for (const id of exIds) for (const m of getExercise(id)?.primary || []) { if (UPPER.includes(m)) up++; else if (LOWER.includes(m)) low++; }

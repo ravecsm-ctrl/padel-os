@@ -36,8 +36,8 @@ export function loadsAreas(ex) {
   const has = (list, ...m) => m.some(x => list.includes(x));
   const out = new Set();
   const press = mv === 'push' || mv === 'press', pull = mv === 'pull';
-  const throwing = ['power', 'rotation'].includes(mv) && has(all, 'shoulders') && !has(prim, 'quads', 'calves');
-  const jump = mv === 'power' && has(all, 'quads', 'calves', 'adductors') && !throwing;
+  const throwing = ['power', 'rotation'].includes(mv) && has(all, 'front_delts', 'side_delts', 'rear_delts') && !has(prim, 'quads', 'calves');
+  const jump = mv === 'power' && has(all, 'quads', 'calves', 'soleus', 'adductors', 'glute_med') && !throwing;
   if (press || throwing) out.add('shoulder');
   if (press || pull || mv === 'carry' || has(prim, 'forearms')) out.add('elbow');
   if ((mv === 'hinge' && has(all, 'lower_back')) || mv === 'carry' || (throwing && has(prim, 'obliques'))) out.add('back');

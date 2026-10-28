@@ -2,7 +2,7 @@
 // 0.5 for each secondary muscle. Pure functions over saved sessions.
 import { getExercise } from './domain-catalog.js';
 import { doneSets } from './domain-progression.js';
-import { MUSCLES } from './domain-taxonomy.js';
+import { MUSCLES, LEGACY_MUSCLES, normalize } from './domain-taxonomy.js';
 import { mondayOf, isoDate } from './domain-calendar.js';
 
 export const SECONDARY_WEIGHT = 0.5;
@@ -47,7 +47,8 @@ export const ranked = map => Object.entries(map).filter(([, v]) => v > 0).sort((
 
 // Rough weekly guidance. ~10–20 hard sets per muscle per week is a common range for
 // building strength; fewer usually maintains it. Small muscles need less.
-const SMALL = new Set(['rotator_cuff', 'forearms', 'shins', 'calves', 'obliques', 'arms']);
+export const SMALL = new Set(['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'upper_chest', 'lower_chest', 'traps', 'biceps', 'triceps', 'forearms',
+  'obliques', 'hip_flexors', 'glute_med', 'calves', 'soleus', 'shins']);
 export function weeklyStatus(muscle, sets) {
   const [lo, hi] = SMALL.has(muscle) ? [6, 16] : [10, 20];
   if (!sets) return { key: 'none', label: 'Not trained' };
@@ -73,4 +74,40 @@ export function exercisesFor(sessions, muscle, since) {
     }
   }
   return [...out.values()].sort((a, b) => b.sets - a.sets);
+}
+
+// ── Converting data saved before the finer muscle split (old ids: shoulders, upper_back, arms, core).
+// For an exercise, each old id becomes the most likely finer group given what the exercise is.
+const has = (n, ...ks) => ks.some(k => n.includes(k));
+export function upgradeMuscle(m, ex = {}) {
+  if (MUSCLES[m]) return [m];
+  const n = String(ex.name || '').toLowerCase(), mv = ex.movement;
+  if (m === 'shoulders') return [has(n, 'lateral raise', 'upright') ? 'side_delts' : has(n, 'face pull', 'reverse fly', 'pull-apart', 'rear') || mv === 'pull' ? 'rear_delts' : 'front_delts'];
+  if (m === 'upper_back') return [has(n, 'shrug', 'deadlift', 'carry', 'upright') ? 'traps' : 'mid_back'];
+  if (m === 'arms') return [has(n, 'curl', 'chin') ? 'biceps' : has(n, 'tricep', 'pushdown', 'skull', 'kickback', 'dip', 'extension') || mv === 'push' ? 'triceps' : 'biceps'];
+  if (m === 'core') return ['abs'];
+  const r = normalize('muscle', m);
+  return r?.id ? [r.id] : [];
+}
+export function upgradeExercise(ex) {
+  const up = list => [...new Set((list || []).flatMap(m => upgradeMuscle(m, ex)))];
+  const primary = up(ex.primary), secondary = up(ex.secondary).filter(m => !primary.includes(m));
+  const changed = JSON.stringify([primary, secondary]) !== JSON.stringify([ex.primary || [], ex.secondary || []]);
+  return changed ? { ...ex, primary, secondary, muscles: ex.custom ? primary.map(m => MUSCLES[m]).join(' · ') : ex.muscles } : ex;
+}
+// Upgrades your own exercises, your edits to library exercises, and recovery tuning.
+// Safe to run any number of times: only old ids are touched. Returns the keys that changed.
+export function upgradeSaved(st) {
+  const changed = [];
+  const own = Object.fromEntries(Object.entries(st.customExercises || {}).map(([k, e]) => [k, upgradeExercise(e)]));
+  if (JSON.stringify(own) !== JSON.stringify(st.customExercises || {})) { st.customExercises = own; changed.push('customExercises'); }
+  const eds = Object.fromEntries(Object.entries(st.exerciseEdits || {}).map(([k, e]) => [k, e.primary || e.secondary ? upgradeExercise({ ...e, movement: e.movement }) : e]));
+  if (JSON.stringify(eds) !== JSON.stringify(st.exerciseEdits || {})) { st.exerciseEdits = eds; changed.push('exerciseEdits'); }
+  const cal = { ...(st.recoveryCal || {}) };
+  let calChanged = false;
+  for (const [old, news] of Object.entries(LEGACY_MUSCLES)) if (old in cal) { for (const m of news) if (!(m in cal)) cal[m] = cal[old]; delete cal[old]; calChanged = true; }
+  // The finer split also added soleus (from calves) and glute med (from glutes): carry the tuning over once.
+  if (calChanged) { if (cal.calves && !cal.soleus) cal.soleus = cal.calves; if (cal.glutes && !cal.glute_med) cal.glute_med = cal.glutes; if (cal.chest) { cal.upper_chest ??= cal.chest; cal.lower_chest ??= cal.chest; } }
+  if (calChanged) { st.recoveryCal = cal; changed.push('recoveryCal'); }
+  return changed;
 }
