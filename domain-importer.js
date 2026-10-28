@@ -136,7 +136,9 @@ export function matchExercise(name) {
 
 // ── Build a custom exercise from a normalised item.
 const slug = s => norm(s).replace(/ /g, '-').slice(0, 40) || 'exercise';
-const GYM = new Set(['barbell', 'trap_bar', 'cable', 'leg_press', 'leg_curl', 'calf_machine', 'landmine', 'med_ball', 'bar']);
+const GYM = new Set(['barbell', 'trap_bar', 'cable', 'leg_press', 'leg_curl', 'calf_machine', 'landmine', 'med_ball', 'bar', 'hack_squat', 'pendulum_squat', 'belt_squat', 'v_squat', 'leg_extension',
+  'hip_abduction', 'glute_machine', 'reverse_hyper', 'back_extension', 'glute_ham_developer', 'chest_press', 'pec_deck', 'shoulder_press', 'lateral_raise_machine', 'row_machine',
+  'pullover_machine', 'assisted_pull_up_machine', 'assisted_dip_machine', 'curl_machine', 'triceps_machine', 'sled', 'battle_ropes', 'rope', 'nordic_bench']);
 export function buildCustomExercise(item, { customEquipment = {}, idSuffix = Date.now().toString(36) } = {}) {
   const wt = item.weightType || (item.needs.length ? 'total' : item.weight ? 'total' : 'bodyweight');
   const tf = item.unit === 'seconds' ? 'sec' : item.unit === 'metres' ? 'm' : 'reps';

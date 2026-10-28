@@ -23,15 +23,28 @@ export const EQUIPMENT = {
   barbell: 'Barbell & plates', trap_bar: 'Trap bar', dumbbells: 'Dumbbells', kettlebell: 'Kettlebell', med_ball: 'Medicine ball', landmine: 'Landmine',
   cable: 'Cable machine', leg_press: 'Leg press', leg_curl: 'Leg curl machine', calf_machine: 'Calf raise machine',
   bench: 'Bench or sturdy chair', box: 'Box or step', band: 'Resistance band', sliders: 'Sliders or towels', bar: 'Pull-up or Smith bar',
+  // Expanded gym machines
+  hack_squat: 'Hack squat machine', pendulum_squat: 'Pendulum squat', belt_squat: 'Belt squat', v_squat: 'V-squat machine', leg_extension: 'Leg extension machine',
+  hip_abduction: 'Hip abduction machine', glute_machine: 'Glute kickback machine', reverse_hyper: 'Reverse hyper', back_extension: 'Back extension bench',
+  glute_ham_developer: 'Glute-ham developer (GHD)', chest_press: 'Chest press machine', pec_deck: 'Pec deck', shoulder_press: 'Shoulder press machine',
+  lateral_raise_machine: 'Lateral raise machine', row_machine: 'Row machine (chest-supported)', pullover_machine: 'Pullover machine',
+  assisted_pull_up_machine: 'Assisted pull-up machine', assisted_dip_machine: 'Assisted dip machine', curl_machine: 'Biceps curl machine', triceps_machine: 'Triceps machine',
+  // Conditioning and accessories
+  sled: 'Sled', battle_ropes: 'Battle ropes', suspension_trainer: 'Suspension trainer (TRX)', rope: 'Climbing rope', sandbag: 'Sandbag',
+  hurdles: 'Mini hurdles', agility_ladder: 'Agility ladder', cones: 'Cones', ab_wheel: 'Ab wheel', stability_ball: 'Stability ball', nordic_bench: 'Nordic bench or anchor',
 };
 export const EQUIPMENT_GROUPS = [
   ['Free weights', ['dumbbells', 'kettlebell', 'barbell', 'trap_bar', 'med_ball', 'landmine']],
-  ['Machines', ['cable', 'leg_press', 'leg_curl', 'calf_machine']],
+  ['Machines', ['cable', 'leg_press', 'leg_curl', 'calf_machine', 'hack_squat', 'pendulum_squat', 'belt_squat', 'v_squat', 'leg_extension', 'hip_abduction', 'glute_machine',
+    'reverse_hyper', 'back_extension', 'glute_ham_developer', 'chest_press', 'pec_deck', 'shoulder_press', 'lateral_raise_machine', 'row_machine', 'pullover_machine',
+    'assisted_pull_up_machine', 'assisted_dip_machine', 'curl_machine', 'triceps_machine']],
   ['Small kit', ['bench', 'box', 'band', 'sliders', 'bar']],
+  ['Conditioning & accessories', ['sled', 'battle_ropes', 'suspension_trainer', 'rope', 'sandbag', 'hurdles', 'agility_ladder', 'cones', 'ab_wheel', 'stability_ball', 'nordic_bench']],
 ];
 // Starting points for the first two locations; the user edits or deletes them.
 export const PRESET_GEAR = {
-  gym: Object.keys(EQUIPMENT),
+  // A typical gym: the core kit only. Specialist machines and conditioning gear are ticked per location.
+  gym: ['barbell', 'trap_bar', 'dumbbells', 'kettlebell', 'med_ball', 'landmine', 'cable', 'leg_press', 'leg_curl', 'calf_machine', 'bench', 'box', 'band', 'sliders', 'bar'],
   db: ['dumbbells', 'bench', 'band', 'box'],
   bw: ['band'],
 };
@@ -59,6 +72,7 @@ const ALIAS = {
     'leg press': 'leg_press', 'leg curl': 'leg_curl', 'hamstring curl': 'leg_curl', 'calf machine': 'calf_machine', 'calf raise machine': 'calf_machine',
     bench: 'bench', chair: 'bench', box: 'box', step: 'box', 'plyo box': 'box', band: 'band', bands: 'band', 'resistance band': 'band', 'mini band': 'band', sliders: 'sliders', slider: 'sliders', towel: 'sliders', towels: 'sliders',
     'pull up bar': 'bar', 'pullup bar': 'bar', 'smith machine': 'bar', smith: 'bar', rings: 'bar',
+    trx: 'suspension_trainer', 'suspension straps': 'suspension_trainer', 'battle rope': 'battle_ropes', ghd: 'glute_ham_developer', 'climbing rope': 'rope', hurdle: 'hurdles', 'swiss ball': 'stability_ball', 'exercise ball': 'stability_ball', 'ab roller': 'ab_wheel', 'pec fly': 'pec_deck', 'leg extension machine': 'leg_extension', 'hack squat machine': 'hack_squat',
   },
   movement: { squat: 'squat', squats: 'squat', hinge: 'hinge', deadlift: 'hinge', 'single leg': 'single-leg', unilateral: 'single-leg', lunge: 'single-leg', lateral: 'lateral', push: 'push', press: 'push', pull: 'pull', row: 'pull',
     rotation: 'rotation', rotational: 'rotation', 'anti rotation': 'anti-rotation', antirotation: 'anti-rotation', core: 'anti-rotation', carry: 'carry', jump: 'power', power: 'power', plyometric: 'power', plyo: 'power', 'jump power': 'power',

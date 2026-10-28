@@ -276,7 +276,7 @@ function keepGroup(w) {
 
 function howSheet(ex) {
   app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${esc(ex.muscles)} · ${esc(ex.equipment)}</p>
-    ${group([['Why it helps', ex.why], ['Get set up', ex.setup], ['Do it', ex.execute], ['Breathing', ex.breathe], ['Avoid', ex.avoid]].map(([t, d]) => row({ title: t, sub: esc(d) })).join(''))}
+    ${group([['Why it helps', ex.why], ['Get set up', ex.setup], ['Do it', ex.execute], ['Breathing', ex.breathe], ['Avoid', ex.avoid]].filter(([, d]) => d).map(([t, d]) => row({ title: t, sub: esc(d) })).join(''))}
     <a class="btn tinted" href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}" target="_blank" rel="noopener">${icon('play')}Watch a Video</a>`);
 }
 

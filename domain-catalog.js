@@ -231,6 +231,13 @@ export const EXERCISES = LIST;
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const BY_NAME = Object.fromEntries(LIST.map(e => [norm(e.name), e.id]));
 
+// Extra library exercises (the expansion pack). They join the built-in list, so they behave
+// exactly like it; names already in the library are skipped.
+export function registerPack(list) {
+  let n = 0;
+  for (const e of list) if (!CATALOG[e.id] && !BY_NAME[norm(e.name)]) { LIST.push(e); CATALOG[e.id] = e; BY_NAME[norm(e.name)] = e.id; n++; }
+  return n;
+}
 export function setCustomExercises(map) { for (const k of Object.keys(CUSTOM)) delete CUSTOM[k]; Object.assign(CUSTOM, map || {}); }
 export const customExercises = () => Object.values(CUSTOM);
 // Starting weights from an import, for library exercises you haven't logged yet.

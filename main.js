@@ -21,6 +21,7 @@ import { body } from './ui-body.js';
 import { review } from './ui-review.js';
 import { feedback } from './ui-feedback.js';
 import { pickerActions } from './ui-picker.js';
+import './domain/pack.js'; // expansion pack: adds its exercises to the library
 import { overview } from './ui-overview.js';
 import { locations, locationSheet, setLocation } from './ui-locations.js';
 
