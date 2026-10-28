@@ -11,6 +11,8 @@ import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips }
 import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
+import { bodyMap } from './ui-bodymap.js';
+import { sessionMuscles, ranked } from './domain-muscles.js';
 
 const W = () => S.active;
 const cur = () => W().exercises[W().index];
@@ -109,6 +111,7 @@ function finishView() {
   return `${navBar({ back: 'Workout', backAction: 'back-to-runner', title: 'Summary' })}
     <div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">Workout complete</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}</p></div>
     <div class="tiles three" style="margin-top:20px">${stat(`<span class="num">${S.form.duration || st.minutes}</span>`, 'Minutes')}${stat(`${st.sets}`, 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
+    ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => m.label).join(' · '))}</p></div></section>` : ''; })()}
     ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
     <label class="field-l">How hard was it overall?</label>${sessionEffortChips('rpe', S.form.rpe)}
