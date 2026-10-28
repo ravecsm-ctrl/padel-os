@@ -4,7 +4,9 @@ import { esc, icon, navBar, group, row, seg, chips } from './ui-kit.js';
 import { allExercises, getExercise, setCustomExercises, setStartWeights } from './domain-catalog.js';
 import { setCustomRoutines } from './domain-program.js';
 import { MUSCLES, MOVEMENTS, CATEGORIES, EQUIPMENT, LEVELS, WEIGHT_TYPES, canDoWith, missingFor, equipLabel, norm } from './domain-taxonomy.js';
-import { rowsFrom, normalizeRow, matchExercise, buildCustomExercise, buildWorkouts, TEMPLATE_CSV, ALLOWED_VALUES, chatgptPrompt } from './domain-importer.js';
+import { rowsFrom, normalizeRow, matchExercise, buildCustomExercise, buildWorkouts, TEMPLATE_CSV, ALLOWED_VALUES, chatgptPrompt, libraryCSV } from './domain-importer.js';
+import { saveFile } from './ui-backup.js';
+import { isoDate } from './domain-calendar.js';
 
 let showAll = false, query = '';
 let IMP = null;   // { source, items, opts }
@@ -86,7 +88,8 @@ function libraryView() {
     ${seg('lib-filter', [['here', `Can do here`], ['all', `Show all (${hiddenTotal} more)`]], showAll ? 'all' : 'here')}
     <div style="height:20px"></div>
     ${group(row({ title: 'Add Your Own Exercise', sub: 'Name it, say what it works and how you log it', icon: 'plus', color: 'green', action: 'nx-start' })
-      + row({ title: 'Import exercises', sub: 'From a CSV file or a pasted list', icon: 'download', color: 'blue', to: 'library/import' }))}
+      + row({ title: 'Import exercises', sub: 'From a CSV file or a pasted list', icon: 'download', color: 'blue', to: 'library/import' })
+      + row({ title: 'Export library as CSV', sub: 'Give it to ChatGPT so it reuses your exercise names', icon: 'share', color: 'teal', action: 'lib-export' }))}
     ${groups || '<p class="t-sub" style="text-align:center;padding:24px">No exercises match.</p>'}`;
 }
 
@@ -112,7 +115,8 @@ function exerciseSheet(id) {
 function importView() {
   return `${navBar({ back: 'Exercises', backTo: 'library', title: 'Import' })}
     <h1 class="t-large" style="padding:8px 4px 2px">Import</h1><p class="t-sub" style="padding:0 4px 20px">Add exercises from a plan, with sets, reps, starting weights, muscles and video links.</p>
-    ${group(row({ title: 'Copy prompt for ChatGPT', sub: 'Paste it with your plan; ChatGPT replies in the right format', icon: 'note', color: 'green', action: 'copy-prompt' })
+    ${group(row({ title: 'Download my exercise library', sub: 'Attach it in ChatGPT so it reuses your names: no duplicates', icon: 'share', color: 'teal', action: 'lib-export' })
+      + row({ title: 'Copy prompt for ChatGPT', sub: 'Paste it with your plan; ChatGPT replies in the right format', icon: 'note', color: 'green', action: 'copy-prompt' })
       + row({ title: 'Download CSV template', sub: 'Open in Numbers, Excel or Google Sheets', icon: 'download', color: 'blue', action: 'dl-template' })
       + row({ title: 'Allowed values', sub: 'Muscles, movements, categories, equipment', icon: 'info', color: 'gray', action: 'allowed-sheet' }), { header: '1 · Get the format' })}
     ${group(`<label class="row has-icon" style="cursor:pointer"><span class="tile indigo">${icon('share')}</span><span class="row-main"><span class="row-title">Choose a CSV file</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg><input id="csvIn" type="file" accept=".csv,text/csv,text/plain" hidden></label>`, { header: '2 · Upload a file…' })}
@@ -251,6 +255,7 @@ export const library = {
   actions: {
     'nx-start'() { S.form = { nx: true, name: '', measure: 'wreps', weightType: 'total', perSide: false, primary: [], category: 'lower-strength', movement: null, needs: [], url: '', cues: '' }; app.go('library/new'); },
     'nx-save'() { saveNewExercise(); },
+    async 'lib-export'() { await saveFile(`padel-os-exercise-library-${isoDate()}.csv`, libraryCSV(allExercises(), { customEquipment: S.customEquipment }), 'text/csv'); },
     'lib-toggle'() { showAll = !showAll; app.render({ keepScroll: true }); },
     'ex-sheet'(el) { exerciseSheet(el.dataset.id); },
     async 'delete-custom'(el) {

@@ -182,8 +182,24 @@ export const ALLOWED_VALUES = {
   category: Object.keys(CATEGORIES), equipment: Object.keys(EQUIPMENT), level: Object.keys(LEVELS),
 };
 
+// Your whole exercise library as CSV, using the same names and values the importer reads.
+// Attach it to an AI chat so it reuses these exact names instead of inventing duplicates.
+export const LIBRARY_COLUMNS = ['name', 'primary_muscles', 'secondary_muscles', 'movement', 'category', 'equipment', 'unit', 'weight_type', 'per_side', 'level', 'source'];
+const cell = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+export function libraryCSV(exercises = allExercises(), { customEquipment = {} } = {}) {
+  const unitOf = ex => { const f = ex.fields?.[ex.fields.length - 1]; return f === 'sec' ? 'seconds' : f === 'm' ? 'metres' : 'reps'; };
+  const gear = ex => (ex.needs || []).map(n => n.split('|').map(a => customEquipment[a] ? customEquipment[a] : a).join(' or ')).join(', ');
+  const rows = [...exercises].sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name)).map(ex => [
+    ex.name, (ex.primary || []).join(', '), (ex.secondary || []).join(', '), ex.movement || '', ex.category || '', gear(ex) || 'none',
+    unitOf(ex), ex.weightType || (ex.fields?.includes('w') ? 'total' : 'bodyweight'), ex.perSide ? 'yes' : 'no', ex.level || '', ex.custom ? 'yours' : 'built-in',
+  ].map(cell).join(','));
+  return [LIBRARY_COLUMNS.join(','), ...rows].join('\n');
+}
+
 export function chatgptPrompt() {
   return `Turn my workout plan into a CSV I can import into my training app. Reply with ONLY the CSV in a code block, no other text.
+
+If I attached my exercise library (a CSV with a "name" column), it lists the exercises my app already has. For any exercise that is already in it, use its name EXACTLY as written there, so it isn't added twice. Only create new exercises for ones that are truly missing.
 
 Use exactly these columns, in this order:
 ${COLUMNS.join(',')}
