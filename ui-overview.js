@@ -6,6 +6,7 @@ import { dayKey, isoDate, relDay } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
+import { recentPain, painHits, areaName } from './domain-pain.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { monthGrid, monthStats, liftProjections, levelEta, whatIf, trackingSince } from './domain-overview.js';
 import { xpEvents } from './domain-stats.js';
@@ -21,8 +22,10 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 // ── What needs doing
 function recoveringHint(routineId, rec) {
-  if (S.settings.adaptive === false) return '';
   const r = app.routine(routineId);
+  const pain = recentPain(S.sessions, { cleared: S.painClear }), hurt = [...new Set(r.blocks.flatMap(b => painHits(b.ex, pain)))];
+  if (hurt.length) return `Gentler options ready for your ${hurt.slice(0, 2).map(a => areaName(a).toLowerCase()).join(' and ')}`;
+  if (S.settings.adaptive === false) return '';
   const tired = [...new Set(r.blocks.flatMap(b => getExercise(b.ex)?.primary || []))].map(m => [m, rec[m]?.level || 0]).filter(([, l]) => l >= 0.35).sort((a, b) => b[1] - a[1]);
   if (!tired.length) return '';
   const names = tired.slice(0, 2).map(([m]) => MUSCLES[m].toLowerCase()).join(' and ');

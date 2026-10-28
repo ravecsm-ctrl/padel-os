@@ -18,6 +18,7 @@ export const S = {
   customExercises: {},// your own exercises (imported or created)
   customRoutines: {}, // your own workouts
   startWeights: {},   // imported starting weights for library exercises
+  painClear: {},      // area → when you said it feels fine again
   recoveryCal: {},    // per-muscle recovery speed learned from your feedback
   overrides: {},      // routine block customisations
   exNotes: {},        // persistent per-exercise notes ("seat 4")

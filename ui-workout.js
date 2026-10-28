@@ -14,6 +14,8 @@ import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { bodyMap } from './ui-bodymap.js';
 import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
+import { recentPain, painHits, gentlerFor, areaName } from './domain-pain.js';
+import { AREAS } from './domain-personalize.js';
 
 const W = () => S.active;
 const cur = () => W().exercises[W().index];
@@ -83,7 +85,23 @@ function coach(e) {
     ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
     ${baseline(e, last)}
     <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${why ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p>
-    ${missingHere(ex)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+    ${missingHere(ex)}${painNote(e)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+}
+
+// Pain-aware: when this exercise loads an area that hurt recently, say so and offer a gentler
+// swap, a lighter version, or "feels fine now". Never blocks.
+const currentPain = () => recentPain(S.sessions, { cleared: S.painClear });
+function painNote(e) {
+  if (W().past || e.painOk) return '';
+  const pain = currentPain(), hits = painHits(e.exId, pain);
+  if (!hits.length) return '';
+  const a = hits[0], when = relDay(pain[a].ts).toLowerCase();
+  const alt = gentlerFor(e.exId, pain, app.owned(), W().exercises.map(x => x.exId));
+  const said = pain[a].from === 'padel' ? `sore after padel more than once lately` : `hurt ${when}`;
+  return `<div class="pain-note"><p><b>Your ${esc(areaName(a).toLowerCase())} ${said}.</b> This exercise loads it.${e.painLight ? ' Lighter version on: stop if it hurts.' : ''}</p>
+    <div class="pain-acts">${alt ? `<button class="btn tinted small" data-action="pain-swap" data-id="${esc(alt)}">Swap for ${esc(getExercise(alt).name)}</button>` : ''}
+      ${e.painLight ? '' : `<button class="btn gray small" data-action="pain-light">Go Lighter</button>`}
+      <button class="link" data-action="pain-fine" data-a="${esc(a)}">Feels fine now</button></div></div>`;
 }
 
 // A gentle note (never a block) when this exercise needs gear the current location lacks.
@@ -140,7 +158,7 @@ function runner() {
 function finishView() {
   const w = W(), st = workoutStats(w);
   const prs = w.exercises.flatMap(e => detectPRs({ ...e, sets: doneSets(e) }, before()).map(p => ({ ...p, name: e.name })));
-  S.form.rpe ??= ''; S.form.pain ??= 'no';
+  S.form.rpe ??= ''; S.form.pain ??= 'no'; S.form.painAreas ??= [];
   const missing = w.exercises.filter(e => !e.skipped && !doneSets(e).length).length;
   const vol = Math.round(toDisplay(st.volume, unit()));
   return `${navBar({ back: 'Workout', backAction: 'back-to-runner', title: 'Summary' })}
@@ -155,7 +173,8 @@ function finishView() {
       + (w.past ? row({ title: 'Date', right: `<input class="input" id="dateIn" type="date" value="${S.form.date || isoDate(new Date(w.startedAt))}" max="${isoDate()}" style="width:150px;text-align:right;background:none;padding:0" aria-label="Date">` }) : '')
       + row({ title: 'Minutes', right: `<input class="input num" id="durIn" type="number" inputmode="numeric" value="${S.form.duration || st.minutes}" style="width:90px;text-align:right;background:none;padding:0" aria-label="Minutes">` }),
       { footer: S.form.pain === 'yes' ? 'Don’t train through sharp or worsening pain. If it persists, see a professional.' : '' })}
-    ${S.form.pain === 'yes' ? `<input class="input" id="painLoc" placeholder="Where did it hurt?" value="${esc(S.form.painLoc || '')}" style="margin:-16px 0 24px">` : ''}
+    ${S.form.pain === 'yes' ? `<div style="margin:-14px 0 24px"><label class="field-l">Where?</label><div class="chipset">${Object.entries(AREAS).map(([k, v]) => `<button type="button" class="chip-btn ${S.form.painAreas.includes(k) ? 'warn-on' : ''}" data-pain-a="${k}" aria-pressed="${S.form.painAreas.includes(k)}">${esc(v)}</button>`).join('')}</div>
+      <input class="input" id="painLoc" placeholder="Details (optional), e.g. left side" value="${esc(S.form.painLoc || '')}" style="margin-top:10px"></div>` : ''}
     <textarea class="input" id="notesIn" rows="3" placeholder="Notes (optional)">${esc(S.form.notes || '')}</textarea>
     <div style="height:20px"></div>
     <div class="btns"><button class="btn filled" data-action="save-workout">Save Workout</button><button class="btn destructive" data-action="discard">Discard Workout</button></div>`;
@@ -174,6 +193,7 @@ export const workout = {
     keepAwake();
     if (S.params[0] === 'finish') {
       const p = document.querySelector('#painLoc'); if (p) p.oninput = () => { S.form.painLoc = p.value; };
+      document.querySelectorAll('[data-pain-a]').forEach(b => b.onclick = () => { const k = b.dataset.painA, l = S.form.painAreas; S.form.painAreas = l.includes(k) ? l.filter(x => x !== k) : [...l, k]; app.render({ keepScroll: true }); });
       document.querySelector('#notesIn').oninput = ev => { S.form.notes = ev.target.value; };
       document.querySelector('#durIn').oninput = ev => { S.form.duration = +ev.target.value; };
       const di = document.querySelector('#dateIn'); if (di) di.onchange = ev => { S.form.date = ev.target.value; };
@@ -266,6 +286,22 @@ export const workout = {
         ${ids.length ? '' : '<p class="t-sub">No alternatives for this one.</p>'}
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
     },
+    'pain-swap'(el) {
+      const from = cur().name;
+      if (doneSets(cur()).length) app.toast('Sets you’d logged for the old exercise were cleared');
+      swapExercise(W(), W().index, el.dataset.id, app.strength, unit()); touch(false);
+      app.toast(`Swapped ${esc(from)} for ${esc(getExercise(el.dataset.id).name)}, just for today`);
+    },
+    'pain-light'() {
+      // About 20% lighter at the bottom of the range: enough to train it without pushing into pain.
+      const e = cur(), ex = getExercise(e.exId);
+      if (e.suggestion.w) e.suggestion = { ...e.suggestion, w: Math.max(0, Math.round(e.suggestion.w * 0.8 / ex.inc) * ex.inc), target: e.target.min };
+      e.painLight = true; touch();
+    },
+    async 'pain-fine'(el) {
+      S.painClear = { ...S.painClear, [el.dataset.a]: Date.now() }; await app.save('painClear');
+      cur().painOk = true; touch(); app.toast('Good to hear. Flags for it are cleared until it hurts again.');
+    },
     'do-swap'(el) {
       if (doneSets(cur()).length) app.toast('Sets you’d logged for the old exercise were cleared');
       swapExercise(W(), W().index, el.dataset.id, app.strength, unit()); app.closeSheet(); touch(false);
@@ -281,7 +317,7 @@ export const workout = {
       S.active = null; await app.saveActive(true); timer.stop(); app.go('overview');
     },
     async 'save-workout'() {
-      const pain = S.form.pain === 'yes' ? { flag: true, location: S.form.painLoc || '' } : { flag: false, location: '' };
+      const pain = S.form.pain === 'yes' ? { flag: true, areas: S.form.painAreas || [], location: S.form.painLoc || '' } : { flag: false, areas: [], location: '' };
       if (W().past && S.form.date && S.form.date <= isoDate()) { const d = parseISO(S.form.date); d.setHours(new Date(W().startedAt).getHours(), new Date(W().startedAt).getMinutes()); W().startedAt = d.getTime(); }
       const session = finalizeWorkout(W(), { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, before());
       try { await db.putSession(session); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }

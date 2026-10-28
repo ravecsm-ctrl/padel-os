@@ -85,6 +85,7 @@ async function boot() {
     S.customRoutines = meta.customRoutines || {};
     S.startWeights = meta.startWeights || {};
     S.recoveryCal = meta.recoveryCal || {};
+    S.painClear = meta.painClear || {};
     setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
     // Locations: first run (or upgrade) creates two editable examples from the old tier setting.
     if (Array.isArray(meta.locations) && meta.locations.length) { S.locations = meta.locations; S.activeLocation = meta.activeLocation || meta.locations[0].id; }

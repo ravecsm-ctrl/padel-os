@@ -10,6 +10,7 @@ import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
 import { activitySheet } from './ui-today.js';
 import { padelSummary, PADEL_TYPES, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
+import { painAreasOf } from './domain-pain.js';
 import { COURT_ROUTINES } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
@@ -168,7 +169,7 @@ function sessionView(id) {
     ${s.prs?.length ? group(s.prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${group(s.exercises.map(e => { const sets = doneSets(e), ex = getExercise(e.exId);
       return row({ title: esc(e.name), sub: e.skipped ? 'Skipped' : sets.length ? sets.map(x => fmtSet(x, e.fields)).join(' · ') : 'Not done', to: ex ? `history/ex/${e.exId}` : '' }); }).join(''), { header: 'Exercises' })}
-    ${s.pain?.flag || s.rpe || s.notes ? group((s.rpe ? row({ title: 'Effort', value: esc(effortWord(s.rpe)) }) : '') + (s.pain?.flag ? row({ title: 'Pain', value: esc(s.pain.location || 'Yes'), cls: 'red' }) : '') + (s.notes ? row({ title: esc(s.notes) }) : ''), { header: 'Notes' }) : ''}
+    ${s.pain?.flag || s.rpe || s.notes ? group((s.rpe ? row({ title: 'Effort', value: esc(effortWord(s.rpe)) }) : '') + (s.pain?.flag ? row({ title: 'Pain', value: esc([painAreasOf(s).map(x => AREAS[x]).join(', '), s.pain.location].filter(Boolean).join(' · ') || 'Yes'), cls: 'red' }) : '') + (s.notes ? row({ title: esc(s.notes) }) : ''), { header: 'Notes' }) : ''}
     ${actions}`;
 }
 
@@ -244,18 +245,21 @@ export const history = {
     'edit-activity'(el) { activitySheet(null, S.sessions.find(x => x.id === el.dataset.id)); },
     'edit-session'(el) {
       const s = S.sessions.find(x => x.id === el.dataset.id);
-      S.form = { rpe: s.rpe ?? '' };
+      S.form = { rpe: s.rpe ?? '', areas: painAreasOf(s) };
       const draw = () => `<h2 class="sheet-title">Edit workout</h2>
         <label class="field-l">How hard was it?</label>${sessionEffortChips('rpe', S.form.rpe)}
         <div style="height:20px"></div>
         ${group(row({ title: 'Date', right: `<input class="input" id="eDate" type="date" value="${isoDate(new Date(s.startedAt))}" max="${isoDate()}" style="width:150px;text-align:right;background:none;padding:0" aria-label="Date">` })
           + row({ title: 'Minutes', right: `<input class="input num" id="eDur" type="number" inputmode="numeric" value="${s.durationMin}" style="width:80px;text-align:right;background:none;padding:0" aria-label="Minutes">` })
           + row({ title: 'Something hurt', right: `<input type="checkbox" class="switch" id="ePain" ${s.pain?.flag ? 'checked' : ''} aria-label="Something hurt">` }))}
-        <input class="input" id="ePainLoc" placeholder="Where? (optional)" value="${esc(s.pain?.location || '')}">
+        <div class="chipset" style="margin-bottom:10px">${Object.entries(AREAS).map(([k, v]) => `<button type="button" class="chip-btn ${S.form.areas.includes(k) ? 'warn-on' : ''}" data-pain-a="${k}" aria-pressed="${S.form.areas.includes(k)}">${esc(v)}</button>`).join('')}</div>
+        <input class="input" id="ePainLoc" placeholder="Details (optional)" value="${esc(s.pain?.location || '')}">
         <label class="field-l" for="eNotes">Notes</label><textarea class="input" id="eNotes" rows="3">${esc(s.notes)}</textarea>
         <div style="height:20px"></div><button class="btn filled" id="eSave">Save</button>`;
-      const mount = b => b.querySelector('#eSave').onclick = async () => {
-        const upd = { ...s, rpe: S.form.rpe === '' ? null : +S.form.rpe, durationMin: +b.querySelector('#eDur').value || s.durationMin, notes: b.querySelector('#eNotes').value, pain: { flag: b.querySelector('#ePain').checked, location: b.querySelector('#ePainLoc').value } };
+      const mount = b => {
+        b.querySelectorAll('[data-pain-a]').forEach(c => c.onclick = () => { const k = c.dataset.painA; S.form.areas = S.form.areas.includes(k) ? S.form.areas.filter(x => x !== k) : [...S.form.areas, k]; c.classList.toggle('warn-on'); c.setAttribute('aria-pressed', S.form.areas.includes(k)); if (S.form.areas.length) b.querySelector('#ePain').checked = true; });
+        b.querySelector('#eSave').onclick = async () => {
+        const upd = { ...s, rpe: S.form.rpe === '' ? null : +S.form.rpe, durationMin: +b.querySelector('#eDur').value || s.durationMin, notes: b.querySelector('#eNotes').value, pain: { flag: b.querySelector('#ePain').checked, areas: b.querySelector('#ePain').checked ? S.form.areas : [], location: b.querySelector('#ePainLoc').value } };
         // Moving to another day keeps the time of day; the end moves with it.
         const day = b.querySelector('#eDate').value;
         if (day && day <= isoDate() && day !== isoDate(new Date(s.startedAt))) {
@@ -263,6 +267,7 @@ export const history = {
           const shift = d.getTime() - s.startedAt; upd.startedAt += shift; if (upd.endedAt) upd.endedAt += shift;
         }
         await db.putSession(upd); await app.reloadSessions(); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Saved');
+        };
       };
       app.onPick = () => { const keep = { dur: document.querySelector('#eDur').value, notes: document.querySelector('#eNotes').value, date: document.querySelector('#eDate').value }; app.sheet(draw(), mount); document.querySelector('#eDur').value = keep.dur; document.querySelector('#eNotes').value = keep.notes; document.querySelector('#eDate').value = keep.date; };
       app.sheet(draw(), mount);

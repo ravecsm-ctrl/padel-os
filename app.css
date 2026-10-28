@@ -400,3 +400,9 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .ein span { font-size: 13px; color: var(--label-2); flex: none; }
 .eset-del { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--fill); color: var(--red); display: grid; place-items: center; }
 .eset-del .i { width: 16px; height: 16px; }
+
+/* Pain-aware note on an exercise */
+.pain-note { background: color-mix(in srgb, var(--orange) 12%, transparent); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 15px; }
+.pain-note b { font-weight: 600; }
+.pain-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
+.pain-acts .btn { width: auto; min-height: 34px; padding: 0 14px; font-size: 15px; }
