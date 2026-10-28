@@ -1,8 +1,62 @@
-// Short guided routines for court days and injury prevention. Each step is timed;
-// rep-based moves are given a time window so the player can run hands-free.
+// Short guided routines: stretching after workouts, daily mobility, padel warm-up and
+// cool-down, and injury prevention. Each step is timed; rep-based moves get a time window
+// so the player can run hands-free. Stretches are gentle holds: tension, never pain.
+import { getExercise } from './domain-catalog.js';
 const s = (name, sec, cue, side = false) => ({ name, sec, cue, side });
 
 export const COURT_ROUTINES = {
+  'stretch-upper': {
+    id: 'stretch-upper', title: 'Upper-body stretch', kind: 'stretch', tag: 'After upper-body work', areas: [],
+    blurb: 'Slow holds for chest, lats, shoulders and forearms after pressing, rowing and gripping.',
+    steps: [
+      s('Doorway chest stretch', 40, 'Forearm on a door frame at shoulder height, step through until the chest opens.', true),
+      s('Kneeling lat stretch', 40, 'Hands on a bench or the floor ahead, sit the hips back, let the armpits sink.'),
+      s('Cross-body shoulder', 35, 'Pull one arm across the chest just above the elbow. Shoulder stays down.', true),
+      s('Overhead triceps', 30, 'Hand down the upper back, gently press the elbow with the other hand.', true),
+      s('Neck side stretch', 30, 'Ear toward shoulder, opposite hand reaching to the floor.', true),
+      s('Thread the needle', 40, 'On hands and knees, slide one arm under the other and rest the shoulder down.', true),
+      s('Forearm stretches', 40, 'Arm straight, gently pull the fingers back, then down.', true),
+      s('Child’s pose breathing', 45, 'Sit back on the heels, arms long, slow breaths into the back.'),
+    ] },
+  'stretch-lower': {
+    id: 'stretch-lower', title: 'Lower-body stretch', kind: 'stretch', tag: 'After lower-body work', areas: [],
+    blurb: 'Slow holds for hips, hamstrings, quads, adductors and calves after squats, lunges and deadlifts.',
+    steps: [
+      s('Half-kneeling hip flexor', 40, 'Squeeze the back glute and shift forward gently. Tall chest.', true),
+      s('Lying hamstring stretch', 40, 'On your back, leg up with a towel around the foot, knee softly straight.', true),
+      s('Side-lying quad stretch', 35, 'Heel toward glute, knees together, hips stacked.', true),
+      s('Figure-4 glute stretch', 40, 'On your back, ankle over the opposite knee, pull the legs toward you.', true),
+      s('Adductor rock-backs', 40, 'On hands and knees, one leg out to the side, rock the hips back slowly.', true),
+      s('Calf stretch, straight knee', 30, 'Hands on a wall, back heel down, knee straight.', true),
+      s('Calf stretch, bent knee', 30, 'Same position, bend the back knee to reach the lower calf.', true),
+      s('Child’s pose breathing', 45, 'Sit back on the heels, arms long, slow breaths into the lower back.'),
+    ] },
+  'stretch-full': {
+    id: 'stretch-full', title: 'Full-body stretch', kind: 'stretch', tag: 'After full-body or power work', areas: [],
+    blurb: 'A short head-to-toe cool-down when a session hit everything.',
+    steps: [
+      s('Easy walk + deep breaths', 45, 'Breathe in through the nose for 4, out for 6.'),
+      s('Half-kneeling hip flexor', 35, 'Squeeze the back glute, shift forward.', true),
+      s('Lying hamstring stretch', 35, 'Towel around the foot, knee softly straight.', true),
+      s('Figure-4 glute stretch', 35, 'Ankle over the opposite knee, pull in.', true),
+      s('Doorway chest stretch', 35, 'Forearm on the frame, step through.', true),
+      s('Kneeling lat stretch', 35, 'Hands ahead, hips back, armpits sink.'),
+      s('Calf stretch', 30, 'Back heel down, knee straight then bent.', true),
+      s('Child’s pose breathing', 45, 'Slow breaths, let everything settle.'),
+    ] },
+  mobility: {
+    id: 'mobility', title: 'Daily mobility', kind: 'daily', tag: 'Rest days or mornings', areas: [],
+    blurb: 'Moving through full range for hips, spine, shoulders and ankles. Good on rest days.',
+    steps: [
+      s('Cat–camel', 40, 'Slowly round and arch the whole spine.'),
+      s('World’s greatest stretch', 50, 'Lunge, hand down inside the front foot, rotate the other arm to the sky.', true),
+      s('90/90 hip switches', 45, 'Sit with both knees at 90°, rotate the knees side to side, tall chest.'),
+      s('Open book', 40, 'Lie on your side, knees bent, rotate the top arm open and follow it with your eyes.', true),
+      s('Deep squat hold', 45, 'Feet shoulder-width, sit down between the heels, hold a door frame if needed.'),
+      s('Ankle rocks', 30, 'Half kneel, drive the front knee over the toes, heel down.', true),
+      s('Shoulder circles (slow)', 40, 'Arm straight, draw the biggest slow circle you can, both directions.', true),
+      s('Hip circles on all fours', 40, 'Lift a bent knee out to the side and around in big slow circles.', true),
+    ] },
   warmup: {
     id: 'warmup', title: 'Pre-match warm-up', kind: 'court', tag: 'Before you play', areas: [],
     blurb: 'Raise temperature, open hips and shoulders, then wake up fast feet. Do it on court.',
@@ -100,3 +154,14 @@ export function expandSteps(routine) {
 }
 export const routineSeconds = r => expandSteps(r).reduce((n, st) => n + st.sec, 0);
 export const routineMinutes = r => Math.round(routineSeconds(r) / 60);
+
+// Which stretch suits a workout: upper, lower, or full body if it hit both.
+const UPPER = ['chest', 'upper_back', 'lats', 'shoulders', 'rotator_cuff', 'arms', 'forearms'];
+const LOWER = ['quads', 'hamstrings', 'glutes', 'adductors', 'calves', 'shins'];
+export function stretchFor(exIds) {
+  let up = 0, low = 0;
+  for (const id of exIds) for (const m of getExercise(id)?.primary || []) { if (UPPER.includes(m)) up++; else if (LOWER.includes(m)) low++; }
+  if (!up && !low) return 'stretch-full';
+  const share = up / (up + low);
+  return share >= 0.7 ? 'stretch-upper' : share <= 0.3 ? 'stretch-lower' : 'stretch-full';
+}

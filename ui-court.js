@@ -1,8 +1,11 @@
-// Court tab: warm-up, cool-down and injury-prevention routines with a hands-free player.
+// Mobility tab: stretching, daily mobility, padel warm-up/cool-down and injury prevention,
+// with a hands-free player. (The route is still 'court' so old links keep working.)
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import { esc, icon, pageHead, navBar, group, row } from './ui-kit.js';
-import { COURT_ROUTINES, expandSteps, routineMinutes } from './domain-court.js';
+import { COURT_ROUTINES, expandSteps, routineMinutes, stretchFor } from './domain-court.js';
+import { isRoutine } from './domain-program.js';
+import { dayKey } from './domain-calendar.js';
 import { prehabFor } from './domain-padel.js';
 import { createActivity } from './domain-workout.js';
 import { AREAS } from './domain-personalize.js';
@@ -11,7 +14,7 @@ import { AREAS } from './domain-personalize.js';
 let P = null;
 let tick = null, ctx = null, wake = null;
 const RING = 2 * Math.PI * 110;
-const LOOK = { warmup: ['flame', 'orange'], cooldown: ['wave', 'teal'], elbow: ['heart', 'pink'], shoulder: ['heart', 'pink'], back: ['heart', 'pink'], knee: ['heart', 'pink'], calf: ['heart', 'pink'] };
+const LOOK = { 'stretch-upper': ['wave', 'teal'], 'stretch-lower': ['wave', 'teal'], 'stretch-full': ['wave', 'teal'], mobility: ['sun', 'indigo'], warmup: ['flame', 'orange'], cooldown: ['wave', 'blue'], elbow: ['heart', 'pink'], shoulder: ['heart', 'pink'], back: ['heart', 'pink'], knee: ['heart', 'pink'], calf: ['heart', 'pink'] };
 
 function beep(hi = false) {
   try {
@@ -45,21 +48,34 @@ function loop() {
 }
 async function keepAwake() { try { if (!wake && 'wakeLock' in navigator) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch {} }
 
+// The stretch that suits today's workout (done, or planned), if any.
+function todaysStretch() {
+  const today = new Date().toDateString();
+  const done = S.sessions.find(x => x.kind === 'strength' && new Date(x.startedAt).toDateString() === today);
+  if (done) return { id: stretchFor(done.exercises.map(e => e.exId)), why: `after today’s ${done.title}` };
+  const plan = S.schedule[dayKey()];
+  if (isRoutine(plan)) return { id: stretchFor(app.routine(plan).blocks.map(b => b.ex)), why: `after today’s ${app.routine(plan).title}` };
+  return null;
+}
+
 function listView() {
-  const pre = prehabFor(S.profile, S.sessions);
+  const pre = prehabFor(S.profile, S.sessions), rec = todaysStretch();
   const item = r => { const [ic, color] = LOOK[r.id] || ['heart', 'pink'];
-    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${pre.ids.includes(r.id) ? '<span class="blue">Recommended for you</span>' : esc(r.tag)}`, icon: ic, color, to: `court/${r.id}` }); };
-  const all = Object.values(COURT_ROUTINES);
+    const note = rec?.id === r.id ? `<span class="blue">Recommended ${esc(rec.why)}</span>` : pre.ids.includes(r.id) ? '<span class="blue">Recommended for you</span>' : esc(r.tag);
+    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${note}`, icon: ic, color, to: `court/${r.id}` }); };
+  const all = Object.values(COURT_ROUTINES), of = kind => all.filter(r => r.kind === kind);
   const flagged = Object.entries(pre.flagged).filter(([, n]) => n >= 2);
-  return `${pageHead('Court', { sub: 'Guided routines that run hands-free.' })}
-    ${flagged.length ? `<div class="banner warn"><span class="tile orange">${icon('heart')}</span><span><b>You flagged ${flagged.map(([a]) => esc((AREAS[a] || a).toLowerCase())).join(' and ')} recently</b><small>Try the matching routine below. See a professional if pain is sharp or getting worse.</small></span></div>` : ''}
-    ${group(all.filter(r => r.kind === 'court').map(item).join(''), { header: 'Match day' })}
-    ${group(all.filter(r => r.kind === 'prehab').sort((a, b) => pre.ids.includes(b.id) - pre.ids.includes(a.id)).map(item).join(''), { header: 'Injury prevention', footer: 'Two or three times a week. Mild discomfort that settles by the next day is normal; sharp pain is a reason to stop.' })}`;
+  return `${pageHead('Mobility', { sub: 'Stretching, mobility and padel routines. They run hands-free.' })}
+    ${flagged.length ? `<div class="banner warn"><span class="tile orange">${icon('heart')}</span><span><b>You flagged ${flagged.map(([a]) => esc((AREAS[a] || a).toLowerCase())).join(' and ')} recently</b><small>Try the matching routine below. See a professional if it persists.</small></span></div>` : ''}
+    ${group(of('stretch').sort((a, b) => (b.id === rec?.id) - (a.id === rec?.id)).map(item).join(''), { header: 'After your workout', footer: 'Gentle holds, never into pain. Stretching after training helps you wind down and builds flexibility over weeks; it does little for next-day soreness.' })}
+    ${group(of('daily').map(item).join(''), { header: 'Every day' })}
+    ${group(of('court').map(item).join(''), { header: 'Padel days' })}
+    ${group(of('prehab').sort((a, b) => pre.ids.includes(b.id) - pre.ids.includes(a.id)).map(item).join(''), { header: 'Injury prevention', footer: 'Two or three times a week. Mild discomfort that settles by the next day is normal; sharp or worsening pain is not.' })}`;
 }
 
 function playerView(r) {
   if (!P || P.id !== r.id) P = { id: r.id, steps: expandSteps(r), i: -1, startedAt: 0, done: false };
-  const nav = navBar({ back: 'Court', backAction: 'cp-exit', title: P.i >= 0 && !P.done ? r.title : '' });
+  const nav = navBar({ back: 'Mobility', backAction: 'cp-exit', title: P.i >= 0 && !P.done ? r.title : '' });
   if (P.i < 0) return `${nav}<h1 class="t-title" style="padding:8px 4px 4px">${esc(r.title)}</h1><p class="t-sub" style="padding:0 4px 20px">${routineMinutes(r)} min · ${esc(r.blurb)}</p>
     ${group(r.steps.map(st => row({ title: esc(st.name), sub: esc(st.cue), value: st.side ? `${st.sec}s × 2` : `${st.sec}s` })).join(''), { cls: 'steps', footer: 'A beep sounds 3 seconds before each change. The screen stays on.' })}
     <button class="btn filled" data-action="cp-start">${icon('play')}Start</button>`;

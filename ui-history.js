@@ -11,7 +11,7 @@ import { activitySheet } from './ui-today.js';
 import { padelSummary, PADEL_TYPES, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { painAreasOf } from './domain-pain.js';
-import { COURT_ROUTINES } from './domain-court.js';
+import { COURT_ROUTINES, stretchFor, routineMinutes as rMin } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
 import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor } from './domain-muscles.js';
@@ -165,6 +165,7 @@ function sessionView(id) {
   const vol = Math.round(toDisplay(volumeKg(s), unit()));
   return `${nav}${head}
     <div class="tiles three">${stat(s.durationMin, 'Minutes')}${stat(setCount(s), 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
+    ${Date.now() - (s.endedAt || s.startedAt) < 3 * 3600000 ? (() => { const r = COURT_ROUTINES[stretchFor(s.exercises.map(e => e.exId))]; return group(row({ title: `Stretch now: ${esc(r.title)}`, sub: `${rMin(r)} min, guided · gentle holds to wind down`, icon: 'wave', color: 'teal', to: `court/${r.id}` })); })() : ''}
     ${musclesCard(sessionMuscles(s), 'Muscles worked')}
     ${s.prs?.length ? group(s.prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${group(s.exercises.map(e => { const sets = doneSets(e), ex = getExercise(e.exId);
