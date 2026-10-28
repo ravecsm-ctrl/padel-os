@@ -71,7 +71,31 @@ export const stat = (value, label, unit = '') => {
   const len = String(value).replace(/<[^>]+>/g, '').length + (unit ? unit.length * 0.6 : 0);
   return `<div class="stat"><small>${esc(label)}</small><strong class="${len > 7 ? 'xs' : len > 5 ? 'sm' : ''}">${value}${unit ? `<span class="u">${esc(unit)}</span>` : ''}</strong></div>`;
 };
-export const empty = (ic, title, msg, cta = '') => `<div class="empty">${icon(ic)}<b>${esc(title)}</b><p>${esc(msg)}</p>${cta}</div>`;
+// Empty screens get a small drawing: a padel court from above, a ball, and the screen's icon.
+const COURT_ART = `<svg class="empty-art" viewBox="0 0 120 90" aria-hidden="true"><g transform="rotate(-12 60 45)"><rect x="30" y="8" width="60" height="74" rx="3" class="ea-court"/><line x1="30" y1="45" x2="90" y2="45" class="ea-net"/><line x1="30" y1="24" x2="90" y2="24" class="ea-line"/><line x1="30" y1="66" x2="90" y2="66" class="ea-line"/><line x1="60" y1="24" x2="60" y2="66" class="ea-line"/></g><circle cx="88" cy="22" r="8" class="ea-ball"/><path d="M82 18 q6 4 12 0 M82 26 q6 -4 12 0" class="ea-seam"/></svg>`;
+export const empty = (ic, title, msg, cta = '') => `<div class="empty"><div class="empty-pic">${COURT_ART}<span class="empty-ic">${icon(ic)}</span></div><b>${esc(title)}</b><p>${esc(msg)}</p>${cta}</div>`;
+
+// A progress ring with a number in the middle (court panels).
+export function ringStat(pct, color, big, small, label) {
+  const r = 24, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
+  return `<div class="ring-stat"><svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="${r}" class="rg-bg"/><circle cx="30" cy="30" r="${r}" class="rg-fg" stroke="${color}" stroke-dasharray="${(c * p).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 30 30)"/>
+    <text x="30" y="${small ? 31 : 35}" text-anchor="middle" class="rg-big">${big}</text>${small ? `<text x="30" y="43" text-anchor="middle" class="rg-small">${small}</text>` : ''}</svg><small>${label}</small></div>`;
+}
+
+// A short celebration for records and goals: a bouncing ball and a burst of confetti, then it
+// fades on its own (tap to close sooner). Reduced-motion settings get the card without the motion.
+export function celebrate(title, sub = '') {
+  document.querySelector('.celebrate')?.remove();
+  const colors = ['var(--ball)', '#64D2FF', '#FFFFFF', '#FF9F0A', '#30D158'];
+  const bits = Array.from({ length: 28 }, (_, i) => `<i style="--x:${Math.round(Math.cos(i * 0.9) * (90 + (i % 5) * 26))}px;--y:${Math.round(-70 - (i % 7) * 22)}px;--r:${(i * 47) % 360}deg;background:${colors[i % colors.length]};animation-delay:${(i % 6) * 25}ms"></i>`).join('');
+  const el = document.createElement('div');
+  el.className = 'celebrate'; el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="cb-card"><div class="cb-burst">${bits}</div><span class="cb-ball"></span><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+  el.onclick = () => el.remove();
+  document.body.appendChild(el);
+  navigator.vibrate?.([30, 40, 30]);
+  setTimeout(() => el.classList.add('out'), 2600); setTimeout(() => el.remove(), 3000);
+}
 export const seg = (name, items, current) => `<div class="seg" role="tablist">${items.map(([v, l]) => `<button role="tab" aria-selected="${String(v) === String(current)}" data-action="pick" data-name="${esc(name)}" data-value="${esc(v)}">${esc(l)}</button>`).join('')}</div>`;
 export const chips = (name, values, current, fmt = v => v) =>
   `<div class="chipset" role="radiogroup">${values.map(v => `<button type="button" role="radio" aria-checked="${String(v) === String(current)}" class="chip-btn ${String(v) === String(current) ? 'on' : ''}" data-action="pick" data-name="${esc(name)}" data-value="${esc(v)}">${esc(fmt(v))}</button>`).join('')}</div>`;

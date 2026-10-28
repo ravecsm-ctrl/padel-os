@@ -574,3 +574,72 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .rs-part em { font-style: normal; font-family: var(--font-round); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .rec-strip .t-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
 .court-stack .done-next .row-main small { color: var(--court-ink-2); }
+
+/* ── Court style, rolled out: workout set card, rest bar, Plan, Mobility, Progress ── */
+.setcard, .all-done { background: var(--court); color: var(--court-ink); box-shadow: 0 10px 30px rgba(11, 61, 110, .22); }
+.setcard .setcard-h b, .all-done .t-title2 { color: var(--court-ink); }
+.setcard .t-foot, .all-done .t-sub, .setcard .feel p { color: var(--court-ink-2); }
+.setcard .feel { border-bottom-color: rgba(255, 255, 255, .14); }
+.setcard .stepper { background: var(--court-2); }
+.setcard .stepper button { background: rgba(255, 255, 255, .12); color: var(--court-ink); box-shadow: none; }
+.setcard .stepper input { color: var(--court-ink); }
+.setcard .stepper input::placeholder { color: var(--court-ink); }
+.setcard .stepper .unit { color: var(--court-ink-2); }
+.setcard .btn.filled, .all-done .btn.filled { background: var(--ball); color: var(--on-ball); }
+.all-done .btn.gray { background: rgba(255, 255, 255, .14); color: var(--court-ink); }
+.all-done .big-tick { background: var(--ball); color: var(--on-ball); }
+.setcard .plates { color: var(--ball); }
+.setcard .seg, .all-done .seg { background: rgba(255, 255, 255, .12); }
+.setcard .seg button, .all-done .seg button { color: var(--court-ink); }
+.setcard .seg button[aria-selected="true"], .all-done .seg button[aria-selected="true"] { background: var(--ball); color: var(--on-ball); box-shadow: none; }
+.restbar { background: var(--court); color: var(--court-ink); box-shadow: 0 10px 30px rgba(11, 61, 110, .3); }
+.restbar button { background: rgba(255, 255, 255, .14); color: var(--court-ink); }
+.restbar .rest-skip { background: var(--ball); color: var(--on-ball); }
+.restbar small, .restbar .lbl-rest { color: var(--court-ink-2); }
+.restbar .rest-fill { background: var(--ball); opacity: .9; }
+/* Progress panel bar */
+.court-bar { display: block; margin-top: 12px; background: rgba(255, 255, 255, .16); }
+.court-bar b { background: var(--ball); }
+/* Plan: the 4-week cycle and this week's days */
+.cycle { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 14px; }
+.cycle span { display: grid; gap: 5px; }
+.cycle b { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); }
+.cycle .past b { background: rgba(255, 255, 255, .45); }
+.cycle .on b { background: var(--ball); }
+.cycle small { font-size: 11px; color: var(--court-ink-2); }
+.cycle .on small { color: var(--court-ink); font-weight: 600; }
+.court-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 12px 10px 14px; background: var(--court-2); }
+.court-days button { display: grid; justify-items: center; gap: 5px; color: var(--court-ink); }
+.court-days small { font-size: 11px; color: var(--court-ink-2); font-weight: 600; }
+.court-days .today small { color: var(--ball); }
+.court-days span { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .08); }
+.court-days span .i { width: 17px; height: 17px; }
+.court-days .gym span { background: #378ADD; }
+.court-days .padel span { background: #1D9E75; }
+.court-days .rec span { background: rgba(255, 159, 10, .28); color: #FFB340; }
+/* Empty states: a little court drawing */
+.empty-pic { position: relative; width: 132px; margin: 0 auto 12px; }
+.empty-art { width: 132px; height: 99px; display: block; }
+.ea-court { fill: color-mix(in srgb, var(--court) 10%, transparent); stroke: var(--court); stroke-opacity: .35; stroke-width: 1.5; }
+.ea-net { stroke: var(--court); stroke-opacity: .55; stroke-width: 2; }
+.ea-line { stroke: var(--court); stroke-opacity: .3; stroke-width: 1; }
+.ea-ball { fill: var(--ball); }
+.ea-seam { fill: none; stroke: #fff; stroke-opacity: .8; stroke-width: 1.2; }
+.empty-ic { position: absolute; left: 6px; bottom: 4px; width: 34px; height: 34px; border-radius: 50%; background: var(--court); color: #fff; display: grid; place-items: center; }
+.empty .empty-ic svg.i { width: 18px; height: 18px; color: #fff; margin: 0; }
+:root[data-theme="dark"] .ea-court, :root[data-theme="dark"] .ea-net, :root[data-theme="dark"] .ea-line { stroke: #64D2FF; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ea-court, :root:not([data-theme="light"]) .ea-net, :root:not([data-theme="light"]) .ea-line { stroke: #64D2FF; } }
+/* Celebration: a card that pops in, a ball that bounces, confetti that bursts out. */
+.celebrate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0, 0, 0, .25); animation: cb-fade .2s ease-out; }
+.celebrate.out { opacity: 0; transition: opacity .4s; }
+.cb-card { position: relative; display: grid; justify-items: center; gap: 6px; min-width: 220px; max-width: 80vw; padding: 26px 24px 22px; border-radius: 24px; background: var(--court); color: #fff; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); animation: cb-pop .45s cubic-bezier(.2, 1.4, .4, 1); }
+.cb-card b { font-size: 22px; font-weight: 700; font-family: var(--font-round); }
+.cb-card small { font-size: 14px; color: var(--court-ink-2); }
+.cb-ball { width: 34px; height: 34px; border-radius: 50%; background: var(--ball); box-shadow: inset -4px -4px 0 rgba(0, 0, 0, .12); margin-bottom: 6px; animation: cb-bounce .9s cubic-bezier(.3, 0, .5, 1) 2; }
+.cb-burst { position: absolute; left: 50%; top: 42px; width: 0; height: 0; }
+.cb-burst i { position: absolute; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: cb-confetti 1.1s ease-out forwards; }
+@keyframes cb-fade { from { opacity: 0; } }
+@keyframes cb-pop { from { transform: scale(.6); opacity: 0; } }
+@keyframes cb-bounce { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-26px); } 55% { transform: translateY(-26px); } }
+@keyframes cb-confetti { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 160px)) rotate(var(--r)); } }
+@media (prefers-reduced-motion: reduce) { .celebrate, .cb-card, .cb-ball, .cb-burst i { animation: none; } .cb-burst { display: none; } }

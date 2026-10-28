@@ -2,7 +2,7 @@
 // with a hands-free player. (The route is still 'court' so old links keep working.)
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
-import { esc, icon, pageHead, navBar, group, row } from './ui-kit.js';
+import { esc, icon, pageHead, navBar, group, row, tile } from './ui-kit.js';
 import { COURT_ROUTINES, expandSteps, routineMinutes, stretchFor } from './domain-court.js';
 import { isRoutine } from './domain-program.js';
 import { dayKey } from './domain-calendar.js';
@@ -65,7 +65,13 @@ function listView() {
     return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${note}`, icon: ic, color, to: `court/${r.id}` }); };
   const all = Object.values(COURT_ROUTINES), of = kind => all.filter(r => r.kind === kind);
   const flagged = Object.entries(pre.flagged).filter(([, n]) => n >= 2);
-  return `${pageHead('Mobility', { sub: 'Stretching, mobility and padel routines. They run hands-free.' })}
+  // The court panel: one routine worth doing right now, with why.
+  const padelToday = S.schedule[dayKey()] === 'Padel';
+  const pick = rec ? { id: rec.id, why: `Recommended ${rec.why}` } : pre.ids[0] ? { id: pre.ids[0], why: 'Recommended for you' } : padelToday ? { id: 'warmup', why: 'Padel today' } : { id: 'mobility', why: 'Good any day' };
+  const pr = COURT_ROUTINES[pick.id];
+  const panel = `<div class="court-stack" style="margin-bottom:24px"><div class="card hero"><div class="hero-top">${tile((LOOK[pr.id] || ['heart'])[0], (LOOK[pr.id] || [0, 'orange'])[1], true)}<div><p class="t-foot">${esc(pick.why)}</p><h2>${esc(pr.title)}</h2><p class="t-sub">${routineMinutes(pr)} min · hands-free</p></div></div>
+    <p class="hero-note">${esc(pr.blurb)}</p><button class="btn filled" data-action="go" data-to="court/${pr.id}">${icon('play')}Start</button></div></div>`;
+  return `${pageHead('Mobility', { sub: 'Stretching, mobility and padel routines. They run hands-free.' })}${panel}
     ${flagged.length ? `<div class="banner warn"><span class="tile orange">${icon('heart')}</span><span><b>You flagged ${flagged.map(([a]) => esc((AREAS[a] || a).toLowerCase())).join(' and ')} recently</b><small>Try the matching routine below. See a professional if it persists.</small></span></div>` : ''}
     ${group(of('stretch').sort((a, b) => (b.id === rec?.id) - (a.id === rec?.id)).map(item).join(''), { header: 'After your workout', footer: 'Gentle holds, never into pain. Stretching after training helps you wind down and builds flexibility over weeks; it does little for next-day soreness.' })}
     ${group(of('daily').map(item).join(''), { header: 'Every day' })}

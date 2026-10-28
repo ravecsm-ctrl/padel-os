@@ -1,7 +1,7 @@
 // Plan: the week at a glance, the schedule, and each workout's exercises.
 import { app, S } from './core-app.js';
 import { esc, icon, pageHead, navBar, group, row, routineLook } from './ui-kit.js';
-import { PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, moveBlock, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
+import { isRoutine, PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, moveBlock, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
 import { prescriptionFor } from './domain-builder.js';
 import { exercisePicker } from './ui-picker.js';
 import { allExercises } from './domain-catalog.js';
@@ -18,8 +18,12 @@ function overview() {
   const pos = app.position(), ph = phaseFor(pos.week), today = dayKey();
   const setup = `${app.location()?.name || EQUIPMENT[S.profile.equipment]} · ${S.profile.minutes} min · ${S.profile.days}× a week`;
   return `${pageHead('Plan', { sub: `Week ${pos.week} of 4 · ${esc(ph.name)}` })}
-    ${group(row({ title: `Week ${pos.week}: ${esc(ph.name)}`, sub: esc(ph.note), icon: 'target', color: 'indigo', action: 'week-sheet' }),
-      { header: 'This cycle', footer: 'Each cycle is 4 weeks. Weeks move forward on their own every Monday.' })}
+    <div class="court-stack"><button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
+      <p class="t-foot">This cycle</p><h2>Week ${pos.week}: ${esc(ph.name)}</h2><p class="t-sub">${esc(ph.note)}</p>
+      <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>
+      <div class="court-days">${DAYS.map(d => { const v = S.schedule[d], kind = isRoutine(v) ? 'gym' : v === 'Padel' ? 'padel' : v === 'Recovery' ? 'rec' : 'rest';
+        return `<button class="${kind} ${d === today ? 'today' : ''}" data-action="day-sheet" data-day="${d}" aria-label="${DAY_NAME[d]}: ${esc(optLabel(v))}"><small>${d[0]}</small><span>${kind === 'gym' ? icon(routineLook(v).icon) : kind === 'padel' ? icon('racket') : kind === 'rec' ? icon('heart') : ''}</span></button>`; }).join('')}</div></div>
+    <p class="grp-f" style="margin:8px 4px 24px">Each cycle is 4 weeks and moves forward on its own every Monday. Tap a day to change it.</p>
     ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(optLabel(S.schedule[d])), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })

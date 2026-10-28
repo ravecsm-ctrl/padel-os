@@ -1,6 +1,6 @@
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
-import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } from './ui-kit.js';
+import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook, ringStat } from './ui-kit.js';
 import { readinessScore, isRoutine, allRoutineIds } from './domain-program.js';
 import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, startForWeek } from './domain-calendar.js';
 import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-analytics.js';
@@ -137,11 +137,6 @@ const UPPER = ['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serra
 const CORE = ['abs', 'obliques', 'lower_back', 'hip_flexors'];
 const LEGS = ['glutes', 'glute_med', 'adductors', 'quads', 'hamstrings', 'calves', 'soleus', 'shins'];
 const readyPct = (rec, ms) => ms.length ? Math.round(100 * (1 - ms.reduce((n, m) => n + (rec[m]?.level || 0), 0) / ms.length)) : 100;
-function ring(pct, color, big, small, label) {
-  const r = 24, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
-  return `<div class="ring-stat"><svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="${r}" class="rg-bg"/><circle cx="30" cy="30" r="${r}" class="rg-fg" stroke="${color}" stroke-dasharray="${(c * p).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 30 30)"/>
-    <text x="30" y="${small ? 31 : 35}" text-anchor="middle" class="rg-big">${big}</text>${small ? `<text x="30" y="43" text-anchor="middle" class="rg-small">${small}</text>` : ''}</svg><small>${label}</small></div>`;
-}
 function rings() {
   if (!S.sessions.length) return '';
   const rec = currentRecovery(), plan = S.schedule[dayKey()];
@@ -150,9 +145,9 @@ function rings() {
   const done = app.strength.filter(s => s.startedAt >= mondayOf().getTime()).length, streak = weekStreak(S.sessions);
   const readyColor = ready >= 75 ? 'var(--ball)' : ready >= 50 ? '#FFD60A' : '#FF9F0A';
   return `<button class="court-rings" data-action="go" data-to="recovery" aria-label="Ready ${ready}%, ${done} of ${planned} workouts this week, ${streak} week streak">
-    ${ring(ready / 100, readyColor, `${ready}%`, '', isRoutine(plan) ? 'Ready for today' : 'Ready')}
-    ${ring(planned ? done / planned : 0, '#64D2FF', `${done}/${planned || done}`, '', 'This week')}
-    ${ring(Math.min(1, streak / 8), '#FFFFFF', String(streak), streak === 1 ? 'week' : 'weeks', 'Streak')}</button>`;
+    ${ringStat(ready / 100, readyColor, `${ready}%`, '', isRoutine(plan) ? 'Ready for today' : 'Ready')}
+    ${ringStat(planned ? done / planned : 0, '#64D2FF', `${done}/${planned || done}`, '', 'This week')}
+    ${ringStat(Math.min(1, streak / 8), '#FFFFFF', String(streak), streak === 1 ? 'week' : 'weeks', 'Streak')}</button>`;
 }
 
 // Recovery at a glance: three bars instead of the full body map (one tap opens it).

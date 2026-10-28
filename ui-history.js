@@ -213,7 +213,7 @@ function exercisesView() {
 
 function exerciseView(id) {
   const ex = getExercise(id);
-  if (!ex) return empty('dumbbell', 'Unknown exercise', '');
+  if (!ex) return `${navBar({ back: 'Exercises', backTo: 'history/progress' })}${empty('dumbbell', 'Exercise not found', 'It may have been deleted from your library.')}`;
   const m = progressMetric(ex), pts = exerciseSeries(app.strength, id), tf = targetField(ex);
   const heaviest = pts.length ? Math.max(...pts.map(p => p.topW || 0)) : 0;
   const bestE = pts.length ? Math.max(...pts.map(p => p.e1rm || 0)) : 0;

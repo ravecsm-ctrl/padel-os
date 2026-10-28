@@ -1,6 +1,7 @@
 // Progress tab (route 'overview'): what happened, then how you're going. Today is the home screen.
 import { app, S } from './core-app.js';
-import { esc, icon, pageHead, group, row, tile } from './ui-kit.js';
+import { esc, icon, pageHead, group, row, tile, ringStat } from './ui-kit.js';
+import { padelSummary } from './domain-padel.js';
 import { isRoutine, getRoutine } from './domain-program.js';
 import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
@@ -33,6 +34,20 @@ function calendar() {
     <div class="card"><div class="cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<small>${d}</small>`).join('')}${weeks.flat().map(cell).join('')}</div>
       <div class="legend" style="justify-content:center"><span><i class="gym"></i>Workout</span><span><i class="padel"></i>Padel</span><span><i class="cd plan"></i>Planned</span><span><i style="background:none;box-shadow:inset 0 0 0 1.5px var(--label-3)"></i>Missed</span></div></div>
     <p class="grp-f">${plural(st.sessions, 'session')} this month${streak ? ` · 🔥 ${plural(streak, 'week')} in a row` : ''}${st.missed ? ` · ${st.missed} planned missed` : ''}</p></section>`;
+}
+
+// ── Court panel: where you stand, in three rings.
+function progressPanel() {
+  if (!S.sessions.length) return '';
+  const now = new Date(), month = S.sessions.filter(s => { const d = new Date(s.startedAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
+  const gym = app.strength.length, ready = gym >= SCORES_AFTER, { axes, level } = currentStats(), cons = axes.find(a => a.key === 'consistency')?.score || 0, pd = padelSummary(S.sessions);
+  const title = ready ? `Level ${level.level} · ${esc(level.name)}` : 'Getting started', sub = ready ? `${level.into} / ${level.need} points to level ${level.level + 1}` : `${Math.min(gym, SCORES_AFTER)} of ${SCORES_AFTER} workouts until your scores unlock`;
+  return `<div class="court-stack" style="margin-bottom:24px"><button class="card hero" data-action="go" data-to="${ready ? 'stats' : 'overview'}" style="display:block;width:100%;text-align:left">
+      <p class="t-foot">Your progress</p><h2>${title}</h2><p class="t-sub">${esc(sub)}</p>
+      <span class="mbar court-bar"><b style="width:${Math.round((ready ? level.progress : gym / SCORES_AFTER) * 100)}%"></b></span></button>
+    <div class="court-rings">${ringStat(Math.min(1, month / 12), '#64D2FF', String(month), '', 'This month')}
+      ${ringStat(cons / 100, 'var(--ball)', ready ? String(cons) : '—', '', 'Consistency')}
+      ${ringStat((pd.winRate ?? 0) / 100, '#FFFFFF', pd.winRate != null ? `${pd.winRate}%` : '—', '', 'Win rate')}</div></div>`;
 }
 
 // ── Goals: a tournament to peak for, and lift targets.
@@ -125,7 +140,7 @@ export const overview = {
     const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
     const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your progress fills in as you train</b><small>Finish a workout or log a match to see your calendar, scores and history here.</small></span></div>` : '';
     return `${pageHead('Progress', { right: avatar })}${empty}
-      <div style="height:${empty ? 24 : 8}px"></div>${calendar()}${goals()}${headed()}
+      <div style="height:${empty ? 24 : 8}px"></div>${progressPanel()}${calendar()}${goals()}${headed()}
       ${S.sessions.length ? `<section class="grp"><h2 class="grp-h">Details</h2><div class="tile-grid">${[
         ['History', 'Every session and weekly load', 'note', 'gray', 'history'], ['Recovery', 'How ready each muscle is', 'heart', 'orange', 'recovery'],
         ['Exercises', 'Progress per exercise', 'dumbbell', 'blue', 'history/progress'], ['Muscles', 'Sets per muscle this week', 'target', 'blue', 'history/muscles'],

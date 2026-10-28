@@ -2,7 +2,8 @@
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
-import { esc, icon, navBar, group, row, stat, tile } from './ui-kit.js';
+import { esc, icon, navBar, group, row, stat, tile, celebrate } from './ui-kit.js';
+import { liftProgress } from './domain-goals.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { keepExercise, routineFromWorkout, setCustomRoutines, getRoutine } from './domain-program.js';
 import { prescriptionFor } from './domain-builder.js';
@@ -547,10 +548,15 @@ export const workout = {
         const r = routineFromWorkout(w, (S.form.saveAsName || '').trim() || 'My workout');
         if (r.blocks.length) { S.customRoutines = { ...S.customRoutines, [r.id]: r }; setCustomRoutines(S.customRoutines); await app.save('customRoutines'); session.routineId = r.id; session.title = r.title; savedAs = r.title; }
       }
+      const goalsBefore = (S.settings.liftGoals || []).filter(g => liftProgress(g, app.strength).done).map(g => g.exId);
       try { await db.putSession(session); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }
       S.active = null; await app.saveActive(true); timer.stop(); wakeLock?.release?.();
       await app.reloadSessions();
       app.go(`history/session/${session.id}`);
+      // A goal you just reached beats a record; either gets a short celebration.
+      const reached = (S.settings.liftGoals || []).filter(g => !goalsBefore.includes(g.exId) && liftProgress(g, app.strength).done);
+      if (reached.length) setTimeout(() => celebrate('Goal reached!', `${getExercise(reached[0].exId).name} · ${fmtW(reached[0].kg, unit())}`), 350);
+      else if (session.prs.length) setTimeout(() => celebrate(session.prs.length > 1 ? `${session.prs.length} new records!` : 'New record!', [...new Set(session.prs.map(p => p.name))].slice(0, 2).join(' · ')), 350);
       const note = soreNote(painAreasOf(session));
       app.toast((savedAs ? `Saved · “${esc(savedAs)}” added to Plan` : kept ? `Saved · ${kept} exercise${kept > 1 ? 's' : ''} kept for next time` : session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''}` : 'Workout saved') + (note ? `. ${note}` : ''));
     },
