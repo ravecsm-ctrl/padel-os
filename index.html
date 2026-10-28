@@ -28,5 +28,20 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <noscript>PADEL OS needs JavaScript.</noscript>
 <script type="module" src="main.js"></script>
+<script>
+// Safety net: if the app hasn't drawn anything after 6 s (for example a half-finished update),
+// offer a clean reload that clears the offline copy. Your data is not touched.
+setTimeout(function () {
+  var app = document.getElementById('app');
+  if (!app || app.children.length) return;
+  app.innerHTML = '<div style="padding:48px 24px;text-align:center;font:17px -apple-system,system-ui,sans-serif"><p style="margin-bottom:16px">The app didn’t load properly.</p><button id="hardReload" style="font:inherit;padding:12px 20px;border-radius:12px;border:0;background:#0A84FF;color:#fff">Reload</button><p style="margin-top:12px;color:#8E8E93;font-size:14px">Your workouts are safe.</p></div>';
+  document.getElementById('hardReload').onclick = function () {
+    Promise.resolve(window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }) : 0)
+      .then(function () { return navigator.serviceWorker ? navigator.serviceWorker.getRegistrations() : []; })
+      .then(function (r) { return Promise.all(r.map(function (x) { return x.update(); })); })
+      .finally(function () { location.reload(); });
+  };
+}, 6000);
+</script>
 </body>
 </html>

@@ -58,3 +58,26 @@ export function toCSV(sessions) {
   }
   return rows.map(r => r.map(csvCell).join(',')).join('\n');
 }
+
+// Which saved settings and data a restore brings back. "replace" takes the backup as is;
+// "merge" keeps this device's preferences and adds what the backup has on top.
+export const RESTORE_KEYS = ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'recoveryCal', 'body', 'supersets', 'painClear'];
+const ADDITIVE = ['exNotes', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'supersets'];
+export function restoreMeta(current, incoming, mode = 'replace', defaults = {}) {
+  const out = {};
+  for (const k of RESTORE_KEYS) {
+    const v = incoming[k];
+    if (v == null) { if (mode === 'replace' && ['body', 'supersets', 'painClear'].includes(k)) out[k] = k === 'body' ? [] : {}; continue; }
+    if (k === 'settings') { out[k] = mode === 'merge' ? current.settings : { ...defaults, ...current.settings, ...v }; continue; }
+    if (k === 'body') {
+      // Body log: union by date; on merge this device's entry wins for the same day.
+      const byDate = new Map((Array.isArray(v) ? v : []).map(e => [e.date, e]));
+      if (mode === 'merge') for (const e of current.body || []) byDate.set(e.date, e);
+      out[k] = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+      continue;
+    }
+    if (mode === 'merge') { if (ADDITIVE.includes(k)) out[k] = { ...v, ...(current[k] || {}) }; continue; }
+    out[k] = v;
+  }
+  return out;
+}

@@ -59,7 +59,7 @@ function todaysStretch() {
 }
 
 function listView() {
-  const pre = prehabFor(S.profile, S.sessions), rec = todaysStretch();
+  const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear }), rec = todaysStretch();
   const item = r => { const [ic, color] = LOOK[r.id] || ['heart', 'pink'];
     const note = rec?.id === r.id ? `<span class="blue">Recommended ${esc(rec.why)}</span>` : pre.ids.includes(r.id) ? '<span class="blue">Recommended for you</span>' : esc(r.tag);
     return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${note}`, icon: ic, color, to: `court/${r.id}` }); };

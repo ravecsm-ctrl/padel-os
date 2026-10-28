@@ -116,6 +116,6 @@ async function boot() {
   if (S.active && S.route !== 'workout') { S.route = 'workout'; S.params = []; window.history.replaceState(null, "", "#/workout"); }
   app.render();
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
 }
 boot();

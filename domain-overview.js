@@ -36,7 +36,8 @@ export function monthGrid(year, month, sessions, schedule, { isRoutine = () => f
 
 export function monthStats(weeks) {
   const days = weeks.flat().filter(d => d.inMonth);
-  return { sessions: days.reduce((n, d) => n + d.sessions.length, 0), workouts: days.filter(d => d.done.includes('gym')).length, missed: days.filter(d => d.missed).length };
+  // Guided routines (stretches etc.) show on the calendar but aren't counted as sessions.
+  return { sessions: days.reduce((n, d) => n + d.sessions.filter(s => !(s.kind === 'activity' && s.routine)).length, 0), workouts: days.filter(d => d.done.includes('gym')).length, missed: days.filter(d => d.missed).length };
 }
 
 // Least-squares slope (value per week) and residual spread.

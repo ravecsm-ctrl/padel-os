@@ -1,5 +1,5 @@
 // Bump VERSION on every release so clients pick up new files.
-const VERSION = 'pos-pro-v16';
+const VERSION = 'pos-pro-v17';
 const SHELL = [
   './', './index.html', './app.css', './manifest.webmanifest',
   './main.js', './core-app.js', './core-db.js', './core-timer.js',
@@ -15,10 +15,13 @@ self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c =>
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 
 // Network-first for same-origin files (fresh when online), cache fallback offline.
+// `no-cache` makes the browser re-check every file with the server (a cheap "has it changed?"
+// request) instead of trusting its 10-minute HTTP cache, so an update never mixes new and old files.
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then(r => {
+  const fresh = e.request.mode === 'navigate' ? new Request(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : new Request(e.request, { cache: 'no-cache' });
+  e.respondWith(fetch(fresh).then(r => {
     if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
     return r;
   }).catch(() => caches.match(e.request, { ignoreSearch: true }).then(hit => hit || caches.match('./index.html'))));

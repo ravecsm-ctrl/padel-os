@@ -2,7 +2,7 @@ import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } from './ui-kit.js';
 import { readinessScore, isRoutine, allRoutineIds } from './domain-program.js';
-import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf } from './domain-calendar.js';
+import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, startForWeek } from './domain-calendar.js';
 import { weeklySeries, loadTrend, trainingDays } from './domain-analytics.js';
 import { createWorkout, createActivity, workoutStats, applySupersets } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
@@ -29,6 +29,8 @@ export function banners({ resumeOnly = false } = {}) {
   }
   if (resumeOnly) return out;
   if (!S.profile.onboarded) out += `<button class="banner" data-action="go" data-to="welcome">${tile('sliders', 'blue')}<span><b>Personalise your plan</b><small>Takes 30 seconds. Your history is kept.</small></span>${chev}</button>`;
+  const br = breakInfo(S.sessions, app.position().week, { acknowledged: S.settings.breakAck || 0 });
+  if (br) out += `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`;
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
   if (S.sessions.length >= 3) {
@@ -78,10 +80,10 @@ function weekCard() {
 }
 
 function stayHealthy() {
-  const pre = prehabFor(S.profile, S.sessions);
+  const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear });
   if (!pre.ids.length) return '';
   return group(pre.ids.map(id => { const r = COURT_ROUTINES[id]; const n = pre.flagged[r.areas[0]];
-    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${n >= 2 ? `you flagged this ${n}× recently` : 'from your profile'}`, icon: 'heart', color: 'pink', to: `court/${id}` }); }).join(''),
+    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${r.areas.some(a => pre.hurt[a]) ? 'you reported pain here recently' : n >= 2 ? `you flagged this ${n}× recently` : 'from your profile'}`, icon: 'heart', color: 'pink', to: `court/${id}` }); }).join(''),
   { header: 'Stay healthy', big: true });
 }
 
@@ -105,6 +107,8 @@ export const today = {
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     'quick-backup'() { saveBackup(); },
+    async 'cycle-restart'() { S.settings.programStart = startForWeek(1, S.settings.programStart); await app.save('settings'); app.render({ keepScroll: true }); app.toast('Plan restarted at week 1'); },
+    async 'cycle-keep'(el) { S.settings.breakAck = +el.dataset.ts; await app.save('settings'); app.render({ keepScroll: true }); },
     start(el) { startFlow(el.dataset.routine); },
     resume() { app.go('workout'); },
     async 'discard-active'() {

@@ -2,6 +2,7 @@
 // they do not prove what causes what.
 import { mondayOf, isoDate } from './domain-calendar.js';
 import { AREA_ROUTINE } from './domain-court.js';
+import { recentPain } from './domain-pain.js';
 
 export const PADEL_TYPES = { match: 'Match', training: 'Training', lesson: 'Lesson', americano: 'Americano' };
 export const SIDES = { drive: 'Drive (right)', reves: 'Revés (left)', both: 'Both' };
@@ -45,11 +46,14 @@ export function padelSummary(sessions, now = Date.now(), days = 60) {
 }
 
 // Prehab routines to recommend: from profile injuries plus areas flagged in recent matches.
-export function prehabFor(profile, sessions, now = Date.now()) {
+// Prevention routines worth doing: areas from your profile, padel soreness that repeats, and
+// pain you reported after a workout (the same "recently hurt" list workouts use to flag exercises).
+export function prehabFor(profile, sessions, now = Date.now(), { cleared = {} } = {}) {
   const ids = new Set((profile?.injuries || []).map(a => AREA_ROUTINE[a]).filter(Boolean));
   const recent = sessions.filter(s => isPadel(s) && now - s.startedAt <= 21 * DAY);
-  const flagged = {};
+  const flagged = {}, hurt = recentPain(sessions, { now, cleared });
   for (const s of recent) for (const a of s.padel?.sore || []) flagged[a] = (flagged[a] || 0) + 1;
   for (const [a, n] of Object.entries(flagged)) if (n >= 2 && AREA_ROUTINE[a]) ids.add(AREA_ROUTINE[a]);
-  return { ids: [...ids], flagged };
+  for (const a of Object.keys(hurt)) { if (AREA_ROUTINE[a]) ids.add(AREA_ROUTINE[a]); flagged[a] = Math.max(flagged[a] || 0, 2); }
+  return { ids: [...ids], flagged, hurt };
 }

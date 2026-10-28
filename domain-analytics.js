@@ -6,6 +6,9 @@ import { mondayOf, isoDate, daysBetween } from './domain-calendar.js';
 export const setCount = s => (s.exercises || []).reduce((n, e) => n + doneSets(e).length, 0);
 export const volumeKg = s => (s.exercises || []).reduce((n, e) => n + doneSets(e).reduce((m, x) => m + (x.w > 0 && x.reps > 0 ? x.w * x.reps : 0), 0), 0);
 // Session-RPE load (Foster): minutes × session RPE, in arbitrary units.
+// Guided routines (stretching, mobility, warm-ups, prevention) are logged too, but they are
+// light work: they shouldn't count as training sessions or keep a streak alive on their own.
+export const isRoutineLog = s => s.kind === 'activity' && !!s.routine;
 export const sessionLoad = s => (s.durationMin > 0 && s.rpe > 0) ? Math.round(s.durationMin * s.rpe) : 0;
 
 export function weeklySeries(history, weeks = 8, now = new Date()) {
@@ -18,7 +21,7 @@ export function weeklySeries(history, weeks = 8, now = new Date()) {
     const idx = weeks - 1 - Math.floor(daysBetween(mondayOf(new Date(s.startedAt)), thisMon) / 7);
     if (idx < 0 || idx >= weeks) continue;
     const w = out[idx], load = sessionLoad(s);
-    w.sessions++;
+    if (!isRoutineLog(s)) w.sessions++;
     if (s.kind === 'strength') { w.gym += load; w.sets += setCount(s); w.volume += volumeKg(s); }
     else if (s.activity === 'padel') w.padel += load;
     else w.other += load;
@@ -43,7 +46,7 @@ export function trainingDays(history) {
 
 // Consecutive weeks (ending this week or last) with at least one session.
 export function weekStreak(history, now = new Date()) {
-  const weeks = new Set(history.map(s => isoDate(mondayOf(new Date(s.startedAt)))));
+  const weeks = new Set(history.filter(s => !isRoutineLog(s)).map(s => isoDate(mondayOf(new Date(s.startedAt)))));
   const m = mondayOf(now);
   if (!weeks.has(isoDate(m))) m.setDate(m.getDate() - 7);
   let n = 0;

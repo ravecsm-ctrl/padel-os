@@ -3,7 +3,7 @@ import { app, S, DEFAULT_SETTINGS, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
 import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
-import { validateBackup, normalizeBackup, toCSV } from './domain-backup.js';
+import { validateBackup, normalizeBackup, toCSV, restoreMeta } from './domain-backup.js';
 import { saveBackup, saveFile } from './ui-backup.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
@@ -87,13 +87,7 @@ async function importFile(file) {
       if (b.dataset.mode === 'replace') { await db.clearAll(); }
       const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
       await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
-      for (const k of ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights', 'recoveryCal']) {
-        if (norm.meta[k] == null) continue;
-        const additive = ['exNotes', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights'];
-        if (b.dataset.mode === 'merge' && !additive.includes(k)) continue; // keep current preferences on merge
-        S[k] = k === 'settings' ? { ...DEFAULT_SETTINGS, ...S.settings, ...norm.meta[k] } : additive.includes(k) && b.dataset.mode === 'merge' ? { ...norm.meta[k], ...S[k] } : norm.meta[k];
-        await app.save(k);
-      }
+      for (const [k, v] of Object.entries(restoreMeta(S, norm.meta, b.dataset.mode, DEFAULT_SETTINGS))) { S[k] = v; await app.save(k); }
       if (b.dataset.mode === 'replace' && S.active) await app.saveActive(true);
       applyTheme(); setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
       await app.reloadSessions(); app.closeSheet(); app.toast('Backup restored'); app.render();

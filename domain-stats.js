@@ -4,6 +4,10 @@
 import { getExercise } from './domain-catalog.js';
 import { doneSets, e1rm } from './domain-progression.js';
 import { mondayOf, isoDate } from './domain-calendar.js';
+import { COURT_ROUTINES } from './domain-court.js';
+
+const isRoutineLog = s => s.kind === 'activity' && !!s.routine;
+const isPrehab = s => isRoutineLog(s) && COURT_ROUTINES[s.routine]?.kind === 'prehab';
 
 const DAY = 86400000, WINDOW = 28 * DAY;
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
@@ -64,14 +68,14 @@ export function pentagon(sessions, { plannedPerWeek = 3, now = Date.now() } = {}
     tip: 'Add jumps or throws at the start of a workout, a few sets every week. Quality over quantity.' };
 
   // Resilience
-  const routines = recent.filter(s => s.kind === 'activity' && s.routine && s.routine !== 'warmup' && s.routine !== 'cooldown').length / 4;
+  const routines = recent.filter(isPrehab).length / 4;
   const prevSets = setsWhere(sessions, now, ex => ex.category === 'prevention') / 4;
   const prevention = clamp(routines / 2 * 60 + prevSets / 12 * 40);
   const flags = recent.reduce((n, s) => n + (s.padel?.sore?.length || 0) + (s.pain?.flag ? 1 : 0), 0);
   const body = recent.length ? clamp(100 - flags * 15) : 0;   // no free points for not training
   const resilienceAxis = { key: 'resilience', label: 'Resilience', score: round(prevention * 0.6 + body * 0.4),
     parts: [part('Prevention work', prevention, `${routines.toFixed(1)} routines and ${prevSets.toFixed(1)} prevention sets a week`), part('Body check', body, flags ? `${flags} sore or pain flag${flags > 1 ? 's' : ''} in 4 weeks` : 'No sore or pain flags in 4 weeks')],
-    tip: 'Do an injury-prevention routine from the Court tab twice a week, and flag soreness honestly so the app can help.' };
+    tip: 'Do an injury-prevention routine from the Mobility tab twice a week, and flag soreness honestly so the app can help.' };
 
   // Conditioning
   const cond = recent.filter(s => s.kind === 'activity' && (s.activity === 'padel' || s.activity === 'cardio'));
@@ -85,7 +89,7 @@ export function pentagon(sessions, { plannedPerWeek = 3, now = Date.now() } = {}
   // Consistency
   const planned = Math.max(1, plannedPerWeek) * 4;
   const done = strength.length;
-  const streak = (() => { const weeks = new Set(sessions.filter(s => s.startedAt <= now).map(s => isoDate(mondayOf(new Date(s.startedAt))))); const m = mondayOf(new Date(now)); if (!weeks.has(isoDate(m))) m.setDate(m.getDate() - 7); let n = 0; while (weeks.has(isoDate(m))) { n++; m.setDate(m.getDate() - 7); } return n; })();
+  const streak = (() => { const weeks = new Set(sessions.filter(s => s.startedAt <= now && !isRoutineLog(s)).map(s => isoDate(mondayOf(new Date(s.startedAt))))); const m = mondayOf(new Date(now)); if (!weeks.has(isoDate(m))) m.setDate(m.getDate() - 7); let n = 0; while (weeks.has(isoDate(m))) { n++; m.setDate(m.getDate() - 7); } return n; })();
   const cDone = clamp(done / planned * 100), cStreak = Math.min(streak, 8) / 8 * 100;
   const consistencyAxis = { key: 'consistency', label: 'Consistency', score: round(cDone * 0.7 + cStreak * 0.3),
     parts: [part('Workouts done', cDone, `${done} of ${planned} planned in 4 weeks`), part('Weekly streak', cStreak, `${streak} week${streak === 1 ? '' : 's'} in a row (100 at 8)`)],
@@ -97,10 +101,10 @@ export function pentagon(sessions, { plannedPerWeek = 3, now = Date.now() } = {}
 // ── XP for good habits (never raw volume) ───────────────────────────────────────
 export function xpEvents(sessions, { plannedIds = [] } = {}) {
   const out = [], sorted = [...sessions].sort((a, b) => a.startedAt - b.startedAt);
-  const weeks = new Map();
+  const weeks = new Map(), lightDays = new Set();
   for (const s of sorted) {
     const wk = isoDate(mondayOf(new Date(s.startedAt)));
-    weeks.set(wk, (weeks.get(wk) || 0) + 1);
+    if (!isRoutineLog(s)) weeks.set(wk, (weeks.get(wk) || 0) + 1);
     if (s.kind === 'strength') {
       const sets = (s.exercises || []).reduce((n, e) => n + doneSets(e).length, 0);
       if (!sets) continue;
@@ -109,6 +113,8 @@ export function xpEvents(sessions, { plannedIds = [] } = {}) {
       if (hit) out.push({ ts: s.startedAt, xp: hit * 10, label: `Hit your targets on ${hit} exercise${hit > 1 ? 's' : ''}` });
       if (s.prs?.length) out.push({ ts: s.startedAt, xp: s.prs.length * 25, label: `${s.prs.length} personal record${s.prs.length > 1 ? 's' : ''}` });
     } else if (s.kind === 'activity') {
+      // Prevention routines earn 30; stretches and warm-ups 10, once a day, so they can't be farmed.
+      if (isRoutineLog(s) && !isPrehab(s)) { const day = isoDate(new Date(s.startedAt)); if (lightDays.has(day)) continue; lightDays.add(day); out.push({ ts: s.startedAt, xp: 10, label: `Routine: ${s.title}` }); continue; }
       out.push({ ts: s.startedAt, xp: s.routine ? 30 : 20, label: s.routine ? `Routine: ${s.title}` : `Logged: ${s.title}` });
     }
   }
@@ -128,10 +134,10 @@ export function levelFor(xp) {
 
 export function achievements(sessions) {
   const strength = sessions.filter(s => s.kind === 'strength');
-  const routines = sessions.filter(s => s.kind === 'activity' && s.routine).length;
+  const routines = sessions.filter(isPrehab).length;
   const matches = sessions.filter(s => s.activity === 'padel').length;
   const prs = strength.reduce((n, s) => n + (s.prs?.length || 0), 0);
-  const weeks = new Set(sessions.map(s => isoDate(mondayOf(new Date(s.startedAt)))));
+  const weeks = new Set(sessions.filter(s => !isRoutineLog(s)).map(s => isoDate(mondayOf(new Date(s.startedAt)))));
   let best = 0, run = 0;
   for (const w of [...weeks].sort()) { const prev = new Date(w + 'T12:00'); prev.setDate(prev.getDate() - 7); run = weeks.has(isoDate(prev)) ? run + 1 : 1; best = Math.max(best, run); }
   return [

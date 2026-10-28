@@ -36,3 +36,13 @@ export function relDay(ts, now = new Date()) {
   if (n < 7) return `${n} days ago`;
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+// The 4-week cycle moves by date. After a long break that can drop you straight into a hard
+// or a lighter week, so offer a restart. Returns { days, lastTs } or null.
+export const BREAK_DAYS = 10;
+export function breakInfo(sessions, week, { now = Date.now(), acknowledged = 0 } = {}) {
+  const last = Math.max(0, ...sessions.filter(s => s.kind === 'strength' && s.startedAt <= now).map(s => s.startedAt));
+  if (!last || week === 1 || last <= acknowledged) return null;
+  const days = Math.floor((now - last) / 86400000);
+  return days >= BREAK_DAYS ? { days, lastTs: last } : null;
+}
