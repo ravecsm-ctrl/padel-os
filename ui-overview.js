@@ -13,7 +13,7 @@ import { weekStreak } from './domain-analytics.js';
 import { fmtW, fmtNum, toDisplay } from './domain-units.js';
 import { currentRecovery, recoveryMapSvg } from './ui-recovery.js';
 import { currentStats, radar } from './ui-stats.js';
-import { banners, activitySheet } from './ui-today.js';
+import { banners, activitySheet, pastWorkoutSheet } from './ui-today.js';
 
 let monthOffset = 0;
 const MONTH = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -116,8 +116,9 @@ export const overview = {
       const title = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
       app.sheet(`<h2 class="sheet-title">${esc(title)}</h2><p class="sheet-sub">${isRoutine(plan) ? `Planned: ${esc(getRoutine(plan).title)}` : plan === 'Padel' ? 'Planned: padel' : 'No workout planned'}</p>
         ${list.length ? group(list.map(s => row({ title: esc(s.title), sub: `${s.durationMin || '—'} min`, to: `history/session/${s.id}` })).join('')) : `<p class="t-sub" style="text-align:center;margin:8px 0 18px">${future ? 'Coming up.' : 'Nothing logged.'}</p>`}
-        ${future ? '' : `<button class="btn tinted" data-action="cal-log" data-iso="${iso}">Log an Activity for This Day</button>`}`);
+        ${future ? '' : `<div class="btns">${iso < isoDate() ? `<button class="btn tinted" data-action="cal-past" data-iso="${iso}">Log a Past Workout</button>` : ''}<button class="btn ${iso < isoDate() ? 'gray' : 'tinted'}" data-action="cal-log" data-iso="${iso}">Log Padel or Activity</button></div>`}`);
     },
+    'cal-past'(el) { pastWorkoutSheet(el.dataset.iso); },
     'cal-log'(el) { app.closeSheet(); activitySheet('padel', null, el.dataset.iso); },
   },
 };

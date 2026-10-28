@@ -5,8 +5,8 @@ import * as timer from './core-timer.js';
 import { esc, icon, navBar, group, row, stat, tile } from './ui-kit.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
-import { lastPerformance, doneSets, detectPRs } from './domain-progression.js';
-import { relDay } from './domain-calendar.js';
+import { lastPerformance, doneSets, detectPRs, bestE1rm } from './domain-progression.js';
+import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
 import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
@@ -18,6 +18,9 @@ import { sessionMuscles, ranked } from './domain-muscles.js';
 const W = () => S.active;
 const cur = () => W().exercises[W().index];
 const unit = () => S.settings.unit;
+// History as of this workout: for a past-dated workout, only what came before it.
+const before = () => W().past ? app.strength.filter(s => s.startedAt < W().startedAt) : app.strength;
+const dayLabel = ts => new Date(ts).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const touch = (keepScroll = true) => { app.saveActive(); app.render({ keepScroll }); };
 let wakeLock = null;
 
@@ -35,6 +38,19 @@ function fmtSet(s, fields) {
   const tf = fields[fields.length - 1];
   const v = `${fmtNum(s[tf])}${tf === 'reps' ? ' reps' : ` ${FIELD_UNIT[tf]}`}`;
   return fields.includes('w') && s.w ? `${fmtNum(toDisplay(s.w, unit()))} ${unit()} × ${v}` : v;
+}
+// "60 kg × 8, 8, 7" when the weight didn't change, otherwise each set in full.
+function compactSets(sets, fields) {
+  const tf = fields[fields.length - 1], ws = new Set(sets.map(s => s.w || 0));
+  if (fields.includes('w') && ws.size === 1 && sets[0].w) return `${fmtNum(toDisplay(sets[0].w, unit()))} ${unit()} × ${sets.map(s => fmtNum(s[tf])).join(', ')}${tf === 'reps' ? '' : ` ${FIELD_UNIT[tf]}`}`;
+  return sets.map(s => fmtSet(s, fields)).join(' · ');
+}
+
+// Your baseline: what you did last time, and your estimated max from it (Epley).
+function baseline(e, last) {
+  if (!last) return '';
+  const max = e.fields.includes('w') ? bestE1rm(last.entry) : null;
+  return `<div class="baseline"><div><small>Last time · ${esc(relDay(last.session.startedAt))}</small><b>${esc(compactSets(doneSets(last.entry), e.fields))}</b></div>${max ? `<div class="bl-max"><small>${simple() ? 'Est. max' : 'Est. 1RM'}</small><b>${esc(fmtW(max, unit()))}</b></div>` : ''}</div>`;
 }
 
 // What the field shows before the user touches it: previous set, else the suggestion.
@@ -60,11 +76,13 @@ function coach(e) {
   const ex = getExercise(e.exId), tf = targetField(ex), sug = e.suggestion;
   const range = e.target.min === e.target.max ? `${e.target.min}` : `${e.target.min}–${e.target.max}`;
   const weight = sug.w != null ? ` at <b>${fmtW(sug.w, unit())}</b>` : e.fields.includes('w') && sug.kind === 'first' ? ', choosing a weight that feels manageable' : '';
-  const last = lastPerformance(app.strength, e.exId);
+  const last = lastPerformance(before(), e.exId);
+  const why = e.adjusted ? '' : (sug.reason || '').replace(/([\d.]+)kg/g, (_, n) => fmtW(+n, unit()));
   const tip = e.adjusted ? '' : sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
     ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
-    <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${esc(effortTarget(e.target.rpe))}.${last ? ` Last time: ${esc(doneSets(last.entry).map(s => fmtSet(s, e.fields)).join(', '))}.` : ''}</p>
+    ${baseline(e, last)}
+    <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${why ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p>
     ${missingHere(ex)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
 }
 
@@ -89,6 +107,7 @@ function setArea(e) {
   const next = e.sets.findIndex(s => !s.done);
   const lastDone = e.sets.map(s => s.done).lastIndexOf(true);
   const w = W(), isLast = w.index === w.exercises.length - 1;
+  const lastSets = doneSets(lastPerformance(before(), e.exId)?.entry), lastSet = next >= 0 ? lastSets[next] : null;
   const doneRows = e.sets.map((s, i) => s.done ? row({ title: `Set ${i + 1}`, sub: setEffortWord(s.rpe), value: esc(fmtSet(s, e.fields)), right: '', action: 'undo-set', data: { set: i }, chevron: false, aria: `Set ${i + 1} done. Tap to reopen.` }).replace('<span class="row-main">', `<span class="tick">${icon('check')}</span><span class="row-main">`) : '').join('');
   const feel = lastDone >= 0 && e.sets[lastDone].rpe == null && next >= 0
     ? `<div class="feel"><p>How did set ${lastDone + 1} feel?</p>${setEffortSeg('set-rpe', '')}</div>` : '';
@@ -97,6 +116,7 @@ function setArea(e) {
         ${lastDone >= 0 && e.sets[lastDone].rpe == null ? `<div style="margin-bottom:16px">${setEffortSeg('set-rpe', '')}</div>` : ''}
         <button class="btn filled" data-action="${isLast ? 'to-finish' : 'next'}">${isLast ? 'Finish Workout' : 'Next Exercise'}</button></section>`
     : `<section class="card setcard">${feel}<div class="setcard-h"><b>Set ${next + 1} of ${e.sets.length}</b><span class="t-foot">${restLabel(e.target.rest)} rest after</span></div>
+        ${lastSet ? `<p class="t-foot bl-set">Last time, set ${next + 1}: ${esc(fmtSet(lastSet, e.fields))}</p>` : ''}
         <div class="steppers">${e.fields.map(f => stepper(e, next, f)).join('')}</div>
         <button class="btn filled" data-action="set-done" data-set="${next}">${icon('check')}Done</button></section>`;
   return `${card}${doneRows ? `<div class="done-list">${group(doneRows, { footer: 'Tap a set to change it.' })}</div>` : ''}`;
@@ -106,7 +126,8 @@ function runner() {
   const w = W(), e = cur(), ex = getExercise(e.exId), n = w.exercises.length, isLast = w.index === n - 1;
   const nextName = isLast ? '' : getExercise(w.exercises[w.index + 1].exId).name;
   const ready = entryState(e) === 'done' || e.skipped;
-  return `${navBar({ back: 'Back', backAction: 'leave', title: w.title, sub: `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
+  return `${navBar({ back: 'Back', backAction: 'leave', title: w.title, sub: w.past ? `Past workout · ${esc(dayLabel(w.startedAt))}` : `<span class="elapsed num" data-start="${w.startedAt}">${clock(w.startedAt)}</span>`, right: '<button class="nav-btn right" data-action="to-finish">End</button>' })}
+    ${w.past && w.index === 0 ? `<div class="banner" style="margin-bottom:14px">${tile('today', 'blue')}<span><b>Logging ${esc(dayLabel(w.startedAt))}</b><small>Enter what you did that day. Suggestions use only your workouts before it.</small></span></div>` : ''}
     ${w.index === 0 || w.adapt?.applied === false ? adaptBanner(w) : ''}
     <div class="wk-dots" role="tablist">${w.exercises.map((x, i) => `<button role="tab" aria-selected="${i === w.index}" class="${entryState(x)} ${i === w.index ? 'on' : ''}" data-action="jump" data-i="${i}" aria-label="Exercise ${i + 1}: ${esc(x.name)}"></button>`).join('')}</div>
     <div class="ex-head"><div><p class="t-foot">Exercise ${w.index + 1} of ${n}${e.adaptedFrom && !e.swappedFrom ? ' · adapted to your setup' : e.swappedFrom ? ' · replaced' : ''}</p><h1>${esc(ex.name)}</h1></div>
@@ -118,7 +139,7 @@ function runner() {
 
 function finishView() {
   const w = W(), st = workoutStats(w);
-  const prs = w.exercises.flatMap(e => detectPRs({ ...e, sets: doneSets(e) }, app.strength).map(p => ({ ...p, name: e.name })));
+  const prs = w.exercises.flatMap(e => detectPRs({ ...e, sets: doneSets(e) }, before()).map(p => ({ ...p, name: e.name })));
   S.form.rpe ??= ''; S.form.pain ??= 'no';
   const missing = w.exercises.filter(e => !e.skipped && !doneSets(e).length).length;
   const vol = Math.round(toDisplay(st.volume, unit()));
@@ -131,6 +152,7 @@ function finishView() {
     <label class="field-l">How hard was it overall?</label>${sessionEffortChips('rpe', S.form.rpe)}
     <div style="height:24px"></div>
     ${group(row({ title: 'Anything hurt?', right: `<input type="checkbox" class="switch" id="painSw" ${S.form.pain === 'yes' ? 'checked' : ''} aria-label="Anything hurt">` })
+      + (w.past ? row({ title: 'Date', right: `<input class="input" id="dateIn" type="date" value="${S.form.date || isoDate(new Date(w.startedAt))}" max="${isoDate()}" style="width:150px;text-align:right;background:none;padding:0" aria-label="Date">` }) : '')
       + row({ title: 'Minutes', right: `<input class="input num" id="durIn" type="number" inputmode="numeric" value="${S.form.duration || st.minutes}" style="width:90px;text-align:right;background:none;padding:0" aria-label="Minutes">` }),
       { footer: S.form.pain === 'yes' ? 'Don’t train through sharp or worsening pain. If it persists, see a professional.' : '' })}
     ${S.form.pain === 'yes' ? `<input class="input" id="painLoc" placeholder="Where did it hurt?" value="${esc(S.form.painLoc || '')}" style="margin:-16px 0 24px">` : ''}
@@ -154,6 +176,7 @@ export const workout = {
       const p = document.querySelector('#painLoc'); if (p) p.oninput = () => { S.form.painLoc = p.value; };
       document.querySelector('#notesIn').oninput = ev => { S.form.notes = ev.target.value; };
       document.querySelector('#durIn').oninput = ev => { S.form.duration = +ev.target.value; };
+      const di = document.querySelector('#dateIn'); if (di) di.onchange = ev => { S.form.date = ev.target.value; };
       document.querySelector('#painSw').onchange = ev => { S.form.pain = ev.target.checked ? 'yes' : 'no'; app.render({ keepScroll: true }); };
     }
   },
@@ -189,7 +212,7 @@ export const workout = {
       if (!s[tf]) return app.toast(`Add the ${UNIT_WORD[tf]} first`);
       s.done = true; s.ts = Date.now();
       const moreHere = e.sets.some(x => !x.done);
-      if (S.settings.autoRest) {
+      if (S.settings.autoRest && !w.past) {
         const nextEx = w.exercises.slice(w.index + 1).find(x => !x.skipped);
         const label = moreHere ? `set ${e.sets.findIndex(x => !x.done) + 1}` : nextEx ? getExercise(nextEx.exId).name : '';
         if (moreHere || nextEx) timer.start(e.target.rest, label);
@@ -257,7 +280,8 @@ export const workout = {
     },
     async 'save-workout'() {
       const pain = S.form.pain === 'yes' ? { flag: true, location: S.form.painLoc || '' } : { flag: false, location: '' };
-      const session = finalizeWorkout(W(), { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, app.strength);
+      if (W().past && S.form.date && S.form.date <= isoDate()) { const d = parseISO(S.form.date); d.setHours(new Date(W().startedAt).getHours(), new Date(W().startedAt).getMinutes()); W().startedAt = d.getTime(); }
+      const session = finalizeWorkout(W(), { rpe: S.form.rpe === '' ? null : +S.form.rpe, notes: S.form.notes, pain, durationMin: S.form.duration }, before());
       try { await db.putSession(session); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }
       S.active = null; await app.saveActive(true); timer.stop(); wakeLock?.release?.();
       await app.reloadSessions();

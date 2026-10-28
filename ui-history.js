@@ -5,7 +5,7 @@ import { esc, icon, pageHead, navBar, group, row, stat, empty, barChart, lineCha
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { weeklySeries, loadTrend, setCount, volumeKg, sessionLoad, weekStreak, trainingDays, exerciseSeries, exerciseSummaries, progressMetric } from './domain-analytics.js';
 import { doneSets } from './domain-progression.js';
-import { isoDate, mondayOf, relDay } from './domain-calendar.js';
+import { isoDate, mondayOf, relDay, parseISO } from './domain-calendar.js';
 import { fmtW, fmtNum, toDisplay } from './domain-units.js';
 import { activitySheet } from './ui-today.js';
 import { padelSummary, PADEL_TYPES, SIDES } from './domain-padel.js';
@@ -198,16 +198,23 @@ export const history = {
       const draw = () => `<h2 class="sheet-title">Edit workout</h2>
         <label class="field-l">How hard was it?</label>${sessionEffortChips('rpe', S.form.rpe)}
         <div style="height:20px"></div>
-        ${group(row({ title: 'Minutes', right: `<input class="input num" id="eDur" type="number" inputmode="numeric" value="${s.durationMin}" style="width:80px;text-align:right;background:none;padding:0" aria-label="Minutes">` })
+        ${group(row({ title: 'Date', right: `<input class="input" id="eDate" type="date" value="${isoDate(new Date(s.startedAt))}" max="${isoDate()}" style="width:150px;text-align:right;background:none;padding:0" aria-label="Date">` })
+          + row({ title: 'Minutes', right: `<input class="input num" id="eDur" type="number" inputmode="numeric" value="${s.durationMin}" style="width:80px;text-align:right;background:none;padding:0" aria-label="Minutes">` })
           + row({ title: 'Something hurt', right: `<input type="checkbox" class="switch" id="ePain" ${s.pain?.flag ? 'checked' : ''} aria-label="Something hurt">` }))}
         <input class="input" id="ePainLoc" placeholder="Where? (optional)" value="${esc(s.pain?.location || '')}">
         <label class="field-l" for="eNotes">Notes</label><textarea class="input" id="eNotes" rows="3">${esc(s.notes)}</textarea>
         <div style="height:20px"></div><button class="btn filled" id="eSave">Save</button>`;
       const mount = b => b.querySelector('#eSave').onclick = async () => {
         const upd = { ...s, rpe: S.form.rpe === '' ? null : +S.form.rpe, durationMin: +b.querySelector('#eDur').value || s.durationMin, notes: b.querySelector('#eNotes').value, pain: { flag: b.querySelector('#ePain').checked, location: b.querySelector('#ePainLoc').value } };
+        // Moving to another day keeps the time of day; the end moves with it.
+        const day = b.querySelector('#eDate').value;
+        if (day && day <= isoDate() && day !== isoDate(new Date(s.startedAt))) {
+          const d = parseISO(day), t = new Date(s.startedAt); d.setHours(t.getHours(), t.getMinutes(), t.getSeconds());
+          const shift = d.getTime() - s.startedAt; upd.startedAt += shift; if (upd.endedAt) upd.endedAt += shift;
+        }
         await db.putSession(upd); await app.reloadSessions(); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Saved');
       };
-      app.onPick = () => { const keep = { dur: document.querySelector('#eDur').value, notes: document.querySelector('#eNotes').value }; app.sheet(draw(), mount); document.querySelector('#eDur').value = keep.dur; document.querySelector('#eNotes').value = keep.notes; };
+      app.onPick = () => { const keep = { dur: document.querySelector('#eDur').value, notes: document.querySelector('#eNotes').value, date: document.querySelector('#eDate').value }; app.sheet(draw(), mount); document.querySelector('#eDur').value = keep.dur; document.querySelector('#eNotes').value = keep.notes; document.querySelector('#eDate').value = keep.date; };
       app.sheet(draw(), mount);
     },
   },

@@ -1,5 +1,5 @@
 // Bump VERSION on every release so clients pick up new files.
-const VERSION = 'pos-pro-v9';
+const VERSION = 'pos-pro-v10';
 const SHELL = [
   './', './index.html', './app.css', './manifest.webmanifest',
   './main.js', './core-app.js', './core-db.js', './core-timer.js',

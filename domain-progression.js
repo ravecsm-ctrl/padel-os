@@ -8,6 +8,10 @@ export const doneSets = entry => (entry?.sets || []).filter(s => s.done);
 
 // e1RM by Epley; only meaningful for sets of ≤12 reps.
 export const e1rm = (w, reps) => (w > 0 && reps > 0 && reps <= 12) ? Math.round(w * (1 + reps / 30) * 10) / 10 : null;
+// Inverse Epley with reps in reserve: the load you could lift for `reps` with `rir` left in the tank.
+export const loadFor = (max, reps, rir = 2) => max > 0 ? max / (1 + Math.min(15, reps + rir) / 30) : null;
+export const bestE1rm = entry => Math.max(0, ...doneSets(entry).map(s => e1rm(s.w, s.reps) || 0)) || null;
+const DAY = 86400000;
 
 // Most recent performances of an exercise. Deload weeks are skipped as a progression
 // baseline unless nothing else exists.
@@ -33,7 +37,7 @@ function topLoadSets(entry) {
 
 // Returns { w, target, reason, kind } where kind ∈ up|hold|down|first|quality|cap.
 // fields: the fields actually logged (home workouts may drop the load column).
-export function suggest({ exId, rx, history, unit = 'kg', fields = null }) {
+export function suggest({ exId, rx, history, unit = 'kg', fields = null, now = Date.now() }) {
   const ex = getExercise(exId);
   const tf = targetField(ex);
   const loaded = (fields || ex.fields).includes('w');
@@ -79,6 +83,19 @@ export function suggest({ exId, rx, history, unit = 'kg', fields = null }) {
   else if (missed(last.entry) && prev && missed(prev.entry)) res = { w: Math.max(0, top - ex.inc), target: rx.min, reason: 'Missed the rep floor twice in a row → back off one step and rebuild.', kind: 'down' };
   else if (missed(last.entry)) res = { w: top, target: rx.min, reason: 'Missed the rep floor last time → repeat the load.', kind: 'hold' };
   else res = { w: top, target: Math.min(rx.max, Math.min(...topVals) + 1), reason: `Same load, add a rep where you can (last: ${topVals.join(', ')}).`, kind: 'hold' };
+
+  // Rep range changed since last time (e.g. sets of 5 → sets of 10): convert through your estimated max.
+  const was = last.entry.target;
+  if (tf === 'reps' && was?.min && (was.min !== rx.min || was.max !== rx.max)) {
+    const w = loadFor(bestE1rm(last.entry), rx.min, rx.rir ?? 2);
+    if (w > 0) res = { w, target: rx.min, reason: `New rep range (${was.min}–${was.max} → ${rx.min}–${rx.max}), so the weight is worked out from your estimated max.`, kind: 'retarget' };
+  }
+  // Long break: strength holds for ~3 weeks, then eases off. Come back a little lighter.
+  const gap = (now - last.session.startedAt) / DAY;
+  if (gap >= 21 && ['up', 'hold', 'retarget'].includes(res.kind)) {
+    const cut = gap >= 42 ? 0.1 : 0.05;
+    res = { w: res.w * (1 - cut), target: rx.min, reason: `First time in ${Math.round(gap / 7)} weeks → about ${cut * 100}% lighter to ease back in.`, kind: 'return' };
+  }
 
   if (deload) { res.w = scale(res.w); res.reason = `Deload week: ~${Math.round((1 - rx.loadMult) * 100)}% lighter. ` + res.reason.split('→')[0].trim(); res.kind = 'deload'; }
   else res.w = roundLoad(res.w, ex.inc, unit);

@@ -102,6 +102,7 @@ export const today = {
         { header: 'More', big: true })}`;
   },
   actions: {
+    'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     start(el) { startFlow(el.dataset.routine); },
     resume() { app.go('workout'); },
     async 'discard-active'() {
@@ -160,6 +161,23 @@ async function begin(routineId, readiness, light, sore = [], asked = []) {
   S.active = w;
   await app.saveActive(true);
   db.requestPersistence();
+  app.go('workout');
+}
+
+// ── Past workouts: log a gym session you forgot, on the day you did it.
+export function pastWorkoutSheet(iso) {
+  if (S.active) { app.closeSheet(); app.toast('Finish or discard the workout in progress first'); return app.go('workout'); }
+  const d = parseISO(iso), planned = S.schedule[DAYS[(d.getDay() + 6) % 7]];
+  const ids = [...new Set([...(isRoutine(planned) ? [planned] : []), ...allRoutineIds()])];
+  app.sheet(`<h2 class="sheet-title">Which workout?</h2><p class="sheet-sub">${esc(d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}. You’ll fill in your sets next.</p>
+    ${group(ids.map(id => { const r = app.routine(id), look = routineLook(id); return row({ title: esc(r.title), sub: `${r.blocks.length} exercises${id === planned ? ' · planned that day' : ''}`, icon: look.icon, color: look.color, action: 'past-start', data: { id, iso } }); }).join(''))}
+    <button class="btn gray" data-action="close-sheet">Cancel</button>`);
+}
+export async function startPast(routineId, iso) {
+  const d = parseISO(iso); d.setHours(18, 0, 0, 0);
+  const w = createWorkout({ routineId, week: app.position().week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, startedAt: d.getTime(), profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
+  S.active = w; app.closeSheet();
+  await app.saveActive(true);
   app.go('workout');
 }
 

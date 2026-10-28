@@ -5,11 +5,11 @@ import { suggest, detectPRs, doneSets } from './domain-progression.js';
 
 const uid = () => (globalThis.crypto?.randomUUID?.() || `s-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-export function buildEntry(block, week, history, unit, light) {
+export function buildEntry(block, week, history, unit, light, now = Date.now()) {
   const ex = getExercise(block.ex);
   const rx = prescribe(block, week, { light });
   const fields = block.noLoad ? ex.fields.filter(f => f !== 'w') : ex.fields;
-  const sug = suggest({ exId: ex.id, rx, history, unit, fields });
+  const sug = suggest({ exId: ex.id, rx, history, unit, fields, now });
   return {
     exId: ex.id, name: ex.name, fields, perSide: ex.perSide, adaptedFrom: block.adaptedFrom,
     target: { sets: rx.sets, min: rx.min, max: rx.max, rest: rx.rest, rpe: rx.rpe },
@@ -18,18 +18,22 @@ export function buildEntry(block, week, history, unit, light) {
   };
 }
 
-export function createWorkout({ routineId, week, history, overrides, unit, readiness = null, light = false, profile = null }) {
+// `startedAt` in the past = logging a workout after the fact: suggestions only look at
+// what came before that day, and there's no live clock.
+export function createWorkout({ routineId, week, history, overrides, unit, readiness = null, light = false, profile = null, startedAt = null }) {
   const r = resolveRoutine(routineId, overrides, profile);
+  const past = startedAt != null, ts = past ? startedAt : Date.now();
+  const before = past ? history.filter(s => s.startedAt < ts) : history;
   return {
-    id: uid(), kind: 'strength', routineId, title: r.title, week, startedAt: Date.now(), index: 0,
-    readiness, light, exercises: r.blocks.map(blk => buildEntry(blk, week, history, unit, light)),
+    id: uid(), kind: 'strength', routineId, title: r.title, week, startedAt: ts, index: 0, past, minutes: r.minutes || 60,
+    readiness, light, exercises: r.blocks.map(blk => buildEntry(blk, week, before, unit, light, ts)),
   };
 }
 
 export function swapExercise(w, i, newExId, history, unit) {
   const old = w.exercises[i];
   const noLoad = !old.fields.includes('w') && getExercise(old.exId).fields.includes('w');
-  const entry = buildEntry({ ex: newExId, sets: old.target.sets, min: old.target.min, max: old.target.max, rest: old.target.rest, noLoad: noLoad && getExercise(newExId).loadOptional }, w.week, history, unit, false);
+  const entry = buildEntry({ ex: newExId, sets: old.target.sets, min: old.target.min, max: old.target.max, rest: old.target.rest, noLoad: noLoad && getExercise(newExId).loadOptional }, w.week, w.past ? history.filter(s => s.startedAt < w.startedAt) : history, unit, false, w.startedAt);
   entry.target = { ...old.target };
   entry.sets = entry.sets.slice(0, old.target.sets);
   entry.swappedFrom = old.exId;
@@ -50,7 +54,7 @@ export function workoutStats(w) {
   const sets = w.exercises.reduce((n, e) => n + doneSets(e).length, 0);
   const planned = w.exercises.reduce((n, e) => n + (e.skipped ? 0 : e.sets.length), 0);
   const volume = w.exercises.reduce((n, e) => n + doneSets(e).reduce((m, s) => m + (s.w || 0) * (s.reps || 0), 0), 0);
-  return { sets, planned, volume, minutes: Math.max(1, Math.round((Date.now() - w.startedAt) / 60000)) };
+  return { sets, planned, volume, minutes: w.past ? w.minutes || 60 : Math.max(1, Math.round((Date.now() - w.startedAt) / 60000)) };
 }
 
 export function finalizeWorkout(w, { rpe, notes, pain, durationMin }, history) {
@@ -61,7 +65,7 @@ export function finalizeWorkout(w, { rpe, notes, pain, durationMin }, history) {
   for (const e of exercises) for (const p of detectPRs(e, history)) prs.push({ exId: e.exId, name: e.name, ...p });
   return {
     id: w.id, kind: 'strength', routineId: w.routineId, title: w.title, week: w.week,
-    startedAt: w.startedAt, endedAt: Date.now(), durationMin: durationMin || workoutStats(w).minutes,
+    startedAt: w.startedAt, endedAt: w.past ? w.startedAt + (durationMin || workoutStats(w).minutes) * 60000 : Date.now(), durationMin: durationMin || workoutStats(w).minutes,
     rpe: rpe ?? null, notes: notes || '', pain: pain || { flag: false, location: '' },
     readiness: w.readiness, light: w.light, prs, exercises,
   };
