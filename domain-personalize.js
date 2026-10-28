@@ -1,6 +1,7 @@
 // Turns a routine template into the version that fits this person: their equipment,
 // time per session and level. Pure functions; see tests for the guarantees.
 import { getExercise, EXERCISES, PATTERN_FALLBACK, targetField } from './domain-catalog.js';
+import { canDoWith } from './domain-taxonomy.js';
 import { DAYS } from './domain-program.js';
 
 export const DEFAULT_PROFILE = {
@@ -14,7 +15,8 @@ export const GOALS = { perform: 'Move better on court', injury: 'Stay injury-fre
 export const AREAS = { elbow: 'Elbow / forearm', shoulder: 'Shoulder', back: 'Lower back', knee: 'Knee', calf: 'Calf / Achilles', ankle: 'Ankle' };
 
 const RANK = { bw: 0, db: 1, gym: 2 };
-export const allowed = (ex, equipment) => RANK[ex.kit] <= RANK[equipment];
+// `equipment` is either a tier ('gym' | 'db' | 'bw') or a Set of equipment ids you own.
+export const allowed = (ex, equipment) => equipment instanceof Set ? canDoWith(ex.needs || [], equipment) : RANK[ex.kit] <= RANK[equipment];
 
 // Best exercise for a slot given the kit: the original, then its substitutes, then the pattern fallbacks.
 export function pickExercise(exId, equipment, used = new Set()) {
@@ -48,13 +50,16 @@ export const estimateMinutes = (blocks, minutes = 70) => Math.round((blocks.redu
 
 export function adaptBlocks(blocks, profile = DEFAULT_PROFILE, overridden = new Set()) {
   const p = { ...DEFAULT_PROFILE, ...profile };
+  // A location's equipment list, when given, replaces the coarse tier.
+  const kit = Array.isArray(p.owned) ? new Set(p.owned) : p.equipment;
+  const hasWeights = kit instanceof Set ? ['dumbbells', 'kettlebell'].some(k => kit.has(k)) : kit !== 'bw';
   // Reserve exercises that stay as they are, so a substitute never duplicates a later slot.
-  const used = new Set(blocks.filter(b => overridden.has(b.index) || allowed(getExercise(b.ex), p.equipment)).map(b => b.ex));
+  const used = new Set(blocks.filter(b => overridden.has(b.index) || allowed(getExercise(b.ex), kit)).map(b => b.ex));
   let out = blocks.map(blk => {
     const b = { ...blk };
     // Equipment: an explicit user choice in Plan always wins.
     if (!overridden.has(b.index)) {
-      const id = pickExercise(b.ex, p.equipment, used);
+      const id = pickExercise(b.ex, kit, used);
       if (id !== b.ex) {
         const from = getExercise(b.ex), to = getExercise(id);
         if (targetField(to) !== targetField(from) && to.range) [b.min, b.max] = to.range;
@@ -64,7 +69,7 @@ export function adaptBlocks(blocks, profile = DEFAULT_PROFILE, overridden = new 
     used.add(b.ex);
     const ex = getExercise(b.ex);
     // Without load available, log reps/time only.
-    b.noLoad = ex.fields.includes('w') && (p.equipment === 'bw' && ex.loadOptional);
+    b.noLoad = ex.fields.includes('w') && ex.loadOptional && !hasWeights;
     // Without load, low-rep strength ranges are too easy: move to at least 8–12.
     const unloaded = b.noLoad || (b.adaptedFrom && !ex.fields.includes('w') && getExercise(b.adaptedFrom).fields.includes('w'));
     if (unloaded && targetField(ex) === 'reps' && !ex.quality && b.min < 8) { b.min = 8; b.max = Math.max(b.max, 12); }

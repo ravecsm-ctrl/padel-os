@@ -5,6 +5,7 @@ import { esc, icon, group, row, routineLook } from './ui-kit.js';
 import { DAYS, ROUTINES, resolveRoutine } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { GOALS, LEVELS, EQUIPMENT, MINUTES, AREAS, generateSchedule } from './domain-personalize.js';
+import { PRESET_GEAR } from './domain-taxonomy.js';
 
 let step = 0;
 const STEPS = 6;
@@ -67,6 +68,11 @@ export const welcome = {
       const { _wizard, ...profile } = f;
       S.profile = { ...profile, simple: document.querySelector('#wSimple').checked, onboarded: true };
       await app.save('profile');
+      // The equipment answer sets up where you train; edit it any time in Settings → Locations.
+      const home = S.locations.find(l => l.id === 'home'), gym = S.locations.find(l => l.id === 'gym');
+      if (home && profile.equipment !== 'gym') home.equipment = [...PRESET_GEAR[profile.equipment]];
+      S.activeLocation = profile.equipment === 'gym' ? (gym?.id || S.activeLocation) : (home?.id || S.activeLocation);
+      await app.save('locations'); await app.save('activeLocation');
       if (replace) { S.schedule = generateSchedule(f.days, f.padelDays); await app.save('schedule'); }
       S.form = {};
       app.go('today');

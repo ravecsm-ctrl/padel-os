@@ -9,6 +9,8 @@ import { lastPerformance, doneSets, detectPRs } from './domain-progression.js';
 import { relDay } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
 import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
+import { allExercises } from './domain-catalog.js';
+import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 
 const W = () => S.active;
 const cur = () => W().exercises[W().index];
@@ -48,7 +50,14 @@ function coach(e) {
   const tip = sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
     <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${esc(effortTarget(e.target.rpe))}.${last ? ` Last time: ${esc(doneSets(last.entry).map(s => fmtSet(s, e.fields)).join(', '))}.` : ''}</p>
-    <button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+    ${missingHere(ex)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+}
+
+// A gentle note (never a block) when this exercise needs gear the current location lacks.
+function missingHere(ex) {
+  const miss = missingFor(ex.needs || [], app.owned());
+  if (!miss.length || !app.location()) return '';
+  return `<p class="t-foot orange" style="margin-top:6px">Needs ${esc(miss.map(n => n.split('|').map(a => equipLabel(a, S.customEquipment)).join(' or ')).join(', '))}, not listed at ${esc(app.location().name)}. <button class="link" data-action="swap">Replace</button></p>`;
 }
 
 function stepper(e, i, f) {
@@ -195,9 +204,14 @@ export const workout = {
     swap() {
       const e = cur(), ex = getExercise(e.exId);
       const base = e.swappedFrom ? getExercise(e.swappedFrom) : ex;
-      const ids = [...new Set([base.id, ...base.subs, ...ex.subs])].filter(id => id !== e.exId && getExercise(id));
+      // Listed alternatives first, then anything else with the same movement; grouped by what's here.
+      const ids = [...new Set([base.id, ...base.subs, ...ex.subs, ...allExercises().filter(x => x.movement && x.movement === (base.movement || ex.movement)).map(x => x.id)])].filter(id => id !== e.exId && getExercise(id));
+      const owned = app.owned(), here = ids.filter(id => canDoWith(getExercise(id).needs || [], owned)), other = ids.filter(id => !here.includes(id));
+      const item = id => { const x = getExercise(id), miss = missingFor(x.needs || [], owned); return row({ title: esc(x.name), sub: miss.length ? `<span class="orange">Needs ${esc(miss.map(n => n.split('|').map(a => equipLabel(a, S.customEquipment)).join(' or ')).join(', '))}</span>` : esc(x.equipment), action: 'do-swap', data: { id } }); };
       app.sheet(`<h2 class="sheet-title">Replace exercise</h2><p class="sheet-sub">Just for today. To change it permanently, edit the workout in Plan.</p>
-        ${ids.length ? group(ids.map(id => { const x = getExercise(id); return row({ title: esc(x.name), sub: esc(x.equipment), action: 'do-swap', data: { id } }); }).join('')) : '<p class="t-sub">No alternatives for this one.</p>'}
+        ${here.length ? group(here.map(item).join(''), { header: `Available at ${esc(app.location()?.name || 'this location')}` }) : ''}
+        ${other.length ? group(other.map(item).join(''), { header: 'Needs other equipment' }) : ''}
+        ${ids.length ? '' : '<p class="t-sub">No alternatives for this one.</p>'}
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
     },
     'do-swap'(el) {

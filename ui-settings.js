@@ -6,6 +6,8 @@ import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
 import { buildBackup, validateBackup, normalizeBackup, toCSV } from './domain-backup.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
+import { setCustomExercises, setStartWeights } from './domain-catalog.js';
+import { setCustomRoutines } from './domain-program.js';
 
 let persist = '…';
 const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
@@ -26,6 +28,8 @@ export const settings = {
       <div style="height:12px"></div>
       ${group(row({ title: '<input class="input" id="nameIn" value="' + esc(S.settings.name) + '" placeholder="Your name" style="padding:0;background:none;min-height:22px" aria-label="Your name">', icon: 'person', color: 'gray' }), { footer: 'Optional. Shown on Today.' })}
       ${group(row({ title: 'Your plan', sub: `${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week`, icon: 'sliders', color: 'blue', to: 'welcome' })
+        + row({ title: 'Locations & equipment', sub: `Training at ${esc(app.location()?.name || '—')} · ${S.locations.length} location${S.locations.length === 1 ? '' : 's'}`, icon: 'target', color: 'teal', to: 'locations' })
+        + row({ title: 'Exercise library', sub: 'Browse and import exercises', icon: 'dumbbell', color: 'gray', to: 'library' })
         + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Training' })}
       ${group(row({ title: 'Start rest timer automatically', icon: 'clock', color: 'orange', right: sw('autoRest', S.settings.autoRest, 'Start rest timer automatically') })
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
@@ -91,14 +95,15 @@ async function importFile(file) {
       if (b.dataset.mode === 'replace') { await db.clearAll(); }
       const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
       await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
-      for (const k of ['settings', 'schedule', 'overrides', 'exNotes', 'profile']) {
+      for (const k of ['settings', 'schedule', 'overrides', 'exNotes', 'profile', 'locations', 'activeLocation', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights']) {
         if (norm.meta[k] == null) continue;
-        if (b.dataset.mode === 'merge' && k !== 'exNotes') continue; // keep current preferences on merge
-        S[k] = k === 'settings' ? { ...DEFAULT_SETTINGS, ...S.settings, ...norm.meta[k] } : k === 'exNotes' ? { ...norm.meta[k], ...S.exNotes } : norm.meta[k];
+        const additive = ['exNotes', 'customEquipment', 'customExercises', 'customRoutines', 'startWeights'];
+        if (b.dataset.mode === 'merge' && !additive.includes(k)) continue; // keep current preferences on merge
+        S[k] = k === 'settings' ? { ...DEFAULT_SETTINGS, ...S.settings, ...norm.meta[k] } : additive.includes(k) && b.dataset.mode === 'merge' ? { ...norm.meta[k], ...S[k] } : norm.meta[k];
         await app.save(k);
       }
       if (b.dataset.mode === 'replace' && S.active) await app.saveActive(true);
-      applyTheme();
+      applyTheme(); setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
       await app.reloadSessions(); app.closeSheet(); app.toast('Backup restored'); app.render();
     });
   });

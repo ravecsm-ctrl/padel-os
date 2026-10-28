@@ -10,6 +10,11 @@ import { settings } from './ui-settings.js';
 import { court } from './ui-court.js';
 import { welcome } from './ui-welcome.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
+import { setCustomExercises, setStartWeights } from './domain-catalog.js';
+import { setCustomRoutines } from './domain-program.js';
+import { PRESET_GEAR } from './domain-taxonomy.js';
+import { library } from './ui-library.js';
+import { locations, locationSheet, setLocation } from './ui-locations.js';
 
 app.register('today', today);
 app.register('workout', workout);
@@ -18,11 +23,15 @@ app.register('plan', plan);
 app.register('settings', settings);
 app.register('court', court);
 app.register('welcome', welcome);
+app.register('library', library);
+app.register('locations', locations);
 
 const GLOBAL = {
   ...today.actions,
   go: el => app.go(el.dataset.to),
   'close-sheet': () => app.closeSheet(),
+  'set-location': el => setLocation(el.dataset.id),
+  'loc-sheet': () => locationSheet(),
 };
 
 // One delegated listener for every [data-action] in the app and in sheets.
@@ -63,6 +72,18 @@ async function boot() {
     S.schedule = { ...DEFAULT_SCHEDULE, ...(meta.schedule || {}) };
     S.profile = { ...DEFAULT_PROFILE, ...(meta.profile || {}) };
     S.overrides = meta.overrides || {};
+    S.customEquipment = meta.customEquipment || {};
+    S.customExercises = meta.customExercises || {};
+    S.customRoutines = meta.customRoutines || {};
+    S.startWeights = meta.startWeights || {};
+    setCustomExercises(S.customExercises); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
+    // Locations: first run (or upgrade) creates two editable examples from the old tier setting.
+    if (Array.isArray(meta.locations) && meta.locations.length) { S.locations = meta.locations; S.activeLocation = meta.activeLocation || meta.locations[0].id; }
+    else {
+      S.locations = [{ id: 'home', name: 'Home', equipment: [...PRESET_GEAR[S.profile.equipment === 'gym' ? 'db' : S.profile.equipment]] }, { id: 'gym', name: 'Gym', equipment: [...PRESET_GEAR.gym] }];
+      S.activeLocation = S.profile.equipment === 'gym' ? 'gym' : 'home';
+      await db.setMeta('locations', S.locations); await db.setMeta('activeLocation', S.activeLocation);
+    }
     S.exNotes = meta.exNotes || {};
     S.lastBackup = meta.lastBackup || 0;
     S.active = meta.active || null;

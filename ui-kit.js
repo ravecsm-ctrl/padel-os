@@ -34,7 +34,7 @@ const P = {
 };
 export const icon = (name, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[name] || ''}</svg>`;
 export const chev = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg>';
-export const routineLook = id => ({ A: { icon: 'legs', color: 'blue' }, B: { icon: 'dumbbell', color: 'indigo' }, C: { icon: 'bolt', color: 'orange' } }[id] || { icon: 'dumbbell', color: 'blue' });
+export const routineLook = id => ({ A: { icon: 'legs', color: 'blue' }, B: { icon: 'dumbbell', color: 'indigo' }, C: { icon: 'bolt', color: 'orange' } }[id] || { icon: 'note', color: 'teal' });
 export const tile = (name, color = 'blue', lg = false) => `<span class="tile ${color} ${lg ? 'lg' : ''}">${icon(name)}</span>`;
 
 // Large title header (top-level tabs).

@@ -29,12 +29,20 @@ export const ROUTINES = {
     b('step-up-knee-drive', 3, 8, 10, 75, 4), b('slider-curl', 3, 8, 12, 60, 5), b('seated-soleus-raise', 3, 15, 20, 45, 7), b('band-ankle', 2, 15, 15, 30, 8) ] },
 };
 
+// Workouts you create (e.g. from an import) sit next to the built-in A/B/C.
+const CUSTOM_ROUTINES = {};
+export function setCustomRoutines(map) { for (const k of Object.keys(CUSTOM_ROUTINES)) delete CUSTOM_ROUTINES[k]; Object.assign(CUSTOM_ROUTINES, map || {}); }
+export const getRoutine = id => ROUTINES[id] || CUSTOM_ROUTINES[id] || null;
+export const isRoutine = id => !!getRoutine(id);
+export const allRoutineIds = () => [...Object.keys(ROUTINES), ...Object.keys(CUSTOM_ROUTINES)];
+export const isCustomRoutine = id => !!CUSTOM_ROUTINES[id];
+
 export const phaseFor = week => PHASES[(week - 1) % 4];
 
 // overrides: { [routineId]: { [blockIndex]: { ex?, sets?, min?, max?, rest? } } }
 // profile: adapts the routine to equipment, time and level (see personalize.js).
 export function resolveRoutine(id, overrides = {}, profile = null) {
-  const base = ROUTINES[id];
+  const base = getRoutine(id);
   if (!base) return null;
   const o = overrides[id] || {};
   const blocks = base.blocks.map((blk, i) => ({ ...blk, ...(o[i] || {}), baseEx: blk.ex, index: i }));

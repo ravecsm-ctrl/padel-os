@@ -41,6 +41,10 @@ export function suggest({ exId, rx, history, unit = 'kg', fields = null }) {
   const deload = rx.loadMult < 1;
   const scale = w => w == null ? null : deload ? roundLoad(w * rx.loadMult, ex.inc, unit) : w;
 
+  if (!last && ex.startW != null && loaded) {
+    const w = rx.loadMult < 1 ? roundLoad(ex.startW * rx.loadMult, ex.inc, unit) : ex.startW;
+    return { w, target: ex.startTarget ?? rx.min, reason: 'Starting weight from your imported plan.', kind: 'first' };
+  }
   if (!last) {
     const reason = loaded
       ? tf === 'reps' ? `First time: choose a load you could lift for about ${rx.min + rx.rir} reps.` : `First time: choose a load you can comfortably ${tf === 'm' ? 'carry' : 'hold'} for ${rx.min}${tf === 'm' ? 'm' : 's'}.`

@@ -12,6 +12,12 @@ export const S = {
   settings: { ...DEFAULT_SETTINGS },
   schedule: { ...DEFAULT_SCHEDULE },
   profile: { ...DEFAULT_PROFILE },  // equipment, time, level, padel days, injuries, simple mode
+  locations: [],      // [{ id, name, equipment: [ids] }], user-editable
+  activeLocation: '', // id of where you're training today
+  customEquipment: {},// { id: label } for gear not in the standard list
+  customExercises: {},// your own exercises (imported or created)
+  customRoutines: {}, // your own workouts
+  startWeights: {},   // imported starting weights for library exercises
   overrides: {},      // routine block customisations
   exNotes: {},        // persistent per-exercise notes ("seat 4")
   lastBackup: 0,
@@ -30,7 +36,9 @@ export const app = {
   view: () => views[S.route] || views.today,
   get strength() { return S.sessions.filter(s => s.kind === 'strength'); },
   position: () => programPosition(S.settings.programStart),
-  routine: id => resolveRoutine(id, S.overrides, S.profile),
+  location: () => S.locations.find(l => l.id === S.activeLocation) || S.locations[0] || null,
+  owned: () => new Set(app.location()?.equipment || []),
+  routine: id => resolveRoutine(id, S.overrides, app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile),
 
   async save(key) { try { await db.setMeta(key, S[key]); } catch { S.storageOk = false; app.toast('Could not save — storage unavailable'); } },
   // Active workout is saved on every change, debounced, and immediately when the app is hidden.

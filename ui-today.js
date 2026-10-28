@@ -1,7 +1,7 @@
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook } from './ui-kit.js';
-import { ROUTINES, readinessScore } from './domain-program.js';
+import { readinessScore, isRoutine, allRoutineIds } from './domain-program.js';
 import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf } from './domain-calendar.js';
 import { weeklySeries, loadTrend, trainingDays } from './domain-analytics.js';
 import { createWorkout, createActivity, workoutStats } from './domain-workout.js';
@@ -38,7 +38,7 @@ function hero() {
       <p class="hero-note">Nice work. Rest and sleep are when your body gets stronger.</p>
       <button class="btn tinted" data-action="go" data-to="history/session/${esc(doneToday[0].id)}">See Summary</button></section>`;
   }
-  if (ROUTINES[plan]) {
+  if (isRoutine(plan)) {
     const r = app.routine(plan), look = routineLook(plan), last = lastDone(plan);
     return `<section class="card hero"><div class="hero-top">${tile(look.icon, look.color, true)}<div><p class="t-foot">Up next</p><h2>${esc(r.title)}</h2><p class="t-sub">${plural(r.blocks.length, 'exercise')} · about ${r.minutes} min</p></div></div>
       <p class="hero-note">${esc(r.focus)}${last ? '' : ' Your first session sets your starting weights.'}</p>
@@ -57,12 +57,12 @@ function hero() {
 
 function weekCard() {
   const days = trainingDays(S.sessions), today = isoDate();
-  const planned = Object.values(S.schedule).filter(v => ROUTINES[v]).length;
+  const planned = Object.values(S.schedule).filter(isRoutine).length;
   const mon = mondayOf().getTime();
   const done = app.strength.filter(s => s.startedAt >= mon).length;
   return `<section class="grp"><h2 class="grp-h big">This week</h2><div class="card"><div class="week">${weekDates().map(d => {
     const did = days.get(d.iso) || [], plan = S.schedule[d.key];
-    const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : ROUTINES[plan] ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : '';
+    const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : isRoutine(plan) ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : '';
     return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(plan)}">${did.length ? icon('check') : ''}</span></div>`;
   }).join('')}</div>
   <p class="week-foot">${planned ? `${done} of ${plural(planned, 'workout')} done` : `${plural(done, 'workout')} done`}</p></div>
@@ -83,8 +83,9 @@ export const today = {
     const initial = (S.settings.name || '').trim()[0];
     const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
     const todays = S.schedule[dayKey()];
-    const others = Object.keys(ROUTINES).filter(id => id !== todays || S.active);
-    return `${pageHead('Today', { eyebrow: date, right: avatar })}
+    const others = allRoutineIds().filter(id => id !== todays || S.active);
+    const loc = app.location();
+    return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
       ${banners()}${hero()}
       <div style="height:28px"></div>${weekCard()}${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);

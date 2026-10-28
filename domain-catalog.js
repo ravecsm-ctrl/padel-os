@@ -157,14 +157,88 @@ export const PATTERN_FALLBACK = {
   lateral: ['lateral-lunge', 'cossack-squat'], ankle: ['band-ankle', 'sl-balance'],
 };
 
+
+// Rich metadata: [needs, primary, secondary, movement, category, level, weightType].
+// `needs` entries may offer alternatives with '|'. An empty list means no equipment.
+const M = {
+  'trap-bar-deadlift': [['trap_bar'], 'quads glutes hamstrings', 'lower_back upper_back forearms', 'hinge', 'lower-strength', 'intermediate', 'total'],
+  rfess: [['bench'], 'quads glutes', 'adductors core', 'single-leg', 'lower-strength', 'intermediate', 'per_hand'],
+  'lateral-lunge': [[], 'adductors glutes quads', 'core', 'lateral', 'lower-strength', 'beginner', 'per_hand'],
+  'sl-rdl': [[], 'hamstrings glutes', 'core lower_back', 'hinge', 'lower-strength', 'intermediate', 'per_hand'],
+  'copenhagen-short': [['bench'], 'adductors', 'obliques core', 'lateral', 'prevention', 'intermediate', 'bodyweight'],
+  'pallof-press': [['band|cable'], 'obliques core', 'shoulders', 'anti-rotation', 'core', 'beginner', 'total'],
+  'standing-calf-raise': [[], 'calves', '', 'calf-ankle', 'prevention', 'beginner', 'total'],
+  'tibialis-raise': [[], 'shins', '', 'calf-ankle', 'prevention', 'beginner', 'bodyweight'],
+  'landmine-press': [['landmine'], 'shoulders chest', 'arms core', 'push', 'upper-strength', 'intermediate', 'total'],
+  'chest-supported-row': [['dumbbells', 'bench'], 'upper_back lats', 'arms shoulders', 'pull', 'upper-strength', 'beginner', 'per_hand'],
+  'incline-db-press': [['dumbbells', 'bench'], 'chest shoulders', 'arms', 'push', 'upper-strength', 'beginner', 'per_hand'],
+  'cable-row-rotation': [['cable'], 'upper_back lats obliques', 'arms', 'pull', 'upper-strength', 'intermediate', 'total'],
+  'cable-er': [['band|cable'], 'rotator_cuff', 'shoulders', 'pull', 'prevention', 'beginner', 'total'],
+  'face-pull': [['cable'], 'shoulders upper_back', 'rotator_cuff', 'pull', 'prevention', 'beginner', 'total'],
+  'wrist-rotation': [[], 'forearms', '', 'rotation', 'prevention', 'beginner', 'per_hand'],
+  'farmer-carry': [['dumbbells|kettlebell'], 'forearms core', 'upper_back shoulders', 'carry', 'core', 'beginner', 'per_hand'],
+  cmj: [[], 'quads glutes calves', '', 'power', 'power', 'intermediate', 'bodyweight'],
+  'lateral-bound': [[], 'glutes quads adductors', 'calves', 'power', 'power', 'intermediate', 'bodyweight'],
+  'mb-scoop-toss': [['med_ball'], 'obliques glutes', 'shoulders core', 'power', 'power', 'intermediate', 'total'],
+  'goblet-squat': [['dumbbells|kettlebell'], 'quads glutes', 'core adductors', 'squat', 'lower-strength', 'beginner', 'total'],
+  'step-up-knee-drive': [['box'], 'quads glutes', 'calves core', 'single-leg', 'lower-strength', 'beginner', 'per_hand'],
+  'slider-curl': [['sliders'], 'hamstrings', 'glutes', 'hinge', 'prevention', 'intermediate', 'bodyweight'],
+  'seated-soleus-raise': [['calf_machine|dumbbells'], 'calves', '', 'calf-ankle', 'prevention', 'beginner', 'total'],
+  'band-ankle': [['band'], 'shins calves', '', 'calf-ankle', 'prevention', 'beginner', 'bodyweight'],
+  'romanian-deadlift': [['barbell'], 'hamstrings glutes', 'lower_back forearms', 'hinge', 'lower-strength', 'intermediate', 'total'],
+  'leg-press': [['leg_press'], 'quads glutes', 'adductors', 'squat', 'lower-strength', 'beginner', 'total'],
+  'reverse-lunge': [[], 'quads glutes', 'adductors core', 'single-leg', 'lower-strength', 'beginner', 'per_hand'],
+  'cossack-squat': [[], 'adductors quads glutes', '', 'lateral', 'lower-strength', 'intermediate', 'total'],
+  'kickstand-rdl': [[], 'hamstrings glutes', 'lower_back', 'hinge', 'lower-strength', 'beginner', 'per_hand'],
+  'side-plank': [[], 'obliques core', 'shoulders', 'anti-rotation', 'core', 'beginner', 'bodyweight'],
+  'cable-adduction': [['cable'], 'adductors', '', 'lateral', 'prevention', 'beginner', 'total'],
+  'dead-bug': [[], 'core', '', 'anti-rotation', 'core', 'beginner', 'bodyweight'],
+  'sl-calf-raise': [[], 'calves', '', 'calf-ankle', 'prevention', 'beginner', 'per_hand'],
+  'hk-db-press': [['dumbbells|kettlebell'], 'shoulders', 'arms core', 'push', 'upper-strength', 'beginner', 'per_hand'],
+  'seated-cable-row': [['cable'], 'upper_back lats', 'arms', 'pull', 'upper-strength', 'beginner', 'total'],
+  'inverted-row': [['bar'], 'upper_back lats', 'arms core', 'pull', 'upper-strength', 'beginner', 'bodyweight'],
+  'push-up': [[], 'chest shoulders', 'arms core', 'push', 'upper-strength', 'beginner', 'bodyweight'],
+  'sa-db-row': [['dumbbells|kettlebell', 'bench'], 'lats upper_back', 'arms', 'pull', 'upper-strength', 'beginner', 'per_hand'],
+  'side-lying-er': [[], 'rotator_cuff', '', 'pull', 'prevention', 'beginner', 'per_hand'],
+  'band-pull-apart': [['band'], 'upper_back shoulders', 'rotator_cuff', 'pull', 'prevention', 'beginner', 'bodyweight'],
+  'suitcase-carry': [['dumbbells|kettlebell'], 'obliques forearms', 'core', 'carry', 'core', 'beginner', 'per_hand'],
+  'box-jump': [['box'], 'quads glutes calves', '', 'power', 'power', 'intermediate', 'bodyweight'],
+  'skater-hop': [[], 'glutes adductors calves', '', 'power', 'power', 'intermediate', 'bodyweight'],
+  'cable-woodchop': [['cable'], 'obliques core', 'shoulders glutes', 'rotation', 'power', 'intermediate', 'total'],
+  'nordic-assisted': [[], 'hamstrings', '', 'hinge', 'prevention', 'advanced', 'bodyweight'],
+  'leg-curl': [['leg_curl'], 'hamstrings', '', 'hinge', 'lower-strength', 'beginner', 'total'],
+  'sl-balance': [[], 'calves shins', 'core', 'calf-ankle', 'prevention', 'beginner', 'bodyweight'],
+  'glute-bridge': [[], 'glutes hamstrings', 'core', 'hinge', 'lower-strength', 'beginner', 'bodyweight'],
+  'bw-squat': [[], 'quads glutes', '', 'squat', 'lower-strength', 'beginner', 'bodyweight'],
+  'pike-push-up': [[], 'shoulders arms', 'chest', 'push', 'upper-strength', 'intermediate', 'bodyweight'],
+  'band-row': [['band'], 'upper_back lats', 'arms', 'pull', 'upper-strength', 'beginner', 'bodyweight'],
+  'band-woodchop': [['band'], 'obliques core', 'shoulders', 'rotation', 'power', 'beginner', 'bodyweight'],
+  'band-face-pull': [['band'], 'shoulders upper_back', 'rotator_cuff', 'pull', 'prevention', 'beginner', 'bodyweight'],
+  'plank-shoulder-tap': [[], 'core shoulders', 'obliques', 'anti-rotation', 'core', 'beginner', 'bodyweight'],
+};
+const words = s => s ? s.split(' ') : [];
+for (const e of LIST) {
+  const m = M[e.id];
+  if (!m) continue;
+  [e.needs, e.primary, e.secondary, e.movement, e.category, e.level, e.weightType] = [m[0], words(m[1]), words(m[2]), m[3], m[4], m[5], m[6]];
+}
+
 export const CATALOG = Object.fromEntries(LIST.map(e => [e.id, e]));
+// Your own exercises (imported or created) live alongside the library.
+const CUSTOM = {};
 export const EXERCISES = LIST;
 
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const BY_NAME = Object.fromEntries(LIST.map(e => [norm(e.name), e.id]));
 
-export function getExercise(id) { return CATALOG[id] || null; }
-export function idForName(name) { return BY_NAME[norm(name)] || null; }
+export function setCustomExercises(map) { for (const k of Object.keys(CUSTOM)) delete CUSTOM[k]; Object.assign(CUSTOM, map || {}); }
+export const customExercises = () => Object.values(CUSTOM);
+// Starting weights from an import, for library exercises you haven't logged yet.
+export function setStartWeights(map) { for (const e of LIST) delete e.startW; for (const [id, w] of Object.entries(map || {})) if (CATALOG[id] && w != null) CATALOG[id].startW = w; }
+export const allExercises = () => [...LIST, ...Object.values(CUSTOM)];
+
+export function getExercise(id) { return CATALOG[id] || CUSTOM[id] || null; }
+export function idForName(name) { return BY_NAME[norm(name)] || Object.values(CUSTOM).find(c => norm(c.name) === norm(name))?.id || null; }
 export const hasLoad = ex => ex.fields.includes('w');
 export const targetField = ex => ex.fields[ex.fields.length - 1];
 export const FIELD_UNIT = { reps: 'reps', sec: 's', m: 'm' };
