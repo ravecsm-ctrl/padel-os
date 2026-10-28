@@ -2,7 +2,7 @@
 import { app, S } from './core-app.js';
 import { esc, icon, chev, pageHead, group, row, routineLook } from './ui-kit.js';
 import { isRoutine, getRoutine } from './domain-program.js';
-import { dayKey, isoDate, relDay } from './domain-calendar.js';
+import { dayKey, isoDate, relDay, mondayOf } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
@@ -59,12 +59,12 @@ function calendar() {
   const st = monthStats(weeks), streak = weekStreak(S.sessions);
   const cell = d => {
     const dots = d.done.map(k => `<i class="cd ${k}"></i>`).join('') || (d.missed ? '<i class="cd missed"></i>' : d.future && d.plan ? `<i class="cd plan ${d.plan}"></i>` : '');
-    return `<button class="cday ${d.inMonth ? '' : 'out'} ${d.today ? 'today' : ''}" data-action="cal-day" data-iso="${d.iso}" aria-label="${d.iso}${d.done.length ? ', trained' : d.missed ? ', planned workout missed' : ''}"><span>${d.day}</span><span class="cdots">${dots}</span></button>`;
+    return `<button class="cday ${d.inMonth ? '' : 'out'} ${d.today ? 'today' : ''}" data-action="cal-day" data-iso="${d.iso}" aria-label="${d.iso}${d.done.length ? ', trained' : d.missed ? ', planned workout missed' : d.future && d.plan ? `, ${d.plan === 'padel' ? 'padel' : 'workout'} planned` : ''}"><span>${d.day}</span><span class="cdots">${dots}</span></button>`;
   };
   return `<section class="grp"><div class="cal-head"><h2 class="grp-h big" style="margin:0">${esc(MONTH(view))}</h2>
       <span><button class="icon-circle" data-action="cal-prev" aria-label="Previous month">${icon('chevL')}</button><button class="icon-circle" data-action="cal-next" ${monthOffset >= 0 ? 'disabled' : ''} aria-label="Next month">${icon('chevR')}</button></span></div>
     <div class="card"><div class="cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<small>${d}</small>`).join('')}${weeks.flat().map(cell).join('')}</div>
-      <div class="legend" style="justify-content:center"><span><i class="gym"></i>Workout</span><span><i class="padel"></i>Padel</span><span><i style="background:none;box-shadow:inset 0 0 0 1.5px var(--label-3)"></i>Missed</span></div></div>
+      <div class="legend" style="justify-content:center"><span><i class="gym"></i>Workout</span><span><i class="padel"></i>Padel</span><span><i class="cd plan"></i>Planned</span><span><i style="background:none;box-shadow:inset 0 0 0 1.5px var(--label-3)"></i>Missed</span></div></div>
     <p class="grp-f">${plural(st.sessions, 'session')} this month${streak ? ` · 🔥 ${plural(streak, 'week')} in a row` : ''}${st.missed ? ` · ${st.missed} planned missed` : ''}</p></section>`;
 }
 
@@ -77,9 +77,27 @@ function recoverySection(rec) {
     <div class="row" style="padding:8px 0 0"><span class="row-main"><span class="row-title">${busy.length ? esc(busy.slice(0, 3).map(([m, r]) => `${MUSCLES[m]} ${r.when}`).join(' · ')) : 'Everything is ready to train'}</span><span class="row-sub">${busy.length ? `${plural(busy.length, 'muscle')} still recovering` : 'Fully recovered'}</span></span>${chev}</div></button></section>`;
 }
 
+// ── Your first few weeks: early wins instead of scores that don't mean much yet.
+export const SCORES_AFTER = 4;
+export function earlyWins(sessions) {
+  const gym = sessions.filter(s => s.kind === 'strength'), perWeek = {};
+  for (const s of gym) { const k = isoDate(mondayOf(new Date(s.startedAt))); perWeek[k] = (perWeek[k] || 0) + 1; }
+  return [
+    { title: 'First workout logged', done: gym.length >= 1 },
+    { title: 'First padel match logged', done: sessions.some(s => s.kind === 'activity' && s.activity === 'padel') },
+    { title: 'Two workouts in one week', done: Object.values(perWeek).some(n => n >= 2) },
+    { title: `${SCORES_AFTER} workouts: your scores and forecasts unlock`, done: gym.length >= SCORES_AFTER, sub: `${Math.min(gym.length, SCORES_AFTER)} of ${SCORES_AFTER} done` },
+  ];
+}
+function gettingStarted() {
+  const wins = earlyWins(S.sessions);
+  return group(wins.map(w => row({ title: esc(w.title), sub: w.sub || (w.done ? 'Done' : ''), icon: w.done ? 'check' : 'clock', color: w.done ? 'green' : 'gray', cls: w.done ? '' : 'todo' })).join(''),
+    { header: 'Getting started', big: true, footer: 'Scores and forecasts need a few workouts before they mean anything. Until then, these are your first goals.' });
+}
+
 // ── How you're going: direction
 function headed() {
-  if (!app.strength.length) return '';
+  if (app.strength.length < SCORES_AFTER) return gettingStarted();
   const { axes, before, level } = currentStats();
   const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) });
   const eta = levelEta(xp, level), proj = liftProjections(app.strength), wi = whatIf(app.strength, xp, level, proj);

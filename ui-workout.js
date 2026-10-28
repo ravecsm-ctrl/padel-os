@@ -263,6 +263,26 @@ function finishView() {
     <div class="btns"><button class="btn filled" data-action="save-workout">Save Workout</button><button class="btn destructive" data-action="discard">Discard Workout</button></div>`;
 }
 
+// A weighted exercise logged with no weight is usually a slip: adding the weight is the main
+// choice; logging without one is asked once per exercise. Closing the sheet logs nothing.
+function noWeightSheet() {
+  return new Promise(res => {
+    app.sheet(`<div class="alert-text"><b>No weight entered</b><p class="t-sub" style="margin-top:6px">This exercise normally uses a weight. Add it so your next suggestion is right.</p></div>
+      <div class="btns"><button class="btn filled" data-nw="add">Add Weight</button><button class="btn plain" data-nw="log">Log Without Weight</button></div>`, body => {
+      body.querySelectorAll('[data-nw]').forEach(b => b.onclick = () => { const v = b.dataset.nw; res(v); app.closeSheet(); });
+    });
+    document.querySelector('#sheet').addEventListener('close', () => res(null), { once: true });
+  });
+}
+
+// The rest timer floats over the bottom of the screen; scroll so the set controls sit above it.
+function clearOfTimer() {
+  const bar = document.querySelector('.restbar:not([hidden])'), card = document.querySelector('.setcard, .all-done');
+  if (!bar || !card) return;
+  const over = card.getBoundingClientRect().bottom + 12 - bar.getBoundingClientRect().top;
+  if (over > 0) window.scrollBy({ top: over, behavior: 'smooth' });
+}
+
 // Plate breakdown for the current set, plus which bar you're using (trap bars vary).
 function platesSheet() {
   const e = cur(), kind = barKind(e), i = Math.max(0, e.sets.findIndex(s => !s.done)), wKg = e.sets[i]?.w ?? defaultVal(e, i, 'w');
@@ -302,6 +322,7 @@ export const workout = {
   render() { return S.params[0] === 'finish' ? finishView() : runner(); },
   mounted() {
     keepAwake();
+    requestAnimationFrame(clearOfTimer);
     if (S.params[0] === 'finish') {
       const p = document.querySelector('#painLoc'); if (p) p.oninput = () => { S.form.painLoc = p.value; };
       document.querySelectorAll('[data-pain-a]').forEach(b => b.onclick = () => { const k = b.dataset.painA, l = S.form.painAreas; S.form.painAreas = l.includes(k) ? l.filter(x => x !== k) : [...l, k]; app.render({ keepScroll: true }); });
@@ -345,6 +366,11 @@ export const workout = {
       autofill(e, i);
       const tf = e.fields[e.fields.length - 1];
       if (!s[tf]) return app.toast(`Add the ${UNIT_WORD[tf]} first`);
+      if (e.fields.includes('w') && !s.w && !getExercise(e.exId).loadOptional && !e.noWeightOk) {
+        const pick = await noWeightSheet();
+        if (pick !== 'log') return pick === 'add' && document.querySelector('.stepper input[data-field="w"]')?.focus();
+        e.noWeightOk = true;
+      }
       const best = heaviest(before(), e.exId);
       if (looksOff(s.w, best) && !(await app.confirm(`${esc(fmtW(s.w, unit()))} is much heavier than your best on this exercise (${esc(fmtW(best, unit()))}). Is that right?`, { ok: 'Yes, Log It' }))) return;
       s.done = true; s.ts = Date.now();
@@ -463,7 +489,7 @@ export const workout = {
     prev() { W().index = Math.max(0, W().index - 1); touch(false); },
     next() { W().index = Math.min(W().exercises.length - 1, W().index + 1); touch(false); },
     leave() { app.saveActive(true); app.go('overview'); app.toast('Workout paused. Continue from Overview or Today.'); },
-    'to-finish'() { S.form = {}; app.saveActive(true); app.go('workout/finish'); },
+    'to-finish'() { S.form = {}; timer.stop(); app.saveActive(true); app.go('workout/finish'); },
     'back-to-runner'() { app.go('workout'); },
     async discard() {
       if (!(await app.confirm('Discard this workout? Nothing will be saved.', { ok: 'Discard Workout', danger: true }))) return;

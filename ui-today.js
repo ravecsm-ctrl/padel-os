@@ -33,9 +33,11 @@ export function banners({ resumeOnly = false } = {}) {
   if (br) out += `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`;
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
-  if (S.sessions.length >= 3) {
+  // Everything lives on this phone, so nudge a backup from the first saved session, then weekly.
+  if (S.sessions.length) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
-    if (days == null || days >= 7) out += `<button class="banner" data-action="quick-backup">${tile('download', 'gray')}<span><b>Back up your data</b><small>${days == null ? 'Tap to save a copy to Files or iCloud Drive.' : `Last backup ${days} days ago. Tap to save a copy.`}</small></span>${chev}</button>`;
+    const snoozed = Date.now() - (S.settings.backupSnooze || 0) < 7 * 86400000;
+    if ((days == null || days >= 7) && !snoozed) out += `<div class="banner">${tile('download', 'blue')}<span><b>${days == null ? 'Back up your workouts' : 'Time for a backup'}</b><small>${days == null ? 'They’re saved only on this phone. Keep a copy in Files or iCloud Drive in case the phone or Safari data is lost.' : `Your workouts are only on this phone. Last backup ${days} days ago.`}</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="quick-backup" style="font-size:15px;white-space:nowrap">Back Up</button><button class="link" data-action="backup-later" style="font-size:13px;white-space:nowrap">Not now</button></span></div>`;
   }
   return out;
 }
@@ -108,6 +110,7 @@ export const today = {
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     'quick-backup'() { saveBackup(); },
+    async 'backup-later'() { S.settings.backupSnooze = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); app.toast('Reminder again in a week. Back up any time in Settings.'); },
     async 'quick-start'() {
       if (S.active) return app.go('workout');
       S.active = createQuickWorkout({ week: app.position().week });

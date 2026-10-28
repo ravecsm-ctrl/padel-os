@@ -403,7 +403,10 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .cd { width: 7px; height: 7px; border-radius: 50%; display: block; }
 .cd.gym { background: var(--blue); } .cd.padel, .cd.other { background: var(--teal); }
 .cd.missed { background: none; box-shadow: inset 0 0 0 1.5px var(--label-3); }
-.cd.plan { background: none; box-shadow: inset 0 0 0 1.5px currentColor; opacity: .5; } .cd.plan.gym { color: var(--blue); } .cd.plan.padel { color: var(--teal); }
+/* Planned: a small faint filled dot, so it never reads as the hollow "missed" ring. */
+.cd.plan { background: currentColor; opacity: .45; transform: scale(.75); color: var(--label-2); } .cd.plan.gym { color: var(--blue); } .cd.plan.padel { color: var(--teal); }
+.row.todo .row-title { color: var(--label-2); }
+.legend i.cd.plan { width: 8px; height: 8px; border-radius: 50%; background: var(--label-2); }
 
 /* Set editor (saved workouts) */
 .eset { gap: 10px; }
