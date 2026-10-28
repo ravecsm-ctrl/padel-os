@@ -224,6 +224,7 @@ body[data-route="workout"].resting main { padding-bottom: calc(190px + var(--saf
 .bl-set { margin: -4px 0 10px; }
 .how { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-size: 15px; margin-top: 10px; min-height: 32px; }
 .how svg.i { width: 18px; height: 18px; }
+.how-row { display: flex; flex-wrap: wrap; column-gap: 20px; }
 .setcard { margin-top: 18px; padding: 18px 16px 16px; }
 .setcard-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
 .setcard-h b { font-size: 17px; font-weight: 600; }
@@ -450,8 +451,7 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .restbar .rest-time.late { font-size: 17px; color: var(--orange); }
 .awake { display: flex; align-items: center; gap: 6px; margin: -4px 0 12px; font-size: 13px; color: var(--label-2); }
 .awake i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
-.awake.off i { background: var(--orange); }
-.awake.off { color: var(--orange); }
+.awake.off i { background: var(--label-3); }
 .awake button { color: inherit; text-decoration: underline; font-size: inherit; background: none; padding: 0; }
 
 /* New workout editor */

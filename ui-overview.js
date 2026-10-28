@@ -1,56 +1,20 @@
-// Overview: the home screen. What needs doing → what happened → how you're going.
+// Progress tab (route 'overview'): what happened, then how you're going. Today is the home screen.
 import { app, S } from './core-app.js';
-import { esc, icon, chev, pageHead, group, row, routineLook } from './ui-kit.js';
+import { esc, icon, pageHead, group, row } from './ui-kit.js';
 import { isRoutine, getRoutine } from './domain-program.js';
-import { dayKey, isoDate, relDay, mondayOf } from './domain-calendar.js';
+import { isoDate, mondayOf } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
-import { getExercise } from './domain-catalog.js';
-import { MUSCLES } from './domain-taxonomy.js';
-import { recentPain, painHits, areaName } from './domain-pain.js';
-import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { monthGrid, monthStats, liftProjections, levelEta, whatIf, trackingSince } from './domain-overview.js';
 import { xpEvents } from './domain-stats.js';
 import { weekStreak } from './domain-analytics.js';
 import { fmtW, fmtNum, toDisplay } from './domain-units.js';
-import { currentRecovery, recoveryMapSvg } from './ui-recovery.js';
 import { currentStats, radar } from './ui-stats.js';
-import { banners, activitySheet, pastWorkoutSheet } from './ui-today.js';
+import { activitySheet, pastWorkoutSheet } from './ui-today.js';
 import { bodySummary } from './ui-body.js';
-import { reviewBanner } from './ui-review.js';
 
 let monthOffset = 0;
 const MONTH = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-
-// ── What needs doing
-function recoveringHint(routineId, rec) {
-  const r = app.routine(routineId);
-  const pain = recentPain(S.sessions, { cleared: S.painClear }), hurt = [...new Set(r.blocks.flatMap(b => painHits(b.ex, pain)))];
-  if (hurt.length) return `Gentler options ready for your ${hurt.slice(0, 2).map(a => areaName(a).toLowerCase()).join(' and ')}`;
-  if (S.settings.adaptive === false) return '';
-  const tired = [...new Set(r.blocks.flatMap(b => getExercise(b.ex)?.primary || []))].map(m => [m, rec[m]?.level || 0]).filter(([, l]) => l >= 0.35).sort((a, b) => b[1] - a[1]);
-  if (!tired.length) return '';
-  const names = tired.slice(0, 2).map(([m]) => MUSCLES[m].toLowerCase()).join(' and ');
-  return tired[0][1] >= 0.6 ? `Lighter today: ${names} still recovering` : `${names[0].toUpperCase() + names.slice(1)} still recovering`;
-}
-
-function upNext(rec) {
-  const plan = S.schedule[dayKey()];
-  const today = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
-  const slim = (ic, color, title, sub, attrs) => `<button class="card upnext" ${attrs}>${`<span class="tile ${color}">${icon(ic)}</span>`}<span class="row-main"><span class="row-title">${title}</span>${sub ? `<span class="row-sub">${sub}</span>` : ''}</span>${chev}</button>`;
-  if (today.length) return slim('check', 'green', `Done today · ${esc(today.map(s => s.title).join(' + '))}`, today[0].durationMin ? `${today[0].durationMin} min` : '', `data-action="go" data-to="history/session/${esc(today[0].id)}"`);
-  if (isRoutine(plan)) {
-    const r = app.routine(plan), look = routineLook(plan), hint = recoveringHint(plan, rec);
-    return slim(look.icon, look.color, `${esc(r.title)} · ${r.minutes} min`, hint ? `<span class="orange">${esc(hint)}</span>` : `${plural(r.blocks.length, 'exercise')} · tap to start`, `data-action="start" data-routine="${esc(plan)}"`);
-  }
-  if (plan === 'Padel') return slim('racket', 'teal', 'Padel day', `Warm up (${routineMinutes(COURT_ROUTINES.warmup)} min) · then log your match`, 'data-action="go" data-to="court/warmup"');
-  // Rest or recovery: say what's next.
-  for (let i = 1; i <= 7; i++) {
-    const d = DAYS[(DAYS.indexOf(dayKey()) + i) % 7];
-    if (isRoutine(S.schedule[d])) return slim(plan === 'Recovery' ? 'heart' : 'snow', plan === 'Recovery' ? 'pink' : 'gray', plan === 'Recovery' ? 'Recovery day' : 'Rest day', `Next: ${esc(getRoutine(S.schedule[d]).title)} ${i === 1 ? 'tomorrow' : `on ${({ Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' })[d]}`}`, 'data-action="go" data-to="today"');
-  }
-  return slim('snow', 'gray', 'Rest day', 'Nothing scheduled', 'data-action="go" data-to="plan"');
-}
 
 // ── What happened
 function calendar() {
@@ -66,15 +30,6 @@ function calendar() {
     <div class="card"><div class="cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<small>${d}</small>`).join('')}${weeks.flat().map(cell).join('')}</div>
       <div class="legend" style="justify-content:center"><span><i class="gym"></i>Workout</span><span><i class="padel"></i>Padel</span><span><i class="cd plan"></i>Planned</span><span><i style="background:none;box-shadow:inset 0 0 0 1.5px var(--label-3)"></i>Missed</span></div></div>
     <p class="grp-f">${plural(st.sessions, 'session')} this month${streak ? ` · 🔥 ${plural(streak, 'week')} in a row` : ''}${st.missed ? ` · ${st.missed} planned missed` : ''}</p></section>`;
-}
-
-// ── How you're going: body
-function recoverySection(rec) {
-  if (!S.sessions.some(s => Date.now() - s.startedAt < 8 * 86400000)) return '';
-  const busy = Object.entries(rec).filter(([, r]) => r.key !== 'ready').sort((a, b) => b[1].level - a[1].level);
-  return `<section class="grp"><h2 class="grp-h big">Recovery</h2><button class="card" data-action="go" data-to="recovery" style="display:block;width:100%;text-align:left">
-    <div style="max-width:230px;margin:0 auto">${recoveryMapSvg(rec)}</div>
-    <div class="row" style="padding:8px 0 0"><span class="row-main"><span class="row-title">${busy.length ? esc(busy.slice(0, 3).map(([m, r]) => `${MUSCLES[m]} ${r.when}`).join(' · ')) : 'Everything is ready to train'}</span><span class="row-sub">${busy.length ? `${plural(busy.length, 'muscle')} still recovering` : 'Fully recovered'}</span></span>${chev}</div></button></section>`;
 }
 
 // ── Your first few weeks: early wins instead of scores that don't mean much yet.
@@ -117,15 +72,13 @@ function headed() {
 export const overview = {
   tab: 'overview',
   render() {
-    const date = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-    const initial = (S.settings.name || '').trim()[0], loc = app.location();
+    const initial = (S.settings.name || '').trim()[0];
     const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
-    const rec = currentRecovery();
-    const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your overview fills in as you train</b><small>Finish a workout or log a match to see your calendar, recovery and progress here.</small></span></div>` : '';
-    return `${pageHead('Overview', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners()}${reviewBanner()}${upNext(rec)}${empty}
-      <div style="height:24px"></div>${calendar()}${recoverySection(rec)}${headed()}
+    const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your progress fills in as you train</b><small>Finish a workout or log a match to see your calendar, scores and history here.</small></span></div>` : '';
+    return `${pageHead('Progress', { right: avatar })}${empty}
+      <div style="height:${empty ? 24 : 8}px"></div>${calendar()}${headed()}
       ${S.sessions.length ? group(row({ title: 'History', sub: 'Every session, weekly load, padel stats', icon: 'note', color: 'gray', to: 'history' })
+        + row({ title: 'Recovery', sub: 'How ready each muscle is', icon: 'heart', color: 'pink', to: 'recovery' })
         + row({ title: 'Exercises', sub: 'Progress per exercise', icon: 'dumbbell', color: 'indigo', to: 'history/progress' })
         + row({ title: 'Muscles', sub: 'Sets per muscle this week', icon: 'target', color: 'blue', to: 'history/muscles' })
         + row({ title: 'Weekly review', sub: 'Your week vs the last, and next week’s focus', icon: 'chart', color: 'indigo', to: 'review' })

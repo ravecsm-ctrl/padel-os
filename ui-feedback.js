@@ -61,7 +61,7 @@ function view() {
 }
 
 export const feedback = {
-  tab: 'overview',
+  tab: 'today',
   render: view,
   actions: {
     'fb-new'() { feedbackSheet(); },

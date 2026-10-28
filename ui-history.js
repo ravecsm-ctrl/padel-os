@@ -16,7 +16,7 @@ import { feedbackSheet } from './ui-feedback.js';
 import { exercisePicker } from './ui-picker.js';
 import { savedEntry } from './domain-workout.js';
 import { COURT_ROUTINES, stretchFor, routineMinutes as rMin } from './domain-court.js';
-import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
+import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips, mname, fmtSets } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
 import { sessionMuscles, lastDays, weeklyMuscles, ranked, weeklyStatus, exercisesFor, SMALL } from './domain-muscles.js';
 import { MUSCLES } from './domain-taxonomy.js';
@@ -73,14 +73,14 @@ function musclesCard(map, header) {
   const list = ranked(map);
   if (!list.length) return '';
   return `<section class="grp"><h2 class="grp-h">${esc(header)}</h2><div class="card">${bodyMap(map)}
-    <div class="mchips">${list.map(m => `<span class="${m.sets < 1 ? 'sec' : ''}">${esc(m.label)} · ${m.sets}</span>`).join('')}</div></div>
+    <div class="mchips">${list.map(m => `<span class="${m.sets < 1 ? 'sec' : ''}">${esc(mname(m.id))} · ${fmtSets(m.sets)}</span>`).join('')}</div></div>
     <p class="grp-f">Sets per muscle. Secondary muscles count as half a set.</p></section>`;
 }
 
 function weekMusclesCard() {
   const map = lastDays(app.strength, 7), list = ranked(map);
   if (!app.strength.length) return '';
-  const top = list.slice(0, 3).map(m => `${esc(m.label)} ${m.sets}`).join(' · ');
+  const top = list.slice(0, 3).map(m => `${esc(mname(m.id))} ${fmtSets(m.sets)}`).join(' · ');
   return `<section class="grp"><h2 class="grp-h">Muscles · last 7 days</h2><button class="card" data-action="go" data-to="history/muscles" style="display:block;width:100%;text-align:left">
     ${bodyMap(map)}<div class="row" style="padding:12px 0 0"><span class="row-main"><span class="row-title">${list.length ? top : 'Nothing trained this week'}</span><span class="row-sub">See sets per muscle</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg></div></button></section>`;
 }
@@ -89,12 +89,12 @@ function musclesView() {
   const map = lastDays(app.strength, 7);
   const zone = m => SMALL.has(m) ? [6, 16] : [10, 20];
   const scale = 24;
-  const rows = Object.keys(MUSCLES).map(id => ({ id, label: MUSCLES[id], sets: map[id] || 0 })).sort((a, b) => b.sets - a.sets).map(m => {
+  const rows = Object.keys(MUSCLES).map(id => ({ id, label: mname(id), sets: map[id] || 0 })).sort((a, b) => b.sets - a.sets).map(m => {
     const st = weeklyStatus(m.id, m.sets), [lo, hi] = zone(m.id);
-    return row({ title: esc(m.label), value: `<span class="mstat ${st.key}">${m.sets ? `${m.sets} · ` : ''}${st.label}</span>`, action: 'muscle-sheet', data: { m: m.id },
+    return row({ title: esc(mname(m.id)), value: `<span class="mstat ${st.key}">${m.sets ? `${fmtSets(m.sets)} · ` : ''}${st.label}</span>`, action: 'muscle-sheet', data: { m: m.id },
       sub: `<span class="mbar"><span class="zone" style="left:${lo / scale * 100}%;width:${(hi - lo) / scale * 100}%"></span><b style="width:${Math.min(100, m.sets / scale * 100)}%"></b></span>` });
   }).join('');
-  return `${navBar({ back: 'Overview', backTo: 'overview', title: 'Muscles' })}
+  return `${navBar({ back: 'Progress', backTo: 'overview', title: 'Muscles' })}
     <h1 class="t-title" style="padding:8px 4px 2px">Muscles</h1><p class="t-sub" style="padding:0 4px 16px">Sets per muscle over the last 7 days. <button class="link" data-action="go" data-to="recovery">See recovery</button></p>
     <div class="card">${bodyMap(map)}<div class="bm-legend">Fewer sets <i></i> More sets</div></div>
     <div style="height:24px"></div>
@@ -104,20 +104,20 @@ function musclesView() {
 function muscleSheet(m) {
   const weeks = weeklyMuscles(app.strength, 8);
   const ex = exercisesFor(app.strength, m, Date.now() - 28 * 86400000);
-  app.sheet(`<h2 class="sheet-title">${esc(MUSCLES[m])}</h2><p class="sheet-sub">Sets per week</p>
+  app.sheet(`<h2 class="sheet-title">${esc(mname(m))}</h2><p class="sheet-sub">Sets per week</p>
     <div class="card">${barChart(weeks.map(w => ({ label: `${w.start.getDate()}/${w.start.getMonth() + 1}`, parts: [{ v: w.map[m] || 0, cls: 'gym' }] })))}</div>
     <div style="height:20px"></div>
     ${ex.length ? group(ex.map(x => row({ title: esc(x.name), value: `${x.sets} sets`, sub: `Last done ${esc(relDay(x.ts).toLowerCase())}` })).join(''), { header: 'Last 4 weeks' }) : '<p class="t-sub" style="text-align:center">Not trained in the last 4 weeks.</p>'}`);
 }
 
 function logView() {
-  if (!S.sessions.length) return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('History')}${tabs('log')}${empty('chart', 'No sessions yet', 'Finish a workout or log a match and your progress shows up here.', '<button class="btn filled" data-action="go" data-to="today" style="max-width:260px">Go to Today</button>')}`;
+  if (!S.sessions.length) return `${navBar({ back: 'Progress', backTo: 'overview', title: '' })}${pageHead('History')}${tabs('log')}${empty('chart', 'No sessions yet', 'Finish a workout or log a match and your progress shows up here.', '<button class="btn filled" data-action="go" data-to="today" style="max-width:260px">Go to Today</button>')}`;
   const series = weeklySeries(S.sessions, 8), tr = loadTrend(series), cur = series[series.length - 1];
   const groups = new Map();
   for (const s of S.sessions) { const k = isoDate(mondayOf(new Date(s.startedAt))); groups.set(k, [...(groups.get(k) || []), s]); }
   const thisMon = isoDate(mondayOf());
   const lists = [...groups.entries()].slice(0, 12).map(([k, arr]) => group(arr.map(sessionRow).join(''), { header: k === thisMon ? 'This week' : `Week of ${new Date(k + 'T12:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}` })).join('');
-  return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('History')}${tabs('log')}
+  return `${navBar({ back: 'Progress', backTo: 'overview', title: '' })}${pageHead('History')}${tabs('log')}
     <div class="tiles">${stat(cur.sessions, 'This week', cur.sessions === 1 ? 'session' : 'sessions')}${(n => stat(n, 'Streak', n === 1 ? 'week' : 'weeks'))(weekStreak(S.sessions))}</div>
     ${weekMusclesCard()}
     <section class="grp"><h2 class="grp-h">Training load</h2><div class="card">${barChart(series.map(w => ({ label: `${w.start.getDate()}/${w.start.getMonth() + 1}`, parts: [{ v: w.gym, cls: 'gym' }, { v: w.padel, cls: 'padel' }, { v: w.other, cls: 'other' }] })))}
@@ -184,8 +184,8 @@ function sessionView(id) {
 
 function exercisesView() {
   const list = exerciseSummaries(app.strength);
-  if (!list.length) return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('Exercises')}${tabs('ex')}${empty('dumbbell', 'Nothing to show yet', 'Complete a workout to start tracking each exercise.')}`;
-  return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}${pageHead('Exercises')}${tabs('ex')}
+  if (!list.length) return `${navBar({ back: 'Progress', backTo: 'overview', title: '' })}${pageHead('Exercises')}${tabs('ex')}${empty('dumbbell', 'Nothing to show yet', 'Complete a workout to start tracking each exercise.')}`;
+  return `${navBar({ back: 'Progress', backTo: 'overview', title: '' })}${pageHead('Exercises')}${tabs('ex')}
     ${group(list.map(x => row({ title: esc(x.ex.name), sub: `Best ${x.metric.load ? fmtW(x.best, unit()) : fmtNum(x.best)} · ${esc(relDay(x.lastTs))}`, to: `history/ex/${x.id}`,
       right: `${sparkline(x.pts.map(p => p[x.metric.key]).filter(v => v != null))}<span class="chg ${x.change > 0 ? 'up' : x.change < 0 ? 'down' : ''}">${x.change == null ? '' : `${x.change > 0 ? '+' : ''}${x.change}%`}</span>` })).join(''),
       { footer: 'Change compares your first and latest session.' })}`;

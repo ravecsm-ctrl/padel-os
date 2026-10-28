@@ -2,6 +2,7 @@
 // Each muscle is tinted by a value; the colour function is pluggable (sets, recovery, one
 // exercise). Shapes are drawn for the figure's left half and mirrored around x = 60.
 import { esc } from './ui-kit.js';
+import { mname } from './ui-words.js';
 import { MUSCLES } from './domain-taxonomy.js';
 
 const MIRROR = 'matrix(-1 0 0 1 120 0)';
@@ -101,7 +102,7 @@ function figure(regions, values, dx, color, max, label, tipFn) {
   const body = `<g class="bm-body">${path(BODY)}${pair(ARM)}${HEAD}</g>`;
   const parts = Object.entries(regions).map(([m, shapes]) => {
     const c = color(values[m] || 0, max, m);
-    const tip = tipFn ? tipFn(m, values[m] || 0) : `${MUSCLES[m]}${values[m] ? `: ${values[m]} set${values[m] === 1 ? '' : 's'}` : ''}`;
+    const tip = tipFn ? tipFn(m, values[m] || 0) : `${mname(m)}${values[m] ? `: ${values[m]} set${values[m] === 1 ? '' : 's'}` : ''}`;
     return `<g class="bm-part" data-muscle="${m}" fill="${c.fill}" fill-opacity="${c.opacity}"><title>${esc(tip)}</title>${shapes.map(d => pair(d)).join('')}</g>`;
   }).join('');
   return `<g transform="translate(${dx - CROP} 0)">${body}${parts}<text x="60" y="${H - 2}" text-anchor="middle" class="bm-label">${label}</text></g>`;
@@ -122,7 +123,7 @@ function callouts(values, backX) {
     for (const l of list) {
       const tx = view === 'f' ? SIDE - 5 : backX + W + 5, lx = view === 'f' ? SIDE - 3 : backX + W + 3;
       out.push(`<g class="bm-callout${l.main ? ' main' : ''}"><path d="M${lx},${l.y - 3.6} L${l.ax},${l.ay}"/><circle cx="${l.ax}" cy="${l.ay}" r="1.5"/>`
-        + `<text x="${tx}" y="${l.y}" text-anchor="${view === 'f' ? 'end' : 'start'}">${esc(MUSCLES[l.m])}</text></g>`);
+        + `<text x="${tx}" y="${l.y}" text-anchor="${view === 'f' ? 'end' : 'start'}">${esc(mname(l.m))}</text></g>`);
     }
   }
   return out.join('');
@@ -131,7 +132,7 @@ function callouts(values, backX) {
 // values: { muscleId: number }. Returns an accessible SVG. `labels` names the worked muscles.
 export function bodyMap(values = {}, { color = blueScale, max = null, title = 'Muscles worked', tip = null, labels = false } = {}) {
   const m = max ?? Math.max(0, ...Object.values(values));
-  const worked = Object.entries(values).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k]) => MUSCLES[k]).join(', ');
+  const worked = Object.entries(values).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k]) => mname(k)).join(', ');
   const side = labels ? SIDE : 0, backX = side + W + (labels ? 14 : 40), width = backX + W + side;
   return `<svg class="bodymap${labels ? ' labelled' : ''}" viewBox="0 0 ${width} ${H}" role="img" aria-label="${esc(title)}: ${esc(worked || 'none')}">
     ${figure(FRONT, values, side, color, m, 'Front', tip)}${figure(BACK, values, backX, color, m, 'Back', tip)}${labels ? callouts(values, backX) : ''}</svg>`;
@@ -143,7 +144,7 @@ export function exerciseMap(ex) {
   const values = {};
   for (const m of ex?.secondary || []) values[m] = 0.5;
   for (const m of ex?.primary || []) values[m] = 1;
-  return bodyMap(values, { color: exColor, max: 1, labels: true, title: `${ex?.name || 'Exercise'}: muscles worked`, tip: (m, v) => `${MUSCLES[m]}${v >= 1 ? ' (main)' : v ? ' (secondary)' : ''}` });
+  return bodyMap(values, { color: exColor, max: 1, labels: true, title: `${ex?.name || 'Exercise'}: muscles worked`, tip: (m, v) => `${mname(m)}${v >= 1 ? ' (main)' : v ? ' (secondary)' : ''}` });
 }
 
 // Tap a muscle to see its name in a small bubble; tap anywhere else on the map to hide it.

@@ -1,6 +1,7 @@
 // Exercise library (built-in + yours), grouped by category, plus CSV/text import.
 import { app, S } from './core-app.js';
 import { esc, icon, navBar, group, row, seg, chips } from './ui-kit.js';
+import { mname } from './ui-words.js';
 import { allExercises, getExercise, setCustomExercises, setStartWeights, applyExerciseEdits, isEdited } from './domain-catalog.js';
 import { setCustomRoutines } from './domain-program.js';
 import { MUSCLES, MOVEMENTS, CATEGORIES, EQUIPMENT, LEVELS, WEIGHT_TYPES, canDoWith, missingFor, equipLabel, norm } from './domain-taxonomy.js';
@@ -13,7 +14,7 @@ let showAll = false, query = '';
 let IMP = null;   // { source, items, opts }
 let draft = '';   // text pasted on the import page
 
-const muscleText = ex => (ex.primary || []).map(m => MUSCLES[m]).join(' · ');
+const muscleText = ex => (ex.primary || []).map(m => mname(m)).join(' · ');
 const missingText = ex => missingFor(ex.needs || [], app.owned()).map(n => n.split('|').map(a => equipLabel(a, S.customEquipment)).join(' or ')).join(', ');
 
 function download(name, text, type) {
@@ -133,7 +134,7 @@ function exerciseSheet(id) {
   const owned = app.owned(), miss = missingFor(e.needs || [], owned);
   const info = [
     ['Main muscles', muscleText(e) || '—'],
-    ['Also works', (e.secondary || []).map(m => MUSCLES[m]).join(' · ') || '—'],
+    ['Also works', (e.secondary || []).map(m => mname(m)).join(' · ') || '—'],
     ['Movement', MOVEMENTS[e.movement] || '—'], ['Category', CATEGORIES[e.category] || '—'], ['Level', LEVELS[e.level] || '—'],
     ['Equipment', (e.needs || []).length ? e.needs.map(n => n.split('|').map(a => equipLabel(a, S.customEquipment)).join(' or ')).join(' + ') : 'None'],
     ['Weight', WEIGHT_TYPES[e.weightType] || '—'],

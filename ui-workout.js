@@ -11,7 +11,7 @@ import { exercisePicker } from './ui-picker.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
-import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
+import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips, mname } from './ui-words.js';
 import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, removeExercise, unusedAdded, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel, CATEGORIES } from './domain-taxonomy.js';
@@ -20,7 +20,8 @@ import { startEdit } from './ui-library.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { applyAdaptation, revertAdaptation } from './domain-adaptive.js';
 import { sessionMuscles, ranked } from './domain-muscles.js';
-import { recentPain, painHits, gentlerFor, areaName } from './domain-pain.js';
+import { recentPain, painHits, gentlerFor, areaName, painAreasOf } from './domain-pain.js';
+import { soreNote } from './ui-today.js';
 import { AREAS } from './domain-personalize.js';
 import { barFor, barWeight, platesPerSide, warmupSets, BARS } from './domain-plates.js';
 
@@ -48,7 +49,7 @@ async function keepAwake() {
 function awakeLine() {
   if (W().past || awake == null) return '';
   return awake === 'on' ? '<p class="awake"><i></i>Screen stays on during your workout</p>'
-    : '<p class="awake off"><i></i>Your phone may lock and miss the rest beep. <button data-action="awake-help">Fix this</button></p>';
+    : '<p class="awake off"><i></i>Rest beep needs the screen on. <button data-action="awake-help">How</button></p>';
 }
 document.addEventListener('visibilitychange', () => { if (S.route === 'workout' && S.active) keepAwake(); if (document.hidden && S.active) app.saveActive(true); });
 
@@ -106,17 +107,17 @@ function coach(e) {
     ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">Adjusted: ${e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter'}. ${esc(e.adjusted.reason)}.</p>` : ''}
     ${baseline(e, last)}${warmupLine(e)}
     <p class="t-foot">${tip ? `<span class="blue">${esc(tip.replace(/<[^>]+>/g, '').trim())}</span> ` : ''}${why ? `${esc(why)} ` : ''}${esc(effortTarget(e.target.rpe))}.</p>
-    ${missingHere(ex)}${painNote(e)}<button class="how" data-action="how">${icon('info')}How to do it</button></div>`;
+    ${missingHere(ex)}${painNote(e)}<div class="how-row"><button class="how" data-action="how">${icon('info')}How to do it</button><a class="how" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a></div></div>`;
 }
 
 // ── Muscles: main ones bold, secondary ones lighter; tap for the body map.
 function muscleLine(ex) {
-  const p = (ex.primary || []).map(m => MUSCLES[m]).filter(Boolean), s = (ex.secondary || []).map(m => MUSCLES[m]).filter(Boolean);
+  const p = (ex.primary || []).map(m => mname(m)).filter(Boolean), s = (ex.secondary || []).map(m => mname(m)).filter(Boolean);
   if (!p.length && !s.length) return '';
   return `<button class="mline" data-action="muscle-map" aria-label="Muscles worked: ${esc([...p, ...s].join(', '))}. Show on body map."><b>${esc(p.join(' · '))}</b>${s.length ? `<span>${esc(s.join(' · '))}</span>` : ''}</button>`;
 }
 export function muscleSheet(ex, { editable = true } = {}) {
-  const list = (ids, label) => ids?.length ? row({ title: label, value: esc(ids.map(m => MUSCLES[m]).join(', ')) }) : '';
+  const list = (ids, label) => ids?.length ? row({ title: label, value: esc(ids.map(m => mname(m)).join(', ')) }) : '';
   app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">Muscles this exercise works</p>
     <div class="card">${exerciseMap(ex)}<div class="bm-legend"><span><i class="lg main"></i>Main</span><span><i class="lg sec"></i>Secondary</span></div></div>
     <div style="height:16px"></div>${group(list(ex.primary, 'Main') + list(ex.secondary, 'Secondary'))}
@@ -243,9 +244,10 @@ function finishView() {
   const unused = unusedAdded(w), missing = w.exercises.filter(e => !e.skipped && !e.added && !doneSets(e).length).length;
   const vol = Math.round(toDisplay(st.volume, unit()));
   return `${navBar({ back: 'Workout', backAction: 'back-to-runner', title: 'Summary' })}
-    <div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">Workout complete</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}</p></div>
+    ${(() => { const doneN = w.exercises.filter(e => doneSets(e).length).length, all = w.exercises.filter(e => !e.skipped && !(e.added && !doneSets(e).length)).length;
+      return `<div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">${doneN >= all ? 'Workout complete' : 'Nice work'}</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}${doneN < all ? ` · ${doneN} of ${all} exercises done` : ''}</p></div>`; })()}
     <div class="tiles three" style="margin-top:20px">${stat(`<span class="num">${S.form.duration || st.minutes}</span>`, 'Minutes')}${stat(`${st.sets}`, 'Sets')}${stat(vol ? vol.toLocaleString() : '—', 'Volume', vol ? unit() : '')}</div>
-    ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => m.label).join(' · '))}</p></div></section>` : ''; })()}
+    ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => mname(m.id)).join(' · '))}</p></div></section>` : ''; })()}
     ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
     ${unused.length ? `<p class="fine" style="margin-bottom:20px">${esc(unused.map(e => e.name).join(', '))} ${unused.length > 1 ? 'have' : 'has'} no sets logged and won’t be saved.</p>` : ''}
@@ -311,10 +313,13 @@ function keepGroup(w) {
   return group(rows.map(([e, i]) => row({ title: esc(e.name), sub: `Add to ${esc(w.title)} for next time`, right: `<input type="checkbox" class="switch" data-keep="${i}" ${S.form.keep.includes(i) ? 'checked' : ''} aria-label="Keep ${esc(e.name)}">` })).join(''), { header: 'Added today', footer: 'Kept exercises show up in this workout from now on. Remove them any time in Plan.' });
 }
 
+// Your own video link if you added one, otherwise a YouTube search for the exercise.
+const demoUrl = ex => ex.url || `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}`;
+
 function howSheet(ex) {
   app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${esc(ex.muscles)} · ${esc(ex.equipment)}</p>
     ${group([['Why it helps', ex.why], ['Get set up', ex.setup], ['Do it', ex.execute], ['Breathing', ex.breathe], ['Avoid', ex.avoid]].filter(([, d]) => d).map(([t, d]) => row({ title: t, sub: esc(d) })).join(''))}
-    <a class="btn tinted" href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}" target="_blank" rel="noopener">${icon('play')}Watch a Video</a>`);
+    <a class="btn tinted" href="${esc(demoUrl(ex))}" target="_blank" rel="noopener noreferrer">${icon('play')}Watch a demo</a>`);
 }
 
 export const workout = {
@@ -488,12 +493,12 @@ export const workout = {
     jump(el) { W().index = +el.dataset.i; touch(false); },
     prev() { W().index = Math.max(0, W().index - 1); touch(false); },
     next() { W().index = Math.min(W().exercises.length - 1, W().index + 1); touch(false); },
-    leave() { app.saveActive(true); app.go('overview'); app.toast('Workout paused. Continue from Overview or Today.'); },
+    leave() { app.saveActive(true); app.go('today'); app.toast('Workout paused. Continue from Today.'); },
     'to-finish'() { S.form = {}; timer.stop(); app.saveActive(true); app.go('workout/finish'); },
     'back-to-runner'() { app.go('workout'); },
     async discard() {
       if (!(await app.confirm('Discard this workout? Nothing will be saved.', { ok: 'Discard Workout', danger: true }))) return;
-      S.active = null; await app.saveActive(true); timer.stop(); app.go('overview');
+      S.active = null; await app.saveActive(true); timer.stop(); app.go('today');
     },
     async 'save-workout'() {
       if (!workoutStats(W()).sets) return app.toast('Log at least one set, or discard the workout');
@@ -518,7 +523,8 @@ export const workout = {
       S.active = null; await app.saveActive(true); timer.stop(); wakeLock?.release?.();
       await app.reloadSessions();
       app.go(`history/session/${session.id}`);
-      app.toast(savedAs ? `Saved · “${esc(savedAs)}” added to Plan` : kept ? `Saved · ${kept} exercise${kept > 1 ? 's' : ''} kept for next time` : session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''}` : 'Workout saved');
+      const note = soreNote(painAreasOf(session));
+      app.toast((savedAs ? `Saved · “${esc(savedAs)}” added to Plan` : kept ? `Saved · ${kept} exercise${kept > 1 ? 's' : ''} kept for next time` : session.prs.length ? `Saved · ${session.prs.length} personal record${session.prs.length > 1 ? 's' : ''}` : 'Workout saved') + (note ? `. ${note}` : ''));
     },
   },
 };

@@ -8,7 +8,7 @@ import { createWorkout, createActivity, workoutStats, applySupersets, createQuic
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { prehabFor, PADEL_TYPES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
-import { sessionEffortChips } from './ui-words.js';
+import { sessionEffortChips, mname } from './ui-words.js';
 import { recoveryCard, currentRecovery } from './ui-recovery.js';
 import { adaptWorkout } from './domain-adaptive.js';
 import { calibrate, colorFor } from './domain-recovery.js';
@@ -16,6 +16,8 @@ import { phaseFor, DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { saveBackup } from './ui-backup.js';
+import { reviewBanner } from './ui-review.js';
+import { recentPain, painHits, areaName } from './domain-pain.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -42,6 +44,29 @@ export function banners({ resumeOnly = false } = {}) {
   return out;
 }
 
+// After you log soreness or pain: say what the app will do about it, so you know it listened.
+// Workout pain counts straight away; padel soreness once it comes back (see recentPain).
+export function soreNote(areas) {
+  if (!areas?.length) return '';
+  const pain = recentPain(S.sessions, { cleared: S.painClear }), names = l => l.map(a => areaName(a).toLowerCase()).join(' and ');
+  const on = areas.filter(a => pain[a]), later = areas.filter(a => !pain[a]);
+  if (on.length) return `Workouts will offer gentler options for your ${names(on)} for now.`;
+  return `Noted. If your ${names(later)} ${later.length > 1 ? 'are' : 'is'} sore after another match, workouts will start going easier on ${later.length > 1 ? 'them' : 'it'}.`;
+}
+
+// One line on the workout card when today's plan should go easier: pain first, then recovery.
+function recoveringHint(routineId) {
+  const r = app.routine(routineId);
+  const pain = recentPain(S.sessions, { cleared: S.painClear }), hurt = [...new Set(r.blocks.flatMap(b => painHits(b.ex, pain)))];
+  if (hurt.length) return `Gentler options ready for your ${hurt.slice(0, 2).map(a => areaName(a).toLowerCase()).join(' and ')}`;
+  if (S.settings.adaptive === false) return '';
+  const rec = currentRecovery();
+  const tired = [...new Set(r.blocks.flatMap(b => getExercise(b.ex)?.primary || []))].map(m => [m, rec[m]?.level || 0]).filter(([, l]) => l >= 0.35).sort((a, b) => b[1] - a[1]);
+  if (!tired.length) return '';
+  const names = tired.slice(0, 2).map(([m]) => mname(m).toLowerCase()).join(' and ');
+  return tired[0][1] >= 0.6 ? `Lighter today: ${names} still recovering` : `${names[0].toUpperCase() + names.slice(1)} still recovering`;
+}
+
 function hero() {
   const plan = S.schedule[dayKey()];
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
@@ -54,6 +79,7 @@ function hero() {
     const r = app.routine(plan), look = routineLook(plan), last = lastDone(plan);
     return `<section class="card hero"><div class="hero-top">${tile(look.icon, look.color, true)}<div><p class="t-foot">Up next</p><h2>${esc(r.title)}</h2><p class="t-sub">${plural(r.blocks.length, 'exercise')} · about ${r.minutes} min</p></div></div>
       <p class="hero-note">${esc(r.focus)}${last ? '' : ' Your first session sets your starting weights.'}</p>
+      ${(() => { const h = recoveringHint(plan); return h ? `<p class="hero-note orange" style="margin-top:-6px">${esc(h)}</p>` : ''; })()}
       ${S.active ? '' : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>`}</section>`;
   }
   if (plan === 'Padel') {
@@ -98,8 +124,8 @@ export const today = {
     const others = allRoutineIds().filter(id => id !== todays || S.active);
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners({ resumeOnly: true })}${hero()}
-      <div style="height:28px"></div>${stayHealthy()}
+      ${banners()}${reviewBanner()}${hero()}
+      <div style="height:28px"></div>${weekCard()}${recoveryCard()}${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
         return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
         + row({ title: 'Quick workout', sub: 'No plan: add exercises as you go', icon: 'bolt', color: 'indigo', action: 'quick-start' })
@@ -141,22 +167,25 @@ function startFlow(routineId) {
   // Muscles this workout relies on, most tired first, so you can flag soreness.
   const rec = currentRecovery();
   const muscles = [...new Set(app.routine(routineId).blocks.flatMap(b => getExercise(b.ex)?.primary || []))].sort((a, b) => rec[b].level - rec[a].level).slice(0, 8);
-  S.form = { sleep: 4, energy: 3, soreness: 2, light: null, sore: [] };
+  // Nothing is pre-selected: unanswered questions count as average, and if you answer none it's a skip.
+  S.form = { sleep: null, energy: null, soreness: null, light: null, sore: [] };
+  const answered = () => ['sleep', 'energy', 'soreness'].some(k => S.form[k] != null);
+  const filled = () => ({ sleep: +(S.form.sleep ?? 3), energy: +(S.form.energy ?? 3), soreness: +(S.form.soreness ?? 1) });
   const draw = () => {
-    const sc = readinessScore(S.form), low = sc.label === 'Low';
+    const sc = readinessScore(filled()), low = sc.label === 'Low';
     const light = S.form.light ?? low;
     return `<h2 class="sheet-title">How do you feel today?</h2><p class="sheet-sub">We’ll adjust today’s workout if you need a lighter day.</p>
       ${Object.entries(SCALE).map(([k, [q, opts]]) => `<label class="field-l">${q}</label>${seg(k, opts.map((o, i) => [i + 1, o]), S.form[k])}`).join('')}
-      ${muscles.length ? `<label class="field-l">Sore anywhere? <small>(optional)</small></label><div class="chipset">${muscles.map(m => `<button type="button" class="chip-btn ${S.form.sore.includes(m) ? 'warn-on' : ''}" data-sore-m="${m}" aria-pressed="${S.form.sore.includes(m)}"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(rec[m].level)};margin-right:6px"></span>${esc(MUSCLES[m])}</button>`).join('')}</div>` : ''}
+      ${muscles.length ? `<label class="field-l">Sore anywhere? <small>(optional)</small></label><div class="chipset">${muscles.map(m => `<button type="button" class="chip-btn ${S.form.sore.includes(m) ? 'warn-on' : ''}" data-sore-m="${m}" aria-pressed="${S.form.sore.includes(m)}"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(rec[m].level)};margin-right:6px"></span>${esc(mname(m))}</button>`).join('')}</div>` : ''}
       <div style="height:20px"></div>
-      ${group(row({ title: 'Lighter workout today', sub: low ? 'Recommended: one fewer set and easier effort.' : sc.label === 'Moderate' ? 'Optional. You seem OK to train.' : 'You seem ready to train as planned.', right: `<input type="checkbox" class="switch" id="lightToggle" ${light ? 'checked' : ''} aria-label="Lighter workout today">` }))}
+      ${group(row({ title: 'Lighter workout today', sub: !answered() ? 'Optional. Answer above and we’ll suggest.' : low ? 'Recommended: one fewer set and easier effort.' : sc.label === 'Moderate' ? 'Optional. You seem OK to train.' : 'You seem ready to train as planned.', right: `<input type="checkbox" class="switch" id="lightToggle" ${light ? 'checked' : ''} aria-label="Lighter workout today">` }))}
       <div class="btns"><button class="btn filled" id="go">${icon('play')}Start Workout</button><button class="btn plain" id="skipCheck">Skip check-in</button></div>`;
   };
   const mount = body => {
     body.querySelector('#lightToggle').onchange = e => { S.form.light = e.target.checked; };
     body.querySelectorAll('[data-sore-m]').forEach(b => b.onclick = () => { const m = b.dataset.soreM; S.form.sore = S.form.sore.includes(m) ? S.form.sore.filter(x => x !== m) : [...S.form.sore, m]; app.sheet(draw(), mount); });
     body.querySelector('#skipCheck').onclick = () => { app.closeSheet(); begin(routineId, null, false, [], []); };
-    body.querySelector('#go').onclick = () => { const r = { sleep: +S.form.sleep, energy: +S.form.energy, soreness: +S.form.soreness }; app.closeSheet(); begin(routineId, r, S.form.light ?? readinessScore(r).label === 'Low', S.form.sore, muscles); };
+    body.querySelector('#go').onclick = () => { const r = answered() ? filled() : null; app.closeSheet(); begin(routineId, r, S.form.light ?? (r ? readinessScore(r).label === 'Low' : false), S.form.sore, muscles); };
   };
   app.sheet(draw(), mount);
   app.onPick = () => app.sheet(draw(), mount);
@@ -240,7 +269,8 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });
       const rec = { ...base, title: titleFor(), padel };
       await db.putSession(rec); await app.reloadSessions(); app.closeSheet();
-      app.toast(existing ? 'Saved' : `${rec.title} saved`);
+      const note = existing ? '' : soreNote(padel?.sore);
+      app.toast(`${existing ? 'Saved' : `${rec.title} saved`}${note ? `. ${note}` : ''}`);
       app.render({ keepScroll: true });
     };
   };

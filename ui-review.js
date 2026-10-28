@@ -15,7 +15,7 @@ export const currentReview = (off = 0) => {
   return weekReview(S.sessions, { weekStart: start, schedule: S.schedule, body: S.body, week: programPosition(S.settings.programStart, start).week, painClear: S.painClear });
 };
 
-// For Overview: a nudge on Sunday and Monday until you've opened the latest review.
+// For Today: a nudge on Sunday and Monday until you've opened the latest review.
 export function reviewBanner() {
   const d = new Date().getDay(), key = isoDate(reviewWeekStart());
   if (![0, 1].includes(d) || S.settings.reviewSeen === key || !S.sessions.length) return '';
@@ -27,7 +27,7 @@ function view() {
   const r = currentReview(offset), u = unit();
   const dots = r.days.map(d => `<div class="rv-day"><span class="rv-dot ${d.gym ? 'gym' : d.padel ? 'padel' : d.other ? 'other' : d.planned ? 'missed' : ''}"></span><small>${d.day[0]}</small></div>`).join('');
   const vol = Math.round(toDisplay(r.volume, u)), pvol = Math.round(toDisplay(r.prev.volume, u));
-  return `${navBar({ back: 'Overview', backTo: 'overview', title: '' })}
+  return `${navBar({ back: 'Progress', backTo: 'overview', title: '' })}
     <div class="cal-head" style="padding:8px 4px 4px"><h1 class="t-title">${offset === 0 ? 'Weekly review' : 'Week of'}</h1>
       <span><button class="icon-circle" data-action="rv-prev" aria-label="Previous week">${icon('chevL')}</button> <button class="icon-circle" data-action="rv-next" ${offset === 0 ? 'disabled' : ''} aria-label="Next week">${icon('chevR')}</button></span></div>
     <p class="t-sub" style="padding:0 4px 16px">${esc(range(r.from, r.to))}${r.inProgress ? ' · in progress' : ''}</p>

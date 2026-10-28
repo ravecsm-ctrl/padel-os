@@ -124,7 +124,7 @@ async function boot() {
   document.querySelector('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') app.closeSheet(); });
   parseHash();
   // First run: onboarding. Existing users keep their data and get a prompt on Today instead.
-  if (!S.profile.onboarded && !S.sessions.length && !S.active && S.route === 'overview') S.route = 'welcome';
+  if (!S.profile.onboarded && !S.sessions.length && !S.active && ['today', 'overview'].includes(S.route)) S.route = 'welcome';
   // A workout in progress always opens first.
   if (S.active && S.route !== 'workout') { S.route = 'workout'; S.params = []; window.history.replaceState(null, "", "#/workout"); }
   app.render();

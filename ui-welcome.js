@@ -27,7 +27,7 @@ function body() {
       </div></div>`;
     case 1: return `${q('What’s your main goal?')}${group(Object.entries(GOALS).map(([k, v]) => pick('goal', k, v)).join(''))}`;
     case 2: return `${q('How much have you lifted weights before?')}${group([['beginner', 'Never or rarely', 'We’ll start gently'], ['intermediate', 'Now and then', 'A few times a month'], ['advanced', 'Regularly', 'Most weeks']].map(([k, t, s]) => pick('level', k, t, s)).join(''))}`;
-    case 3: return `${q('Where will you work out?')}${group(pick('equipment', 'gym', EQUIPMENT.gym, 'Machines, cables and barbells') + pick('equipment', 'db', EQUIPMENT.db, 'A pair of dumbbells and a bench or chair') + pick('equipment', 'bw', EQUIPMENT.bw, 'Just your body and a resistance band'))}`;
+    case 3: return `${q('Where will you work out?')}${group(pick('equipment', 'gym', EQUIPMENT.gym, 'Machines, cables and barbells') + pick('equipment', 'db', EQUIPMENT.db, 'A pair of dumbbells and a bench or chair') + pick('equipment', 'bw', EQUIPMENT.bw, 'Just your body (a resistance band helps if you have one)'))}`;
     case 4: return `${q('How much time do you have?')}${group(MINUTES.map(m => pick('minutes', m, `${m} minutes`, m === 20 ? 'Just the essentials' : m === 40 ? 'A balanced workout' : 'The complete workout')).join(''), { header: 'Each workout' })}
       ${group([1, 2, 3].map(d => pick('days', d, `${d} ${d === 1 ? 'day' : 'days'} a week`, d === 1 ? 'Keep what you have' : d === 2 ? 'Steady progress' : 'Best results')).join(''), { header: 'Workouts per week' })}`;
     case 5: return `${q('When do you play padel?', 'We’ll keep hard workouts away from match days.')}${group(DAYS.map(d => multi('padelDays', d, DAY_LONG[d])).join(''), { header: 'Usual padel days' })}
@@ -36,7 +36,8 @@ function body() {
       const sched = generateSchedule(f.days, f.padelDays);
       const ids = [...new Set(Object.values(sched).filter(v => ROUTINES[v]))];
       return `${q('Your plan is ready', 'You can change any of this later.')}
-        <div class="plan-week" style="margin-bottom:28px">${DAYS.map(d => `<div>${d[0]}<b>${ROUTINES[sched[d]] ? '●' : sched[d] === 'Padel' ? '<span style="color:var(--teal)">●</span>' : '–'}</b></div>`).join('')}</div>
+        <div class="plan-week" style="margin-bottom:8px">${DAYS.map(d => `<div>${d[0]}<b>${ROUTINES[sched[d]] ? '●' : sched[d] === 'Padel' ? '<span style="color:var(--teal)">●</span>' : sched[d] === 'Recovery' ? '<span style="color:var(--pink)">●</span>' : '–'}</b></div>`).join('')}</div>
+        <p class="t-foot" style="text-align:center;margin-bottom:24px">● Workout &nbsp; <span style="color:var(--teal)">●</span> Padel &nbsp; <span style="color:var(--pink)">●</span> Recovery &nbsp; – Rest</p>
         ${group(ids.map(id => { const r = resolveRoutine(id, {}, f), look = routineLook(id);
           return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min · ${DAYS.filter(d => sched[d] === id).map(d => DAY_LONG[d]).join(', ')}`, icon: look.icon, color: look.color }); }).join(''), { header: 'Your workouts' })}
         ${group(row({ title: 'Simple mode', sub: 'Plain words instead of training terms', right: `<input type="checkbox" class="switch" id="wSimple" ${f.simple ? 'checked' : ''} aria-label="Simple mode">` })
@@ -48,7 +49,8 @@ function body() {
 
 export const welcome = {
   render() {
-    if (!S.form || S.form._wizard !== true) { S.form = { _wizard: true, ...structuredClone(S.profile) }; step = S.profile.onboarded ? 1 : 0; }
+    // First time: start from a middle-of-the-road week (40 min, twice) rather than the longest option.
+    if (!S.form || S.form._wizard !== true) { S.form = { _wizard: true, ...structuredClone(S.profile), ...(S.profile.onboarded ? {} : { minutes: 40, days: 2 }) }; step = S.profile.onboarded ? 1 : 0; }
     const left = step > (S.profile.onboarded ? 1 : 0) ? `<button class="nav-btn" data-action="w-back">${icon('chevL')}Back</button>` : S.profile.onboarded ? '<button class="nav-btn" data-action="w-cancel">Cancel</button>' : '<span></span>';
     return `<div class="wiz-top">${left}<div class="dots">${step ? Array.from({ length: STEPS }, (_, i) => `<i class="${i < step ? 'on' : ''}"></i>`).join('') : ''}</div><span></span></div>
       ${body()}
@@ -60,7 +62,7 @@ export const welcome = {
     'w-toggle'(el) { const arr = F()[el.dataset.name], v = el.dataset.value; F()[el.dataset.name] = arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]; app.render({ keepScroll: true }); },
     'w-back'() { step = Math.max(0, step - 1); app.render(); },
     'w-cancel'() { S.form = {}; app.go('settings'); },
-    async 'w-skip'() { S.profile = { ...S.profile, onboarded: true, simple: true }; await app.save('profile'); S.form = {}; app.go('overview'); },
+    async 'w-skip'() { S.profile = { ...S.profile, onboarded: true, simple: true }; await app.save('profile'); S.form = {}; app.go('today'); },
     async 'w-next'() {
       if (step < STEPS) { step++; return app.render(); }
       const f = F();
@@ -75,7 +77,7 @@ export const welcome = {
       await app.save('locations'); await app.save('activeLocation');
       if (replace) { S.schedule = generateSchedule(f.days, f.padelDays); await app.save('schedule'); }
       S.form = {};
-      app.go('overview');
+      app.go('today');
       app.toast('Your plan is ready');
     },
   },

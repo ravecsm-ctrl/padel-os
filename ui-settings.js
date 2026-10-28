@@ -16,11 +16,11 @@ const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-
 
 
 export const settings = {
-  tab: 'overview',
+  tab: 'today',
   render() {
     const notif = globalThis.Notification ? Notification.permission : 'unsupported';
     const lb = S.lastBackup ? new Date(S.lastBackup).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'Never';
-    return `${navBar({ back: 'Overview', backTo: 'overview', title: 'Settings' })}
+    return `${navBar({ back: 'Today', backTo: 'today', title: 'Settings' })}
       <div style="height:12px"></div>
       ${group(row({ title: '<input class="input" id="nameIn" value="' + esc(S.settings.name) + '" placeholder="Your name" style="padding:0;background:none;min-height:22px" aria-label="Your name">', icon: 'person', color: 'gray' }), { footer: 'Optional. Shown on Today.' })}
       ${group(row({ title: 'Your plan', sub: `${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week`, icon: 'sliders', color: 'blue', to: 'welcome' })

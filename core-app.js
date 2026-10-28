@@ -73,7 +73,7 @@ export const app = {
     el.classList.add('show');
     clearTimeout(el._t);
     el.onclick = async e => { if (e.target.closest('[data-undo]') && undo) { el.classList.remove('show'); await undo(); } };
-    el._t = setTimeout(() => el.classList.remove('show'), undo ? 6000 : 2600);
+    el._t = setTimeout(() => el.classList.remove('show'), undo ? 6000 : Math.min(7000, Math.max(2600, String(msg).length * 55)));   // longer messages stay longer
   },
 
   sheet(html, onMount) {
@@ -103,7 +103,7 @@ export function applyTheme() {
 
 export function parseHash() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-  S.route = parts[0] || 'overview';
+  S.route = parts[0] || 'today';
   S.params = parts.slice(1);
   if (S.route === 'workout' && !S.active) S.route = 'today';
 }

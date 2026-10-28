@@ -3,6 +3,7 @@
 import { S } from './core-app.js';
 import { chips, seg } from './ui-kit.js';
 import { fmtNum } from './domain-units.js';
+import { MUSCLES } from './domain-taxonomy.js';
 
 export const simple = () => S.profile?.simple !== false;
 
@@ -11,7 +12,7 @@ const SESSION_EFFORT = [[3, 'Very easy'], [5, 'Easy'], [6, 'Moderate'], [7, 'Har
 
 export function effortTarget(rpe) {
   if (!simple()) return `RPE ${fmtNum(rpe)}`;
-  return rpe <= 6 ? 'Easy effort' : rpe <= 7 ? '~3 reps left in the tank' : rpe <= 8 ? '~2 reps left in the tank' : '~1 rep left';
+  return rpe <= 6 ? 'Easy effort' : rpe <= 7 ? 'Stop with about 3 reps to spare' : rpe <= 8 ? 'Stop with about 2 reps to spare' : 'Stop with about 1 rep to spare';
 }
 export function setEffortChips(name, current) {
   return simple() ? chips(name, SET_EFFORT.map(e => e[0]), current, v => SET_EFFORT.find(e => e[0] === v)[1])
@@ -28,3 +29,14 @@ export const setEffortSeg = (name, current) => simple()
   ? seg(name, SET_EFFORT.map(([v, l]) => [v, l]), current)
   : seg(name, [6, 7, 8, 9, 10].map(v => [v, `RPE ${v}`]), current);
 export const setEffortWord = rpe => rpe == null ? '' : simple() ? (SET_EFFORT.find(e => e[0] === rpe)?.[1] || `RPE ${rpe}`) : `RPE ${fmtNum(rpe)}`;
+
+// Muscle names: everyday words in Simple mode, the anatomy terms otherwise.
+const PLAIN = {
+  front_delts: 'Front shoulders', side_delts: 'Side shoulders', rear_delts: 'Rear shoulders', rotator_cuff: 'Shoulder stabilisers',
+  traps: 'Upper back & neck', lats: 'Wide back', lower_back: 'Lower back', forearms: 'Forearms & grip', obliques: 'Side abs',
+  hip_flexors: 'Front of hips', glute_med: 'Side glutes', adductors: 'Inner thighs', quads: 'Front thighs', hamstrings: 'Back thighs',
+  soleus: 'Deep calves', shins: 'Shins',
+};
+export const mname = m => MUSCLES[m] ? (simple() && PLAIN[m]) || MUSCLES[m] : undefined;
+// Sets per muscle count secondary work as half a set: show ½ rather than .5.
+export const fmtSets = n => { const w = Math.floor(n), h = Math.round((n - w) * 2) === 1; return w ? `${w}${h ? '½' : ''}` : h ? '½' : '0'; };
