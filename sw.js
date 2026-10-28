@@ -1,5 +1,5 @@
 // Bump VERSION on every release so clients pick up new files.
-const VERSION = 'pos-pro-v11';
+const VERSION = 'pos-pro-v12';
 const SHELL = [
   './', './index.html', './app.css', './manifest.webmanifest',
   './main.js', './core-app.js', './core-db.js', './core-timer.js',
@@ -7,7 +7,7 @@ const SHELL = [
   './domain-backup.js', './domain-units.js', './domain-calendar.js', './domain-workout.js',
   './domain-personalize.js', './domain-court.js', './domain-padel.js', './domain-taxonomy.js', './domain-importer.js', './domain-muscles.js', './domain-builder.js', './domain-recovery.js', './domain-adaptive.js', './domain-stats.js', './domain-overview.js',
   './ui-kit.js', './ui-today.js', './ui-workout.js', './ui-history.js', './ui-plan.js', './ui-settings.js',
-  './ui-court.js', './ui-welcome.js', './ui-words.js', './ui-library.js', './ui-locations.js', './ui-bodymap.js', './ui-builder.js', './ui-recovery.js', './ui-stats.js', './ui-overview.js',
+  './ui-court.js', './ui-welcome.js', './ui-words.js', './ui-library.js', './ui-locations.js', './ui-bodymap.js', './ui-builder.js', './ui-recovery.js', './ui-stats.js', './ui-overview.js', './ui-backup.js',
   './icon-180.png', './icon-192.png', './icon-512.png',
 ];
 

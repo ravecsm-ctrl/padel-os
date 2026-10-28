@@ -3,7 +3,8 @@ import { app, S, DEFAULT_SETTINGS, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
 import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
-import { buildBackup, validateBackup, normalizeBackup, toCSV } from './domain-backup.js';
+import { validateBackup, normalizeBackup, toCSV } from './domain-backup.js';
+import { saveBackup, saveFile } from './ui-backup.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
 import { setCustomExercises, setStartWeights } from './domain-catalog.js';
@@ -12,12 +13,6 @@ import { setCustomRoutines } from './domain-program.js';
 let persist = '…';
 const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
 
-function download(name, text, type) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
 
 export const settings = {
   tab: 'overview',
@@ -39,7 +34,7 @@ export const settings = {
         + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'During workouts' })}
       <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>
       <section class="grp"><h2 class="grp-h">Appearance</h2>${seg('appearance', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.settings.appearance || 'system')}</section>
-      ${group(row({ title: 'Back up now', sub: `Last backup: ${esc(lb)}`, icon: 'download', color: 'blue', action: 'export-json' })
+      ${group(row({ title: 'Back up now', sub: `Save to Files or iCloud Drive · last: ${esc(lb)}`, icon: 'download', color: 'blue', action: 'export-json' })
         + row({ title: 'Export for spreadsheets', sub: 'CSV file of every set', icon: 'share', color: 'green', action: 'export-csv' })
         + `<label class="row has-icon" style="cursor:pointer"><span class="tile teal">${icon('plus')}</span><span class="row-main"><span class="row-title">Restore from backup</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg><input id="importIn" type="file" accept="application/json,.json" hidden></label>`
         + (persist !== 'granted' ? row({ title: 'Protect my data', sub: 'Ask the browser not to clear it', icon: 'shield', color: 'indigo', action: 'persist' }) : ''),
@@ -65,12 +60,8 @@ export const settings = {
   actions: {
     async notif() { try { await Notification.requestPermission(); } catch {} app.render({ keepScroll: true }); },
     async persist() { persist = await db.requestPersistence(); app.toast(persist === 'granted' ? 'Your data is protected' : 'Not allowed. Add to Home Screen and back up regularly.'); app.render({ keepScroll: true }); },
-    async 'export-json'() {
-      const meta = await db.allMeta(); delete meta.timer;
-      download(`padel-os-backup-${isoDate()}.json`, JSON.stringify(buildBackup(meta, S.sessions), null, 2), 'application/json');
-      S.lastBackup = Date.now(); await app.save('lastBackup'); app.render({ keepScroll: true });
-    },
-    'export-csv'() { download(`padel-os-sets-${isoDate()}.csv`, toCSV(S.sessions), 'text/csv'); },
+    'export-json'() { saveBackup(); },
+    'export-csv'() { saveFile(`padel-os-sets-${isoDate()}.csv`, toCSV(S.sessions), 'text/csv'); },
     async reset() {
       if (!(await app.confirm('Erase all workouts, matches and settings on this device?', { ok: 'Continue', danger: true }))) return;
       if (!(await app.confirm('This can’t be undone without a backup. Erase everything?', { ok: 'Erase Everything', danger: true }))) return;

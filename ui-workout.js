@@ -5,7 +5,7 @@ import * as timer from './core-timer.js';
 import { esc, icon, navBar, group, row, stat, tile } from './ui-kit.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-units.js';
-import { lastPerformance, doneSets, detectPRs, bestE1rm } from './domain-progression.js';
+import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
 import { autofill, swapExercise, workoutStats, finalizeWorkout } from './domain-workout.js';
@@ -205,11 +205,13 @@ export const workout = {
       } else s[f] = Math.max(0, (base || 0) + dir * (f === 'reps' ? 1 : 5));
       touch();
     },
-    'set-done'(el) {
+    async 'set-done'(el) {
       const w = W(), e = cur(), i = +el.dataset.set, s = e.sets[i];
       autofill(e, i);
       const tf = e.fields[e.fields.length - 1];
       if (!s[tf]) return app.toast(`Add the ${UNIT_WORD[tf]} first`);
+      const best = heaviest(before(), e.exId);
+      if (looksOff(s.w, best) && !(await app.confirm(`${esc(fmtW(s.w, unit()))} is much heavier than your best on this exercise (${esc(fmtW(best, unit()))}). Is that right?`, { ok: 'Yes, Log It' }))) return;
       s.done = true; s.ts = Date.now();
       const moreHere = e.sets.some(x => !x.done);
       if (S.settings.autoRest && !w.past) {

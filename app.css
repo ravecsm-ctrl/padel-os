@@ -391,3 +391,12 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .cd.gym { background: var(--blue); } .cd.padel, .cd.other { background: var(--teal); }
 .cd.missed { background: none; box-shadow: inset 0 0 0 1.5px var(--label-3); }
 .cd.plan { background: none; box-shadow: inset 0 0 0 1.5px currentColor; opacity: .5; } .cd.plan.gym { color: var(--blue); } .cd.plan.padel { color: var(--teal); }
+
+/* Set editor (saved workouts) */
+.eset { gap: 10px; }
+.eset .row-title { flex: 0 0 18px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+.ein { flex: 1; display: flex; align-items: baseline; gap: 4px; min-width: 0; }
+.ein .input { width: 100%; min-width: 0; padding: 6px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+.ein span { font-size: 13px; color: var(--label-2); flex: none; }
+.eset-del { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--fill); color: var(--red); display: grid; place-items: center; }
+.eset-del .i { width: 16px; height: 16px; }

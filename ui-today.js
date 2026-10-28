@@ -15,6 +15,7 @@ import { calibrate, colorFor } from './domain-recovery.js';
 import { phaseFor, DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
+import { saveBackup } from './ui-backup.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -32,7 +33,7 @@ export function banners({ resumeOnly = false } = {}) {
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
   if (S.sessions.length >= 3) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
-    if (days == null || days >= 14) out += `<button class="banner" data-action="go" data-to="settings">${tile('download', 'gray')}<span><b>Back up your data</b><small>${days == null ? 'You haven’t made a backup yet.' : `Last backup ${days} days ago.`}</small></span>${chev}</button>`;
+    if (days == null || days >= 7) out += `<button class="banner" data-action="quick-backup">${tile('download', 'gray')}<span><b>Back up your data</b><small>${days == null ? 'Tap to save a copy to Files or iCloud Drive.' : `Last backup ${days} days ago. Tap to save a copy.`}</small></span>${chev}</button>`;
   }
   return out;
 }
@@ -103,6 +104,7 @@ export const today = {
   },
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
+    'quick-backup'() { saveBackup(); },
     start(el) { startFlow(el.dataset.routine); },
     resume() { app.go('workout'); },
     async 'discard-active'() {

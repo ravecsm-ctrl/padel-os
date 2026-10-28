@@ -128,3 +128,24 @@ export function detectPRs(entry, history) {
   }
   return prs;
 }
+
+// Records are relative to everything before a session, so changing one session can change
+// the records of later ones. Returns only the sessions whose records changed.
+export function recomputePRs(sessions) {
+  const prior = [], changed = [];
+  for (const s of sessions.filter(x => x.kind === 'strength').sort((a, b) => a.startedAt - b.startedAt)) {
+    const prs = [];
+    for (const e of s.exercises || []) for (const p of detectPRs(e, prior)) prs.push({ exId: e.exId, name: e.name, ...p });
+    if (JSON.stringify(prs) !== JSON.stringify(s.prs || [])) changed.push({ ...s, prs });
+    prior.push(s);
+  }
+  return changed;
+}
+
+// A weight far above anything you've lifted on this exercise is probably a typo (600 for 60).
+export function heaviest(history, exId) {
+  let best = 0;
+  for (const s of history) if (s.kind === 'strength') for (const e of s.exercises || []) if (e.exId === exId) for (const x of doneSets(e)) best = Math.max(best, x.w || 0);
+  return best;
+}
+export const looksOff = (w, best) => best > 0 && w > Math.max(best * 1.6, best + 20);

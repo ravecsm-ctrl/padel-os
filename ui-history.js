@@ -4,9 +4,9 @@ import * as db from './core-db.js';
 import { esc, icon, pageHead, navBar, group, row, stat, empty, barChart, lineChart, sparkline, routineLook } from './ui-kit.js';
 import { getExercise, targetField, FIELD_UNIT } from './domain-catalog.js';
 import { weeklySeries, loadTrend, setCount, volumeKg, sessionLoad, weekStreak, trainingDays, exerciseSeries, exerciseSummaries, progressMetric } from './domain-analytics.js';
-import { doneSets } from './domain-progression.js';
+import { doneSets, recomputePRs, heaviest, looksOff } from './domain-progression.js';
 import { isoDate, mondayOf, relDay, parseISO } from './domain-calendar.js';
-import { fmtW, fmtNum, toDisplay } from './domain-units.js';
+import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
 import { activitySheet } from './ui-today.js';
 import { padelSummary, PADEL_TYPES, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
@@ -123,13 +123,37 @@ function logView() {
     ${lists}`;
 }
 
+// ── Edit the sets of a saved workout (typos, forgotten sets).
+let EDIT = null;
+function editView(id) {
+  if (!EDIT || EDIT.id !== id) {
+    const s = S.sessions.find(x => x.id === id);
+    if (!s || s.kind !== 'strength') return sessionView(id);
+    EDIT = structuredClone(s);
+    for (const e of EDIT.exercises) e.sets = doneSets(e);
+  }
+  const u = unit();
+  const input = (ei, si, f, v, label) => `<label class="ein"><input class="input num" type="number" inputmode="decimal" step="any" min="0" data-ei="${ei}" data-si="${si}" data-f="${f}" value="${v ?? ''}" aria-label="${esc(label)}"><span>${esc(f === 'w' ? u : f === 'reps' ? 'reps' : FIELD_UNIT[f])}</span></label>`;
+  const groups = EDIT.exercises.map((e, ei) => {
+    if (e.skipped) return '';
+    const tf = e.fields[e.fields.length - 1];
+    const rows = e.sets.map((x, si) => `<div class="row eset"><span class="row-title">${si + 1}</span>
+      ${e.fields.includes('w') ? input(ei, si, 'w', x.w != null ? fmtNum(toDisplay(x.w, u)) : '', `Set ${si + 1} weight`) : ''}${input(ei, si, tf, x[tf], `Set ${si + 1} ${tf}`)}
+      <button class="eset-del" data-action="eset-del" data-ei="${ei}" data-si="${si}" aria-label="Remove set ${si + 1}">${icon('minus')}</button></div>`).join('');
+    return group(rows + row({ title: 'Add Set', icon: 'plus', color: 'green', action: 'eset-add', data: { ei }, chevron: false, cls: 'action' }), { header: esc(e.name) });
+  }).join('');
+  return `${navBar({ back: 'Cancel', backAction: 'edit-cancel', title: 'Edit Sets', right: '<button class="nav-btn right" data-action="edit-save">Save</button>' })}<div style="height:12px"></div>
+    ${groups}<p class="fine">Records, suggestions and projections update after you save. Sets left empty are removed.</p>`;
+}
+
 function sessionView(id) {
+  EDIT = null;
   const s = S.sessions.find(x => x.id === id);
   if (!s) return `${navBar({ back: 'History', backTo: 'history' })}${empty('chart', 'Not found', 'This session no longer exists.')}`;
   const gym = s.kind === 'strength';
   const nav = navBar({ back: 'History', backTo: 'history', title: '' });
   const head = `<h1 class="t-title" style="padding:8px 4px 2px">${esc(s.title)}</h1><p class="t-sub" style="padding:0 4px 20px">${esc(dateLong(s.startedAt))}</p>`;
-  const actions = `<div class="btns"><button class="btn tinted" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">Edit</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>`;
+  const actions = `<div class="btns">${gym ? `<button class="btn tinted" data-action="go" data-to="history/edit/${esc(s.id)}">Edit Sets</button>` : ''}<button class="btn ${gym ? 'gray' : 'tinted'}" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">${gym ? 'Edit Details' : 'Edit'}</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>`;
   if (!gym) {
     const pd = s.padel;
     const details = pd ? [['Type', PADEL_TYPES[pd.type]], ['Result', pd.result === 'won' ? 'Won' : pd.result === 'lost' ? 'Lost' : ''], ['Score', pd.score], ['Partner', pd.partner], ['Side', pd.side === 'drive' ? 'Right' : pd.side === 'reves' ? 'Left' : pd.side === 'both' ? 'Both' : ''], ['Sore', pd.sore?.length ? pd.sore.map(a => AREAS[a]).join(', ') : 'Nothing']].filter(r => r[1]) : [];
@@ -177,12 +201,20 @@ export const history = {
   render() {
     const [sub, id] = S.params;
     if (sub === 'session') return sessionView(id);
+    if (sub === 'edit') return editView(id);
     if (sub === 'progress') return exercisesView();
     if (sub === 'ex') return exerciseView(id);
     if (sub === 'muscles') return musclesView();
     return logView();
   },
-  onInput(el) { if (el.dataset.note) { S.exNotes[el.dataset.note] = el.value; clearTimeout(this._n); this._n = setTimeout(() => app.save('exNotes'), 400); } },
+  onInput(el) {
+    if (el.dataset.ei != null && EDIT) {
+      const x = EDIT.exercises[+el.dataset.ei].sets[+el.dataset.si], f = el.dataset.f;
+      const raw = el.value === '' ? null : Number(String(el.value).replace(',', '.'));
+      x[f] = f === 'w' ? fromDisplay(raw, unit()) : raw;
+      return;
+    }
+    if (el.dataset.note) { S.exNotes[el.dataset.note] = el.value; clearTimeout(this._n); this._n = setTimeout(() => app.save('exNotes'), 400); } },
   actions: {
     async 'delete-session'(el) {
       const s = S.sessions.find(x => x.id === el.dataset.id);
@@ -191,6 +223,24 @@ export const history = {
       app.toast('Deleted', async () => { await db.putSession(s); await app.reloadSessions(); app.render({ keepScroll: true }); });
     },
     'muscle-sheet'(el) { muscleSheet(el.dataset.m); },
+    'eset-add'(el) {
+      const e = EDIT.exercises[+el.dataset.ei], last = e.sets[e.sets.length - 1];
+      e.sets.push({ w: last?.w ?? null, reps: last?.reps ?? null, sec: last?.sec ?? null, m: last?.m ?? null, rpe: null, done: true });
+      app.render({ keepScroll: true });
+    },
+    'eset-del'(el) { EDIT.exercises[+el.dataset.ei].sets.splice(+el.dataset.si, 1); app.render({ keepScroll: true }); },
+    'edit-cancel'() { const id = EDIT?.id; EDIT = null; app.go(id ? `history/session/${id}` : 'history'); },
+    async 'edit-save'() {
+      const s = EDIT;
+      for (const e of s.exercises) { const tf = e.fields[e.fields.length - 1]; e.sets = e.sets.filter(x => x[tf] > 0).map(x => ({ ...x, done: true })); }
+      const others = S.sessions.filter(x => x.id !== s.id);
+      const odd = s.exercises.flatMap(e => { const best = heaviest(others, e.exId); return e.sets.filter(x => looksOff(x.w, best)).map(x => `${fmtW(x.w, unit())} on ${e.name} (your best is ${fmtW(best, unit())})`); });
+      if (odd.length && !(await app.confirm(`${esc(odd[0])} looks unusually heavy. Save anyway?`, { ok: 'Save Anyway' }))) return;
+      const changed = recomputePRs([...others, s]), mine = changed.find(c => c.id === s.id) || s;
+      try { for (const x of [mine, ...changed.filter(c => c.id !== s.id)]) await db.putSession(x); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }
+      await app.reloadSessions(); EDIT = null; app.go(`history/session/${s.id}`);
+      app.toast(changed.length ? 'Saved · records updated' : 'Saved');
+    },
     'edit-activity'(el) { activitySheet(null, S.sessions.find(x => x.id === el.dataset.id)); },
     'edit-session'(el) {
       const s = S.sessions.find(x => x.id === el.dataset.id);
