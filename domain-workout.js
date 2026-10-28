@@ -58,8 +58,13 @@ export function workoutStats(w) {
   return { sets, planned, volume, minutes: w.past ? w.minutes || 60 : Math.max(1, Math.round((Date.now() - w.startedAt) / 60000)) };
 }
 
+// Exercises you added yourself and never logged a set for are left out of the saved workout
+// (usually added by mistake). Planned ones stay, marked as not done.
+export const unusedAdded = w => w.exercises.filter(e => e.added && !doneSets(e).length);
+
 export function finalizeWorkout(w, { rpe, notes, pain, durationMin }, history) {
-  const exercises = w.exercises
+  const unused = new Set(unusedAdded(w));
+  const exercises = w.exercises.filter(e => !unused.has(e))
     .map(e => ({ exId: e.exId, name: e.name, fields: e.fields, perSide: e.perSide, target: e.target, skipped: e.skipped, swappedFrom: e.swappedFrom, note: e.note,
       // What the app suggested, so the weekly review can check how often it was right.
       suggested: e.suggestion ? { w: e.suggestion.w ?? null, target: e.suggestion.target ?? null, kind: e.suggestion.kind || null } : null,
@@ -121,4 +126,23 @@ export function addExercise(w, exId, history, unit = 'kg', at = w.exercises.leng
   entry.added = true;
   w.exercises.splice(Math.max(0, Math.min(at, w.exercises.length)), 0, entry);
   return w.exercises.indexOf(entry);
+}
+
+// Take an exercise out of a workout in progress (a superset partner goes back to solo).
+export function removeExercise(w, i) {
+  if (!w.exercises[i]) return null;
+  unpairExercise(w, i);
+  const [gone] = w.exercises.splice(i, 1);
+  if (i < w.index) w.index--;
+  w.index = Math.max(0, Math.min(w.index, w.exercises.length - 1));
+  return gone;
+}
+
+// A blank exercise to add to a saved workout when editing it afterwards.
+export function savedEntry(exId) {
+  const ex = getExercise(exId);
+  if (!ex) return null;
+  const rx = prescriptionFor(ex);
+  return { exId, name: ex.name, fields: ex.fields, perSide: ex.perSide, target: { sets: rx.sets, min: rx.min, max: rx.max, rest: rx.rest }, skipped: false, added: true,
+    sets: [{ w: null, reps: null, sec: null, m: null, rpe: null, done: true }] };
 }

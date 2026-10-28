@@ -13,6 +13,8 @@ import { AREAS } from './domain-personalize.js';
 import { painAreasOf } from './domain-pain.js';
 import { routineFromWorkout, setCustomRoutines } from './domain-program.js';
 import { feedbackSheet } from './ui-feedback.js';
+import { exercisePicker } from './ui-picker.js';
+import { savedEntry } from './domain-workout.js';
 import { COURT_ROUTINES, stretchFor, routineMinutes as rMin } from './domain-court.js';
 import { simple, effortWord, loadUnit, e1rmLabel, sessionEffortChips } from './ui-words.js';
 import { bodyMap } from './ui-bodymap.js';
@@ -126,7 +128,7 @@ function logView() {
     ${lists}`;
 }
 
-// ── Edit the sets of a saved workout (typos, forgotten sets).
+// ── Edit a saved workout: fix sets, add a forgotten exercise, remove one added by mistake.
 let EDIT = null;
 function editView(id) {
   if (!EDIT || EDIT.id !== id) {
@@ -138,15 +140,18 @@ function editView(id) {
   const u = unit();
   const input = (ei, si, f, v, label) => `<label class="ein"><input class="input num" type="number" inputmode="decimal" step="any" min="0" data-ei="${ei}" data-si="${si}" data-f="${f}" value="${v ?? ''}" aria-label="${esc(label)}"><span>${esc(f === 'w' ? u : f === 'reps' ? 'reps' : FIELD_UNIT[f])}</span></label>`;
   const groups = EDIT.exercises.map((e, ei) => {
-    if (e.skipped) return '';
     const tf = e.fields[e.fields.length - 1];
     const rows = e.sets.map((x, si) => `<div class="row eset"><span class="row-title">${si + 1}</span>
       ${e.fields.includes('w') ? input(ei, si, 'w', x.w != null ? fmtNum(toDisplay(x.w, u)) : '', `Set ${si + 1} weight`) : ''}${input(ei, si, tf, x[tf], `Set ${si + 1} ${tf}`)}
       <button class="eset-del" data-action="eset-del" data-ei="${ei}" data-si="${si}" aria-label="Remove set ${si + 1}">${icon('minus')}</button></div>`).join('');
-    return group(rows + row({ title: 'Add Set', icon: 'plus', color: 'green', action: 'eset-add', data: { ei }, chevron: false, cls: 'action' }), { header: esc(e.name) });
+    return group(rows + row({ title: 'Add Set', icon: 'plus', color: 'green', action: 'eset-add', data: { ei }, chevron: false, cls: 'action' })
+      + row({ title: 'Remove Exercise', icon: 'trash', color: 'red', action: 'eex-del', data: { ei }, chevron: false, cls: 'action red' }),
+      { header: `${esc(e.name)}${e.skipped && !e.sets.length ? ' · skipped' : !e.sets.length ? ' · not done' : ''}` });
   }).join('');
-  return `${navBar({ back: 'Cancel', backAction: 'edit-cancel', title: 'Edit Sets', right: '<button class="nav-btn right" data-action="edit-save">Save</button>' })}<div style="height:12px"></div>
-    ${groups}<p class="fine">Records, suggestions and projections update after you save. Sets left empty are removed.</p>`;
+  return `${navBar({ back: 'Cancel', backAction: 'edit-cancel', title: 'Edit Workout', right: '<button class="nav-btn right" data-action="edit-save">Save</button>' })}<div style="height:12px"></div>
+    ${groups || '<p class="t-sub" style="text-align:center;margin:20px 0">No exercises left. Add one, or cancel and delete the workout.</p>'}
+    <button class="btn gray" data-action="eex-add">${icon('plus')}Add Exercise</button>
+    <p class="fine">Records, suggestions and projections update after you save. Sets left empty are removed. Date, effort and notes are under Edit Details.</p>`;
 }
 
 function sessionView(id) {
@@ -156,7 +161,7 @@ function sessionView(id) {
   const gym = s.kind === 'strength';
   const nav = navBar({ back: 'History', backTo: 'history', title: '' });
   const head = `<h1 class="t-title" style="padding:8px 4px 2px">${esc(s.title)}</h1><p class="t-sub" style="padding:0 4px 20px">${esc(dateLong(s.startedAt))}</p>`;
-  const actions = `<div class="btns">${gym && !s.routineId ? `<button class="btn tinted" data-action="save-as-routine" data-id="${esc(s.id)}">Save as a Workout</button>` : ''}${gym ? `<button class="btn ${s.routineId ? 'tinted' : 'gray'}" data-action="go" data-to="history/edit/${esc(s.id)}">Edit Sets</button>` : ''}<button class="btn ${gym ? 'gray' : 'tinted'}" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">${gym ? 'Edit Details' : 'Edit'}</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>
+  const actions = `<div class="btns">${gym && !s.routineId ? `<button class="btn tinted" data-action="save-as-routine" data-id="${esc(s.id)}">Save as a Workout</button>` : ''}${gym ? `<button class="btn ${s.routineId ? 'tinted' : 'gray'}" data-action="go" data-to="history/edit/${esc(s.id)}">Edit Workout</button>` : ''}<button class="btn ${gym ? 'gray' : 'tinted'}" data-action="${gym ? 'edit-session' : 'edit-activity'}" data-id="${esc(s.id)}">${gym ? 'Edit Details' : 'Edit'}</button><button class="btn destructive" data-action="delete-session" data-id="${esc(s.id)}">Delete</button></div>
     <p style="text-align:center;margin-top:14px"><button class="link" data-action="feels-off-session" data-id="${esc(s.id)}">Something feels off?</button></p>`;
   if (!gym) {
     const pd = s.padel;
@@ -250,10 +255,21 @@ export const history = {
       app.render({ keepScroll: true });
     },
     'eset-del'(el) { EDIT.exercises[+el.dataset.ei].sets.splice(+el.dataset.si, 1); app.render({ keepScroll: true }); },
+    'eex-del'(el) { const [e] = EDIT.exercises.splice(+el.dataset.ei, 1); app.render({ keepScroll: true }); app.toast(`${esc(e.name)} removed. Tap Save to keep the change.`); },
+    'eex-add'() {
+      exercisePicker({ sub: 'Then enter the sets you did.', inUse: EDIT.exercises.map(e => e.exId), pick: id => {
+        const e = savedEntry(id); if (!e) return;
+        EDIT.exercises.push(e); app.render({ keepScroll: true });
+        setTimeout(() => document.querySelector(`[data-ei="${EDIT.exercises.length - 1}"][data-si="0"]`)?.focus(), 300);
+      } });
+    },
     'edit-cancel'() { const id = EDIT?.id; EDIT = null; app.go(id ? `history/session/${id}` : 'history'); },
     async 'edit-save'() {
       const s = EDIT;
-      for (const e of s.exercises) { const tf = e.fields[e.fields.length - 1]; e.sets = e.sets.filter(x => x[tf] > 0).map(x => ({ ...x, done: true })); }
+      for (const e of s.exercises) { const tf = e.fields[e.fields.length - 1]; e.sets = e.sets.filter(x => x[tf] > 0).map(x => ({ ...x, done: true })); if (e.sets.length) e.skipped = false; }
+      // An exercise added here but left empty is dropped; planned ones you didn't do stay as they were.
+      s.exercises = s.exercises.filter(e => e.sets.length || !e.added);
+      if (!s.exercises.some(e => e.sets.length)) return app.toast('No sets left. To remove this workout, cancel and tap Delete.');
       const others = S.sessions.filter(x => x.id !== s.id);
       const odd = s.exercises.flatMap(e => { const best = heaviest(others, e.exId); return e.sets.filter(x => looksOff(x.w, best)).map(x => `${fmtW(x.w, unit())} on ${e.name} (your best is ${fmtW(best, unit())})`); });
       if (odd.length && !(await app.confirm(`${esc(odd[0])} looks unusually heavy. Save anyway?`, { ok: 'Save Anyway' }))) return;

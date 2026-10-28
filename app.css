@@ -95,7 +95,7 @@ button.row:active, a.row:active { background: var(--fill); }
 .tile.green { background: var(--green); } .tile.orange { background: var(--orange); } .tile.teal { background: var(--teal); }
 .tile.indigo { background: var(--indigo); } .tile.pink { background: var(--pink); } .tile.red { background: var(--red); } .tile.gray { background: #8E8E93; }
 .row.danger { color: var(--red); justify-content: center; }
-.row.action { color: var(--blue); }
+.row.action { color: var(--blue); } .row.action.red { color: var(--red); }
 .check-mark { color: var(--blue); width: 20px; height: 20px; stroke-width: 2.6; }
 
 /* Cards */

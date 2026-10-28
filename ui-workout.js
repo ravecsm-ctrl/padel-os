@@ -12,7 +12,7 @@ import { toDisplay, fromDisplay, fmtW, fmtNum, displayStep } from './domain-unit
 import { lastPerformance, doneSets, detectPRs, bestE1rm, heaviest, looksOff } from './domain-progression.js';
 import { relDay, isoDate, parseISO } from './domain-calendar.js';
 import { simple, effortTarget, setEffortSeg, setEffortWord, sessionEffortChips } from './ui-words.js';
-import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
+import { autofill, swapExercise, workoutStats, finalizeWorkout, addExercise, removeExercise, unusedAdded, partnerIndex, pairExercises, unpairExercise, supersetPairs, afterSet } from './domain-workout.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel, CATEGORIES } from './domain-taxonomy.js';
 import { bodyMap, exerciseMap } from './ui-bodymap.js';
@@ -240,7 +240,7 @@ function finishView() {
   const w = W(), st = workoutStats(w);
   const prs = w.exercises.flatMap(e => detectPRs({ ...e, sets: doneSets(e) }, before()).map(p => ({ ...p, name: e.name })));
   S.form.rpe ??= ''; S.form.pain ??= 'no'; S.form.painAreas ??= [];
-  const missing = w.exercises.filter(e => !e.skipped && !doneSets(e).length).length;
+  const unused = unusedAdded(w), missing = w.exercises.filter(e => !e.skipped && !e.added && !doneSets(e).length).length;
   const vol = Math.round(toDisplay(st.volume, unit()));
   return `${navBar({ back: 'Workout', backAction: 'back-to-runner', title: 'Summary' })}
     <div class="finish-hero"><div class="big-tick">${icon('check')}</div><h1 class="t-title">Workout complete</h1><p class="t-sub" style="margin-top:4px">${esc(w.title)}</p></div>
@@ -248,6 +248,7 @@ function finishView() {
     ${(() => { const mm = sessionMuscles({ kind: 'strength', exercises: w.exercises }), top = ranked(mm).slice(0, 4); return top.length ? `<section class="grp"><h2 class="grp-h">Muscles worked</h2><div class="card">${bodyMap(mm)}<p class="t-foot" style="text-align:center;margin-top:8px">${esc(top.map(m => m.label).join(' · '))}</p></div></section>` : ''; })()}
     ${prs.length ? group(prs.map(p => row({ title: esc(p.name), sub: p.type === 'e1RM' ? (simple() ? 'New estimated max' : 'New e1RM') : `New ${esc(p.type.toLowerCase())}`, value: p.type === 'e1RM' || p.type === 'Heaviest' ? fmtW(p.value, unit()) : fmtNum(p.value), icon: 'trophy', color: 'orange' })).join(''), { header: 'Personal records' }) : ''}
     ${missing ? `<p class="fine" style="margin-bottom:20px">${missing} exercise${missing > 1 ? 's were' : ' was'} not done and won’t be counted.</p>` : ''}
+    ${unused.length ? `<p class="fine" style="margin-bottom:20px">${esc(unused.map(e => e.name).join(', '))} ${unused.length > 1 ? 'have' : 'has'} no sets logged and won’t be saved.</p>` : ''}
     ${keepGroup(w)}
     <label class="field-l">How hard was it overall?</label>${sessionEffortChips('rpe', S.form.rpe)}
     <div style="height:24px"></div>
@@ -385,6 +386,7 @@ export const workout = {
             : nextFree() >= 0 ? row({ title: `Superset with ${esc(W().exercises[nextFree()].name)}`, sub: 'Alternate sets, rest after each pair', icon: 'bolt', color: 'orange', action: 'pair' }) : '')
           + row({ title: 'Replace exercise', sub: 'Busy equipment or something feels off', icon: 'swap', color: 'indigo', action: 'swap' })
           + row({ title: e.skipped ? 'Don’t skip' : 'Skip exercise', icon: 'skip', color: 'orange', action: 'skip' })
+          + row({ title: 'Remove exercise', sub: W().routineId ? 'Just from this workout' : 'Added by mistake? Take it out', icon: 'trash', color: 'red', action: 'remove-ex' })
           + row({ title: 'My notes', sub: note ? esc(note.slice(0, 40)) : 'Seat height, grip, reminders', icon: 'note', color: 'gray', action: 'notes' })
           + row({ title: 'Something feels off', sub: 'Weight, recovery, anything: saved for tuning', icon: 'info', color: 'orange', action: 'feels-off' }))}
         <button class="btn gray" data-action="close-sheet">Cancel</button>`);
@@ -408,6 +410,12 @@ export const workout = {
       app.sheet(`<h2 class="sheet-title">My notes</h2><p class="sheet-sub">Saved with ${esc(getExercise(e.exId).name)} and shown next time.</p>
         <textarea class="input" data-note="${esc(e.exId)}" rows="4" placeholder="e.g. seat on 4, narrow grip">${esc(S.exNotes[e.exId] || '')}</textarea>
         <div style="height:16px"></div><button class="btn filled" data-action="close-sheet">Done</button>`);
+    },
+    async 'remove-ex'() {
+      const w = W(), e = cur(), n = doneSets(e).length;
+      app.closeSheet();
+      if (n && !(await app.confirm(`Remove ${esc(e.name)}? Its ${n} logged set${n > 1 ? 's' : ''} will be lost.`, { ok: 'Remove', danger: true }))) return;
+      removeExercise(w, w.index); touch(false); app.toast(`${esc(e.name)} removed`);
     },
     'add-set'() { const e = cur(); e.sets.push({ w: null, reps: null, sec: null, m: null, rpe: null, done: false }); app.closeSheet(); touch(); },
     'remove-set'() { const e = cur(); if (e.sets.length > 1) { const i = e.sets.map(s => s.done).lastIndexOf(false); e.sets.splice(i >= 0 ? i : e.sets.length - 1, 1); } app.closeSheet(); touch(); },
