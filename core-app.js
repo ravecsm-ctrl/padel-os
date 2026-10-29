@@ -1,9 +1,9 @@
 // Application state, persistence wiring, hash router, toasts and sheets.
 // Views import `app` and `S`; main.js registers views and boots.
 import * as db from './core-db.js';
-import { DEFAULT_SCHEDULE, resolveRoutine } from './domain-program.js';
+import { DEFAULT_SCHEDULE, resolveRoutine, DAYS } from './domain-program.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
-import { isoDate, mondayOf, programPosition } from './domain-calendar.js';
+import { isoDate, mondayOf, programPosition, parseISO } from './domain-calendar.js';
 
 export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, adaptive: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
@@ -44,6 +44,11 @@ export const app = {
   position: () => programPosition(S.settings.programStart),
   location: () => S.locations.find(l => l.id === S.activeLocation) || S.locations[0] || null,
   owned: () => new Set(app.location()?.equipment || []),
+  // What's planned on a date: the weekly schedule, unless today's workout was swapped with a later day this week.
+  planOn(iso = isoDate()) {
+    const sw = S.settings.swap, plan = S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
+    return sw && iso === sw.date ? sw.to : sw && iso === sw.back ? sw.from : plan;
+  },
   routine: id => resolveRoutine(id, S.overrides, app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile),
 
   async save(key) { try { await db.setMeta(key, S[key]); } catch { S.storageOk = false; app.toast('Could not save — storage unavailable'); } },

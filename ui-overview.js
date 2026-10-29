@@ -153,7 +153,7 @@ export const overview = {
     'cal-next'() { monthOffset = Math.min(0, monthOffset + 1); app.render({ keepScroll: true }); },
     'cal-day'(el) {
       const iso = el.dataset.iso, list = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === iso);
-      const d = new Date(iso + 'T12:00'), plan = S.schedule[DAYS[(d.getDay() + 6) % 7]], future = iso > isoDate();
+      const d = new Date(iso + 'T12:00'), plan = app.planOn(iso), future = iso > isoDate();
       const title = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
       app.sheet(`<h2 class="sheet-title">${esc(title)}</h2><p class="sheet-sub">${isRoutine(plan) ? `Planned: ${esc(getRoutine(plan).title)}` : plan === 'Padel' ? 'Planned: padel' : 'No workout planned'}</p>
         ${list.length ? group(list.map(s => row({ title: esc(s.title), sub: `${s.durationMin || '—'} min`, to: `history/session/${s.id}` })).join('')) : `<p class="t-sub" style="text-align:center;margin:8px 0 18px">${future ? 'Coming up.' : 'Nothing logged.'}</p>`}

@@ -10,7 +10,7 @@ import { prehabFor, PADEL_TYPES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { sessionEffortChips, mname } from './ui-words.js';
 import { recoveryCard, currentRecovery } from './ui-recovery.js';
-import { adaptWorkout } from './domain-adaptive.js';
+import { adaptWorkout, exerciseFatigue, RECOVERING_FROM } from './domain-adaptive.js';
 import { calibrate, colorFor } from './domain-recovery.js';
 import { phaseFor, DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
@@ -77,23 +77,68 @@ function recoveringHint(routineId) {
   const r = app.routine(routineId);
   const pain = painWithProfile(S.sessions, S.profile, { cleared: S.painClear }), hurt = [...new Set(r.blocks.flatMap(b => painHits(b.ex, pain)))];
   if (hurt.length) return `Gentler options ready for your ${hurt.slice(0, 2).map(a => areaName(a).toLowerCase()).join(' and ')}`;
-  if (S.settings.adaptive === false) return '';
+  return adjustPreview(routineId)?.text || '';
+}
+
+// ── Today's workout as it will start: same build and adjustments as pressing Start, so the card can say what changes.
+const DAY_MS = 86400000;
+const isoIn = n => { const d = new Date(); d.setDate(d.getDate() + n); return isoDate(d); };
+const DAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const weekday = iso => DAY_LONG[parseISO(iso).getDay()];
+// Recent padel with no gym since: the tiredness is from the match.
+const afterPadel = (now = Date.now()) => S.sessions.some(s => s.activity === 'padel' && now - s.startedAt < 2 * DAY_MS) && !S.sessions.some(s => s.kind === 'strength' && now - s.startedAt < 3 * DAY_MS);
+function buildWorkout(routineId, { readiness = null, light = false, sore = [] } = {}) {
+  const week = app.position().week;
+  const w = createWorkout({ routineId, week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
   const rec = currentRecovery();
-  const tired = [...new Set(r.blocks.flatMap(b => getExercise(b.ex)?.primary || []))].map(m => [m, rec[m]?.level || 0]).filter(([, l]) => l >= 0.35).sort((a, b) => b[1] - a[1]);
-  if (!tired.length) return '';
-  const names = tired.slice(0, 2).map(([m]) => mname(m).toLowerCase()).join(' and ');
-  return tired[0][1] >= 0.6 ? `Lighter today: ${names} still recovering` : `${names[0].toUpperCase() + names.slice(1)} still recovering`;
+  if (S.settings.adaptive !== false) {
+    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: app.planOn(isoIn(1)) === 'Padel', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
+      deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit, afterPadel: afterPadel() });
+  }
+  return { w, rec };
+}
+const regionOf = m => LEGS.includes(m) ? 'Legs' : CORE.includes(m) ? 'Core' : 'Upper body';
+// "Legs still recovering after your match: Solid effort on 3 exercises, one set fewer on Box jump."
+function adjustPreview(routineId) {
+  if (S.settings.adaptive === false) return null;
+  const said = todayFeel(), r = said ? FEELS[said.feel].r : null, tp = taperFor(S.settings.tournament);
+  const { w } = buildWorkout(routineId, { readiness: r, light: !!(tp?.lighter || tp?.noGym) || (r ? readinessScore(r).label === 'Low' : false) });
+  const ch = w.adapt?.changes || [];
+  if (!ch.length) return null;
+  const by = d => ch.filter(c => c.dir === d), names = l => l.length <= 2 ? l.map(c => c.name).join(' and ') : `${l.length} exercises`;
+  const parts = [by('down').length && `one set fewer on ${names(by('down'))}`, by('hold').length && `same weight on ${names(by('hold'))}`,
+    by('ease').length && `Solid effort on ${names(by('ease'))}`, by('up').length && `an extra set on ${names(by('up'))}`].filter(Boolean);
+  const regions = [...new Set(ch.filter(c => c.dir !== 'up' && c.muscle).map(c => regionOf(c.muscle)))];
+  const head = regions.length ? `${regions.join(' and ')} still recovering${afterPadel() ? ' after your match' : ''}` : 'Fully recovered';
+  return { text: `${head}: ${parts.join(', ')}.`, changes: ch };
+}
+// A workout later this week that suits today better: its muscles are ready while today's are still recovering.
+// Only a straight swap within this week, and never one that puts the moved workout the day before padel.
+function swapOffer(routineId) {
+  if (S.active || S.settings.adaptive === false || S.settings.swap?.date === isoDate()) return null;
+  const rec = currentRecovery();
+  const worst = id => Math.max(0, ...app.routine(id).blocks.map(b => getExercise(b.ex)).filter(Boolean).map(ex => exerciseFatigue(ex, rec).level));
+  const mine = worst(routineId);
+  if (mine < RECOVERING_FROM) return null;
+  for (let i = 1; i < 7; i++) {
+    const iso = isoIn(i);
+    if (parseISO(iso).getDay() === 1) break;
+    const alt = app.planOn(iso);
+    if (!isRoutine(alt) || alt === routineId || S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso)) continue;
+    if (worst(alt) < RECOVERING_FROM && mine - worst(alt) >= 0.15 && app.planOn(isoIn(i + 1)) !== 'Padel') return { to: alt, back: iso };
+  }
+  return null;
 }
 
 // The next scheduled workout after today: { id, when: 'Tomorrow' | 'Wednesday' }.
 function nextPlanned() {
   const names = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
-  for (let i = 1; i <= 7; i++) { const d = DAYS[(DAYS.indexOf(dayKey()) + i) % 7]; if (isRoutine(S.schedule[d])) return { id: S.schedule[d], when: i === 1 ? 'Tomorrow' : names[d] }; }
+  for (let i = 1; i <= 7; i++) { const d = DAYS[(DAYS.indexOf(dayKey()) + i) % 7], v = app.planOn(isoIn(i)); if (isRoutine(v)) return { id: v, when: i === 1 ? 'Tomorrow' : names[d] }; }
   return null;
 }
 
 function hero() {
-  const plan = S.schedule[dayKey()];
+  const plan = app.planOn();
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
   const tp = taperFor(S.settings.tournament);
   // On tournament day the tournament card stays up after each match (that's when you need it most).
@@ -122,7 +167,10 @@ function hero() {
       <p class="hero-note">${esc(r.focus)}${last ? '' : ' Your first session sets your starting weights.'}</p>
       ${(() => { const h = recoveringHint(plan); return h ? `<p class="hero-note orange" style="margin-top:-6px">${esc(h)}</p>` : ''; })()}
       ${S.active ? '' : feelCard()}
-      ${S.active ? '' : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>`}</section>`;
+      ${(() => { const sw = S.settings.swap; return sw?.date === isoDate() && sw.to === plan ? `<p class="hero-note swap-note">Swapped: ${esc(app.routine(sw.from).title)} moves to ${esc(weekday(sw.back))}. <button class="link" data-action="swap-undo">Undo</button></p>` : ''; })()}
+      ${S.active ? '' : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>`}
+      ${(() => { const o = S.active ? null : swapOffer(plan); return o ? `<button class="btn tinted" data-action="swap-today" data-r="${esc(o.to)}" data-back="${o.back}">Swap to ${esc(app.routine(o.to).title)}</button>
+        <p class="t-foot swap-why">Those muscles are ready. ${esc(r.title)} moves to ${esc(weekday(o.back))}.</p>` : ''; })()}</section>`;
   }
   if (plan === 'Padel') {
     return `<section class="card hero"><div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">Warm up, play, then log it</p></div></div>
@@ -159,7 +207,7 @@ const LEGS = ['glutes', 'glute_med', 'adductors', 'quads', 'hamstrings', 'calves
 const readyPct = (rec, ms) => ms.length ? Math.round(100 * (1 - ms.reduce((n, m) => n + (rec[m]?.level || 0), 0) / ms.length)) : 100;
 function rings() {
   if (!S.sessions.length) return '';
-  const rec = currentRecovery(), plan = S.schedule[dayKey()];
+  const rec = currentRecovery(), plan = app.planOn();
   const muscles = isRoutine(plan) ? [...new Set(app.routine(plan).blocks.flatMap(b => getExercise(b.ex)?.primary || []))] : [...UPPER, ...CORE, ...LEGS];
   const feel = isRoutine(plan) ? todayFeel()?.feel : null;
   const ready = Math.round(readyPct(rec, muscles) * (feel === 'tired' ? 0.75 : feel === 'sore' ? 0.85 : 1)), planned = Object.values(S.schedule).filter(isRoutine).length;
@@ -185,7 +233,7 @@ function weekCard() {
   const mon = mondayOf().getTime();
   const done = app.strength.filter(s => s.startedAt >= mon).length, matches = S.sessions.filter(s => s.activity === 'padel' && s.startedAt >= mon).length;
   return `<section class="grp"><h2 class="grp-h big">This week</h2><div class="card"><div class="week">${weekDates().map(d => {
-    const did = days.get(d.iso) || [], plan = S.schedule[d.key];
+    const did = days.get(d.iso) || [], plan = app.planOn(d.iso);
     const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : isRoutine(plan) ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : 'rest';
     return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(plan)}">${did.length ? icon('check') : ''}</span></div>`;
   }).join('')}</div>
@@ -206,7 +254,7 @@ export const today = {
     const date = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
     const initial = (S.settings.name || '').trim()[0];
     const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
-    const todays = S.schedule[dayKey()];
+    const todays = app.planOn();
     const others = allRoutineIds().filter(id => id !== todays || S.active);
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
@@ -222,6 +270,12 @@ export const today = {
   },
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
+    async 'swap-today'(el) {
+      S.settings.swap = { date: isoDate(), from: app.planOn(), to: el.dataset.r, back: el.dataset.back };
+      await app.save('settings'); app.render({ keepScroll: true });
+      app.toast(`Swapped for this week: ${app.routine(S.settings.swap.from).title} on ${weekday(el.dataset.back)}`);
+    },
+    async 'swap-undo'() { delete S.settings.swap; await app.save('settings'); app.render({ keepScroll: true }); app.toast('Back to your usual plan'); },
     async feel(el) { S.settings.checkin = { date: isoDate(), feel: el.dataset.feel }; await app.save('settings'); app.render({ keepScroll: true }); },
     async 'feel-clear'() { delete S.settings.checkin; await app.save('settings'); app.render({ keepScroll: true }); },
     'quick-backup'() { saveBackup(); },
@@ -284,18 +338,12 @@ function startFlow(routineId) {
 }
 
 async function begin(routineId, readiness, light, sore = [], asked = []) {
-  const week = app.position().week, tp = taperFor(S.settings.tournament);
+  const tp = taperFor(S.settings.tournament);
   // Before (and just after) a tournament every workout is the lighter version.
   if (tp?.lighter || tp?.noGym) { light = true; app.toast(tp.phase === 'recover' ? 'Easy session while you recover from the tournament' : 'Tournament week: lighter workout today'); }
-  const w = createWorkout({ routineId, week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
-  const rec = currentRecovery();
+  const { w, rec } = buildWorkout(routineId, { readiness, light, sore });
   // Only explicit answers teach the model: a muscle you marked sore. (Not ticking one isn't the same as "feels fine".)
   if (sore.length) { for (const m of sore) S.recoveryCal = calibrate(S.recoveryCal, m, true, rec[m].level); app.save('recoveryCal'); }
-  if (S.settings.adaptive !== false) {
-    const tomorrow = DAYS[(DAYS.indexOf(dayKey()) + 1) % 7];
-    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: S.schedule[tomorrow] === 'Padel', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
-      deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit });
-  }
   applySupersets(w, S.supersets[routineId]);
   applyPainHolds(w);
   S.active = w;
@@ -307,7 +355,7 @@ async function begin(routineId, readiness, light, sore = [], asked = []) {
 // ── Past workouts: log a gym session you forgot, on the day you did it.
 export function pastWorkoutSheet(iso) {
   if (S.active) { app.closeSheet(); app.toast('Finish or discard the workout in progress first'); return app.go('workout'); }
-  const d = parseISO(iso), planned = S.schedule[DAYS[(d.getDay() + 6) % 7]];
+  const d = parseISO(iso), planned = app.planOn(iso);
   const ids = [...new Set([...(isRoutine(planned) ? [planned] : []), ...allRoutineIds()])];
   app.sheet(`<h2 class="sheet-title">Which workout?</h2><p class="sheet-sub">${esc(d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}. You’ll fill in your sets next.</p>
     ${group(ids.map(id => { const r = app.routine(id), look = routineLook(id); return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"}${id === planned ? ' · planned that day' : ''}`, icon: look.icon, color: look.color, action: 'past-start', data: { id, iso } }); }).join('')

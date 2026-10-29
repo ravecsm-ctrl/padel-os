@@ -90,8 +90,8 @@ function defaultVal(e, i, f) {
 function adaptBanner(w) {
   const a = w.adapt;
   if (!a?.changes?.length) return '';
-  const n = a.changes.length, up = a.changes.filter(c => c.dir === 'up').length, down = a.changes.filter(c => c.dir === 'down').length;
-  const what = down && !up ? 'a little lighter' : up && !down ? 'a bit harder' : 'tuned';
+  const n = a.changes.length, up = a.changes.filter(c => c.dir === 'up').length, down = a.changes.filter(c => c.dir !== 'up').length;
+  const what = down && !up ? (a.changes.some(c => c.dir === 'down') ? 'a little lighter' : 'a little easier') : up && !down ? 'a bit harder' : 'tuned';
   return a.applied
     ? `<div class="banner" style="margin-bottom:14px">${tile('sliders', up && !down ? 'green' : 'orange')}<span><b>Adjusted for today</b><small>${n} exercise${n > 1 ? 's' : ''} ${what}, based on your recovery.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="adapt-why" style="font-size:15px">Why?</button><button class="link" data-action="adapt-undo" style="font-size:13px">Use original</button></span></div>`
     : `<div class="banner" style="margin-bottom:14px;background:var(--fill)">${tile('sliders', 'gray')}<span><b>Original plan</b><small>Recovery adjustments are off for this workout.</small></span><button class="link" data-action="adapt-redo" style="margin-left:auto;font-size:15px">Use recommended</button></div>`;
@@ -106,7 +106,7 @@ function coach(e) {
   const why = e.adjusted ? '' : (sug.reason || '').replace(/([\d.]+)kg/g, (_, n) => fmtW(+n, unit()));
   const tip = e.adjusted ? '' : sug.kind === 'up' ? `${icon('chevR')} Heavier than last time. You’ve earned it.` : sug.kind === 'down' ? 'A little lighter today to rebuild.' : sug.kind === 'deload' ? 'Recovery week: lighter on purpose.' : '';
   return `<div class="coach"><p class="goal"><b>${e.sets.length} sets</b> of <b>${range} ${UNIT_WORD[tf]}</b>${ex.perSide ? ' each side' : ''}${weight}.</p>
-    ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">${(() => { const what = e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter';
+    ${e.adjusted ? `<p class="t-foot" style="color:${e.adjusted.dir === 'up' ? 'var(--green)' : 'var(--orange)'};font-weight:600">${(() => { const what = e.adjusted.dir === 'up' ? 'one extra set' : e.adjusted.dir === 'hold' ? 'same weight as last time' : e.adjusted.dir === 'ease' ? 'aim for solid, not hard' : e.adjusted.to.sets < e.adjusted.from.sets ? `one set fewer${e.adjusted.to.w != null && e.adjusted.to.w < e.adjusted.from.w ? ', slightly lighter' : ''}` : 'slightly lighter';
       const why = e.adjusted.reason; return why.toLowerCase().includes(what) ? `Adjusted: ${esc(why[0].toLowerCase() + why.slice(1))}.` : `Adjusted: ${what}. ${esc(why)}.`; })()}</p>` : ''}
     ${missingHere(ex)}${painNote(e)}
     ${(() => {
@@ -422,7 +422,7 @@ export const workout = {
       const a = W().adapt, inp = a.inputs;
       const ctx = [inp.readiness && `Check-in: ${inp.readiness.toLowerCase()} readiness`, inp.sore.length && `Sore: ${inp.sore.join(', ').replace(/_/g, ' ')}`, inp.padelTomorrow && 'Padel tomorrow'].filter(Boolean).join(' · ');
       app.sheet(`<h2 class="sheet-title">Why it changed</h2><p class="sheet-sub">${ctx ? esc(ctx) + '. ' : ''}Based on how recently and how hard each muscle worked.</p>
-        ${group(a.changes.map(c => row({ title: esc(c.name), sub: esc(c.reason), value: `${c.from.sets}→${c.to.sets} sets${c.to.w != null && c.from.w != null && c.to.w !== c.from.w ? ` · ${fmtW(c.from.w, unit())}→${fmtW(c.to.w, unit())}` : ''}` })).join(''))}
+        ${group(a.changes.map(c => row({ title: esc(c.name), sub: esc(c.reason), value: c.dir === 'ease' ? 'Solid effort' : c.dir === 'hold' && c.from.sets === c.to.sets ? 'Same weight' : `${c.from.sets}→${c.to.sets} sets${c.to.w != null && c.from.w != null && c.to.w !== c.from.w ? ` · ${fmtW(c.from.w, unit())}→${fmtW(c.to.w, unit())}` : ''}` })).join(''))}
         <div class="btns"><button class="btn filled" data-action="close-sheet">Keep Adjustments</button><button class="btn plain" data-action="adapt-undo">Use Original Plan</button></div>
         <p class="fine">You can turn this off in Settings → Adapt workouts to recovery.</p>`);
     },

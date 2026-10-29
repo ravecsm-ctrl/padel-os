@@ -6,6 +6,8 @@ import { performances, doneSets } from './domain-progression.js';
 import { roundLoad } from './domain-units.js';
 import { TIRED_FROM } from './domain-recovery.js';
 
+// From here a muscle counts as still recovering and the workout eases off (below TIRED_FROM it keeps every set).
+export const RECOVERING_FROM = 0.35;
 const LEGS = ['quads', 'hamstrings', 'glutes', 'glute_med', 'calves', 'soleus', 'adductors'];
 const lower = s => s.charAt(0).toLowerCase() + s.slice(1);
 
@@ -35,11 +37,17 @@ export function adaptEntry(entry, ctx) {
   if (ctx.padelTomorrow && (ex.primary || []).some(m => LEGS.includes(m)) && sets > 2) return down('Padel tomorrow: saving your legs');
   // Big week: trim the main work, keep injury-prevention and power work as is.
   if (ctx.loadRatio > 1.5 && sets > 2 && ex.category !== 'prevention' && ex.movement !== 'power') return down('Big training week: one set fewer');
-  // Hold: recovering muscles shouldn't take a weight jump today.
-  if (fat >= 0.35 && entry.suggestion?.kind === 'up') {
-    const last = performances(ctx.history || [], ex.id, 1)[0];
-    const lastTop = last ? Math.max(0, ...doneSets(last.entry).map(s => s.w || 0)) : 0;
-    return { dir: 'hold', reason: `${MUSCLES[muscle]} still recovering, so same weight as last time`, sets, w: lastTop || w };
+  // Still recovering (not tired): keep the work, take the edge off. Jumps and quick moves lose a set
+  // (tired legs and landings don't mix), a planned weight jump waits, everything else is done at Solid effort.
+  if (fat >= RECOVERING_FROM) {
+    const why = `${MUSCLES[muscle]} still recovering${ctx.afterPadel ? ' after your match' : ''}`;
+    if ((ex.quality || ex.pattern === 'power') && sets > 1) return { ...down(`${why}: one set fewer on jumps and quick moves`), muscle };
+    if (entry.suggestion?.kind === 'up') {
+      const last = performances(ctx.history || [], ex.id, 1)[0];
+      const lastTop = last ? Math.max(0, ...doneSets(last.entry).map(s => s.w || 0)) : 0;
+      return { dir: 'hold', reason: `${why}, so same weight as last time`, sets, w: lastTop || w, muscle };
+    }
+    return { dir: 'ease', reason: `${why}: aim for Solid, not Hard`, sets, w, muscle };
   }
   // Challenge: fully recovered, felt easy last time, not a recovery week.
   if (!ctx.deload && ctx.level !== 'beginner' && ctx.readiness?.label !== 'Low' && fat < 0.1 && !ex.quality && entry.suggestion?.kind === 'hold' && sets < 5) {
@@ -55,8 +63,9 @@ export function adaptWorkout(w, ctx) {
   const changes = [];
   w.exercises.forEach((e, i) => {
     const c = adaptEntry(e, ctx);
-    if (!c || (c.sets === e.sets.length && c.w === e.suggestion?.w)) return;
-    changes.push({ i, exId: e.exId, name: e.name, dir: c.dir, reason: c.reason, from: { sets: e.sets.length, w: e.suggestion?.w ?? null }, to: { sets: c.sets, w: c.w ?? null } });
+    // An 'ease' keeps sets and weight on purpose: the change is the effort you aim for.
+    if (!c || (c.dir !== 'ease' && c.sets === e.sets.length && c.w === e.suggestion?.w)) return;
+    changes.push({ i, exId: e.exId, name: e.name, dir: c.dir, reason: c.reason, muscle: c.muscle ?? exerciseFatigue(getExercise(e.exId), ctx.rec || {}).muscle, from: { sets: e.sets.length, w: e.suggestion?.w ?? null }, to: { sets: c.sets, w: c.w ?? null } });
   });
   w.adapt = { changes, applied: false, inputs: { sore: ctx.sore || [], readiness: ctx.readiness?.label || null, padelTomorrow: !!ctx.padelTomorrow } };
   if (changes.length) applyAdaptation(w);

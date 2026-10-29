@@ -651,3 +651,6 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .feel-btn { min-height: 44px; border-radius: 12px; background: rgba(255, 255, 255, .14); color: var(--court-ink); font: inherit; font-size: 15px; font-weight: 600; padding: 0 4px; }
 .feel-btn:active { background: var(--ball); color: var(--on-ball); }
 .court-stack .feel-said .link { color: var(--ball); }
+.court-stack .swap-why { margin: 8px 4px 0; text-align: center; }
+.court-stack .swap-note .link { color: var(--ball); }
+.court-stack .hero .btn + .btn.tinted { margin-top: 10px; }

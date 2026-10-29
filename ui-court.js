@@ -53,7 +53,7 @@ function todaysStretch() {
   const today = new Date().toDateString();
   const done = S.sessions.find(x => x.kind === 'strength' && new Date(x.startedAt).toDateString() === today);
   if (done) return { id: stretchFor(done.exercises.map(e => e.exId)), why: `after today’s ${done.title}` };
-  const plan = S.schedule[dayKey()];
+  const plan = app.planOn();
   if (isRoutine(plan)) return { id: stretchFor(app.routine(plan).blocks.map(b => b.ex)), why: `after today’s ${app.routine(plan).title}` };
   return null;
 }
@@ -66,7 +66,7 @@ function listView() {
   const all = Object.values(COURT_ROUTINES), of = kind => all.filter(r => r.kind === kind);
   const flagged = Object.entries(pre.flagged).filter(([, n]) => n >= 2);
   // The court panel: one routine worth doing right now, with why.
-  const padelToday = S.schedule[dayKey()] === 'Padel';
+  const padelToday = app.planOn() === 'Padel';
   const pick = rec ? { id: rec.id, why: `Recommended ${rec.why}` } : pre.ids[0] ? { id: pre.ids[0], why: 'Recommended for you' } : padelToday ? { id: 'warmup', why: 'Padel today' } : { id: 'mobility', why: 'Good any day' };
   const pr = COURT_ROUTINES[pick.id];
   const panel = `<div class="court-stack" style="margin-bottom:24px"><div class="card hero"><div class="hero-top">${tile((LOOK[pr.id] || ['heart'])[0], (LOOK[pr.id] || [0, 'orange'])[1], true)}<div><p class="t-foot">${esc(pick.why)}</p><h2>${esc(pr.title)}</h2><p class="t-sub">${routineMinutes(pr)} min · hands-free</p></div></div>
