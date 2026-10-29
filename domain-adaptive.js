@@ -9,6 +9,8 @@ import { TIRED_FROM } from './domain-recovery.js';
 // From here a muscle counts as still recovering and the workout eases off (below TIRED_FROM it keeps every set).
 export const RECOVERING_FROM = 0.35;
 const LEGS = ['quads', 'hamstrings', 'glutes', 'glute_med', 'calves', 'soleus', 'adductors'];
+// Exercises with a landing: jumps, bounds, hops.
+export const lands = ex => (ex.quality || ex.pattern === 'power') && /jump|bound|hop|burpee/i.test(`${ex.id} ${ex.name}`);
 const lower = s => s.charAt(0).toLowerCase() + s.slice(1);
 
 // How tired the muscles this exercise relies on are (main muscles count fully).
@@ -37,11 +39,11 @@ export function adaptEntry(entry, ctx) {
   if (ctx.padelTomorrow && (ex.primary || []).some(m => LEGS.includes(m)) && sets > 2) return down('Padel tomorrow: saving your legs');
   // Big week: trim the main work, keep injury-prevention and power work as is.
   if (ctx.loadRatio > 1.5 && sets > 2 && ex.category !== 'prevention' && ex.movement !== 'power') return down('Big training week: one set fewer');
-  // Still recovering (not tired): keep the work, take the edge off. Jumps and quick moves lose a set
-  // (tired legs and landings don't mix), a planned weight jump waits, everything else is done at Solid effort.
+  // Still recovering (not tired): keep the work, take the edge off. Jumps lose a set (tired legs and landings
+  // don't mix; throws and swings have no landing, so they're treated like any other exercise), a planned weight jump waits, everything else is done at Solid effort.
   if (fat >= RECOVERING_FROM) {
     const why = `${MUSCLES[muscle]} still recovering${ctx.afterPadel ? ' after your match' : ''}`;
-    if ((ex.quality || ex.pattern === 'power') && sets > 1) return { ...down(`${why}: one set fewer on jumps and quick moves`), muscle };
+    if (lands(ex) && sets > 1) return { ...down(`${why}: one set fewer on jumps`), muscle };
     if (entry.suggestion?.kind === 'up') {
       const last = performances(ctx.history || [], ex.id, 1)[0];
       const lastTop = last ? Math.max(0, ...doneSets(last.entry).map(s => s.w || 0)) : 0;

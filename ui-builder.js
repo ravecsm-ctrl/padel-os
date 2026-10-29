@@ -4,7 +4,7 @@ import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
 import { FOCUS, buildProgram, alternativesFor, prescriptionFor, rankExercises } from './domain-builder.js';
 import { estimateMinutes, generateSchedule, LEVELS } from './domain-personalize.js';
 import { getExercise } from './domain-catalog.js';
-import { setCustomRoutines, rangeLabel } from './domain-program.js';
+import { setCustomRoutines, rangeLabel, isLegHeavy } from './domain-program.js';
 import { missingFor, equipLabel } from './domain-taxonomy.js';
 
 let B = null;   // builder state
@@ -79,7 +79,7 @@ async function save() {
   });
   setCustomRoutines(S.customRoutines);
   await app.save('customRoutines');
-  if (B.schedule) { S.schedule = generateSchedule(ids.length, S.profile.padelDays || [], ids); await app.save('schedule'); }
+  if (B.schedule) { S.schedule = generateSchedule(ids.length, S.profile.padelDays || [], ids, isLegHeavy); await app.save('schedule'); }
   const count = ids.length; B = null;
   app.go('plan');
   app.toast(`Program saved · ${count} workout${count > 1 ? 's' : ''}${count && S.schedule ? ' on your schedule' : ''}`);

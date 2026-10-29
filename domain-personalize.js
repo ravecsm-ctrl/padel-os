@@ -95,22 +95,55 @@ export function adaptBlocks(blocks, profile = DEFAULT_PROFILE, overridden = new 
   return { blocks: out, dropped, minutes: estimateMinutes(out, p.minutes) };
 }
 
-// Gym days avoid padel days and, where possible, the day right before one.
-export function generateSchedule(days, padelDays = [], ids = null) {
+// The weekly plan. Gym days never go on padel days; where they can, they also stay off the day before
+// a match (you'd play on tired legs) and leg-heavy workouts stay off the day after one (legs still recovering).
+// Every choice of days and order is scored and the lowest wins; ties keep the earliest days and the given order.
+const SCORE = { legsBefore: 4, otherBefore: 1, legsAfter: 2, backToBack: 1.5, legsTwoDays: 2, uneven: 0.3 };
+const defaultLegs = id => id === 'A' || id === 'C';
+const choose = (arr, k) => k === 0 ? [[]] : arr.flatMap((x, i) => choose(arr.slice(i + 1), k - 1).map(r => [x, ...r]));
+const orders = a => a.length <= 1 ? [a] : a.flatMap((x, i) => orders([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r]));
+
+// Penalty for gym workouts on these day indexes (0 = Monday), given the padel days.
+function weekPenalty(dayIdx, ids, padelDays, legs) {
+  const padel = i => padelDays.includes(DAYS[(i + 7) % 7]);
+  let sc = 0;
+  dayIdx.forEach((i, k) => {
+    const heavy = legs(ids[k]);
+    if (padel(i + 1)) sc += heavy ? SCORE.legsBefore : SCORE.otherBefore;
+    if (padel(i - 1) && heavy) sc += SCORE.legsAfter;
+  });
+  if (dayIdx.length > 1) {
+    const gaps = dayIdx.map((x, k) => ((dayIdx[(k + 1) % dayIdx.length] - x + 7) % 7) || 7);
+    sc += gaps.filter(g => g === 1).length * SCORE.backToBack + (Math.max(...gaps) - Math.min(...gaps)) * SCORE.uneven;
+    // Two leg-heavy workouts on consecutive days.
+    dayIdx.forEach((x, k) => { const j = dayIdx.indexOf((x + 1) % 7); if (j >= 0 && legs(ids[k]) && legs(ids[j])) sc += SCORE.legsTwoDays; });
+  }
+  return sc;
+}
+
+// Best days and order for these workouts: { days: ['Mon', ...], ids: [...], score }.
+export function bestWeek(ids, padelDays = [], legs = defaultLegs) {
+  const free = DAYS.map((_, i) => i).filter(i => !padelDays.includes(DAYS[i]));
+  const n = Math.min(ids.length, free.length);
+  let best = null;
+  for (const set of choose(free, n)) for (const order of orders(ids.slice(0, n))) {
+    const score = weekPenalty(set, order, padelDays, legs);
+    if (!best || score < best.score - 1e-9) best = { days: set.map(i => DAYS[i]), ids: order, score };
+  }
+  return best || { days: [], ids: [], score: 0 };
+}
+
+// How a schedule you already have scores, on the same scale.
+export function scheduleScore(sched, isGym, legs = defaultLegs) {
+  const padelDays = DAYS.filter(d => sched[d] === 'Padel'), gym = DAYS.filter(d => isGym(sched[d]));
+  return weekPenalty(gym.map(d => DAYS.indexOf(d)), gym.map(d => sched[d]), padelDays, legs);
+}
+
+export function generateSchedule(days, padelDays = [], ids = null, legs = defaultLegs) {
   const sched = Object.fromEntries(DAYS.map(d => [d, padelDays.includes(d) ? 'Padel' : 'Rest']));
   const routines = ids ? ids.slice(0, Math.max(1, days)) : days >= 3 ? ['A', 'B', 'C'] : days === 2 ? ['A', 'B'] : ['A'];
-  const free = DAYS.filter(d => !padelDays.includes(d));
-  const beforePadel = d => padelDays.includes(DAYS[(DAYS.indexOf(d) + 1) % 7]);
-  // Score spreads sessions out: prefer days not before padel, then spacing.
-  const chosen = [];
-  const ideal = { 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4] }[Math.min(4, routines.length)];
-  for (const target of ideal) {
-    const best = free.filter(d => !chosen.includes(d))
-      .map(d => ({ d, score: Math.abs(DAYS.indexOf(d) - target) + (beforePadel(d) ? 2.5 : 0) + (chosen.some(c => Math.abs(DAYS.indexOf(c) - DAYS.indexOf(d)) === 1) ? 1.5 : 0) }))
-      .sort((a, b) => a.score - b.score)[0];
-    if (best) chosen.push(best.d);
-  }
-  chosen.sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b)).forEach((d, i) => { sched[d] = routines[i]; });
+  const w = bestWeek(routines, padelDays, legs);
+  w.days.forEach((d, i) => { sched[d] = w.ids[i]; });
   // One recovery day in the remaining rest days, if any.
   const rest = DAYS.filter(d => sched[d] === 'Rest');
   if (rest.length > 1) sched[rest[Math.floor(rest.length / 2)]] = 'Recovery';

@@ -34,6 +34,11 @@ const CUSTOM_ROUTINES = {};
 export function setCustomRoutines(map) { for (const k of Object.keys(CUSTOM_ROUTINES)) delete CUSTOM_ROUTINES[k]; Object.assign(CUSTOM_ROUTINES, map || {}); }
 export const getRoutine = id => ROUTINES[id] || CUSTOM_ROUTINES[id] || null;
 export const isRoutine = id => !!getRoutine(id);
+// Leg-heavy: at least 40% of its exercises work the legs as a main muscle. The weekly plan keeps these off
+// the day after padel (and, more strongly, the day before).
+const LEG_MUSCLES = new Set(['quads', 'hamstrings', 'glutes', 'glute_med', 'adductors', 'calves', 'soleus']);
+export const isLegHeavy = id => { const r = getRoutine(id); if (!r?.blocks?.length) return false;
+  return r.blocks.filter(b => (getExercise(b.ex)?.primary || []).some(m => LEG_MUSCLES.has(m))).length / r.blocks.length >= 0.4; };
 export const allRoutineIds = () => [...Object.keys(ROUTINES), ...Object.keys(CUSTOM_ROUTINES)];
 export const isCustomRoutine = id => !!CUSTOM_ROUTINES[id];
 

@@ -654,3 +654,7 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .court-stack .swap-why { margin: 8px 4px 0; text-align: center; }
 .court-stack .swap-note .link { color: var(--ball); }
 .court-stack .hero .btn + .btn.tinted { margin-top: 10px; }
+/* Plan: a better week suggestion */
+.week-tip { margin-bottom: 24px; }
+.week-tip .hero-top b { font-size: 17px; }
+.week-moves { margin: 0 0 14px; padding-left: 20px; color: var(--label); font-size: 15px; line-height: 22px; }

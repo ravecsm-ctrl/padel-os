@@ -1,18 +1,54 @@
 // Plan: the week at a glance, the schedule, and each workout's exercises.
 import { app, S } from './core-app.js';
 import { esc, icon, pageHead, navBar, group, row, routineLook } from './ui-kit.js';
-import { isRoutine, PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, moveBlock, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
+import { isRoutine, isLegHeavy, PHASES, DAYS, DAY_OPTIONS, ROUTINES, resolveRoutine, prescribe, rangeLabel, phaseFor, getRoutine, allRoutineIds, isCustomRoutine, setCustomRoutines, removeExtra, moveBlock, routineFromBlocks, estimateRoutineMinutes } from './domain-program.js';
 import { prescriptionFor } from './domain-builder.js';
 import { exercisePicker } from './ui-picker.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { getExercise } from './domain-catalog.js';
 import { startForWeek, dayKey } from './domain-calendar.js';
-import { EQUIPMENT, AREAS } from './domain-personalize.js';
+import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.js';
 import { bodySummary } from './ui-body.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const optLabel = v => getRoutine(v) ? getRoutine(v).title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
+
+// ── A better week for the schedule you have: same workouts and padel days, days moved so legs aren't
+// the day before (or after) a match. Shown when it's clearly better, until you use it or say Not now.
+function betterWeek() {
+  const sched = S.schedule, gym = DAYS.filter(d => isRoutine(sched[d]));
+  if (!gym.length || S.settings.weekTipOff === JSON.stringify(sched)) return null;
+  const padel = DAYS.filter(d => sched[d] === 'Padel');
+  const best = bestWeek(gym.map(d => sched[d]), padel, isLegHeavy);
+  if (scheduleScore(sched, isRoutine, isLegHeavy) - best.score < 1.9) return null;
+  const next = { ...sched };
+  gym.forEach(d => { next[d] = 'Rest'; });
+  const hadRecovery = DAYS.filter(d => sched[d] === 'Recovery').length;
+  best.days.forEach((d, i) => { next[d] = best.ids[i]; });
+  // A workout that landed on your recovery day: put the recovery day on one of the days it left.
+  const freed = gym.filter(d => !best.days.includes(d));
+  if (DAYS.filter(d => next[d] === 'Recovery').length < hadRecovery && freed.length) next[freed[Math.floor(freed.length / 2)]] = 'Recovery';
+  // Say what the new week fixes: the first problem in your week that isn't in the new one.
+  const at = (w, d, k) => w[DAYS[(DAYS.indexOf(d) + k + 7) % 7]];
+  const problems = w => DAYS.filter(d => isRoutine(w[d])).flatMap(d => [
+    isLegHeavy(w[d]) && at(w, d, 1) === 'Padel' && `${optLabel(w[d])} is the day before padel`,
+    isLegHeavy(w[d]) && at(w, d, -1) === 'Padel' && `${optLabel(w[d])} is the day after padel`,
+    isLegHeavy(w[d]) && isLegHeavy(at(w, d, 1)) && `${optLabel(w[d])} and ${optLabel(at(w, d, 1))} are leg days in a row`,
+    isRoutine(at(w, d, 1)) && `${optLabel(w[d])} and ${optLabel(at(w, d, 1))} are on back-to-back days`,
+    !isLegHeavy(w[d]) && at(w, d, 1) === 'Padel' && `${optLabel(w[d])} is the day before padel`]).filter(Boolean);
+  const fixed = problems(next);
+  const why = problems(sched).find(p => !fixed.includes(p)) || 'Your workouts can be spread out better around padel';
+  const moves = gym.map(d => [d, best.days[best.ids.indexOf(sched[d])]]).filter(([a, b]) => b && a !== b).map(([a, b]) => `${optLabel(sched[a])}: ${DAY_NAME[a]} → ${DAY_NAME[b]}`);
+  return moves.length ? { next, why, moves } : null;
+}
+function betterWeekCard() {
+  const b = betterWeek();
+  if (!b) return '';
+  return `<section class="card week-tip"><div class="hero-top" style="margin-bottom:10px">${`<span class="tile orange">${icon('sliders')}</span>`}<div><b>A better week</b><p class="t-sub">${esc(b.why)}.</p></div></div>
+    <ul class="week-moves">${b.moves.map(m => `<li>${esc(m)}</li>`).join('')}</ul>
+    <div class="btns"><button class="btn filled" data-action="week-better">Use Better Week</button><button class="btn plain" data-action="week-tip-off">Not now</button></div></section>`;
+}
 
 function overview() {
   const pos = app.position(), ph = phaseFor(pos.week), today = dayKey();
@@ -24,6 +60,7 @@ function overview() {
       <div class="court-days">${DAYS.map(d => { const v = S.schedule[d], kind = isRoutine(v) ? 'gym' : v === 'Padel' ? 'padel' : v === 'Recovery' ? 'rec' : 'rest';
         return `<button class="${kind} ${d === today ? 'today' : ''}" data-action="day-sheet" data-day="${d}" aria-label="${DAY_NAME[d]}: ${esc(optLabel(v))}"><small>${d[0]}</small><span>${kind === 'gym' ? icon(routineLook(v).icon) : kind === 'padel' ? icon('racket') : kind === 'rec' ? icon('heart') : ''}</span></button>`; }).join('')}</div></div>
     <p class="grp-f" style="margin:8px 4px 24px">Each cycle is 4 weeks and moves forward on its own every Monday. Tap a day to change it.</p>
+    ${betterWeekCard()}
     ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(optLabel(S.schedule[d])), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
@@ -114,6 +151,13 @@ export const plan = {
         ${group([...DAY_OPTIONS.slice(0, 3), ...allRoutineIds().filter(isCustomRoutine), ...DAY_OPTIONS.slice(3)].map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
           { footer: 'Tip: avoid your hardest leg workout the day before an important match.' })}`);
     },
+    async 'week-better'() {
+      const b = betterWeek(); if (!b) return;
+      const old = { ...S.schedule };
+      S.schedule = b.next; await app.save('schedule'); app.render({ keepScroll: true });
+      app.toast('Week updated', async () => { S.schedule = old; await app.save('schedule'); app.render({ keepScroll: true }); });
+    },
+    async 'week-tip-off'() { S.settings.weekTipOff = JSON.stringify(S.schedule); await app.save('settings'); app.render({ keepScroll: true }); },
     async 'set-day'(el) { S.schedule[el.dataset.day] = el.dataset.v; await app.save('schedule'); app.closeSheet(); app.render({ keepScroll: true }); },
     'how-sheet'() {
       app.sheet(`<h2 class="sheet-title">How your plan adapts</h2><div style="height:12px"></div>
