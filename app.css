@@ -643,3 +643,11 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 @keyframes cb-bounce { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-26px); } 55% { transform: translateY(-26px); } }
 @keyframes cb-confetti { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 160px)) rotate(var(--r)); } }
 @media (prefers-reduced-motion: reduce) { .celebrate, .cb-card, .cb-ball, .cb-burst i { animation: none; } .cb-burst { display: none; } }
+
+/* One-tap check-in on the Today court panel */
+.feel { margin: 4px 0 16px; }
+.feel-q { font-size: 15px; font-weight: 600; color: var(--court-ink); margin: 0 0 8px; }
+.feel-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.feel-btn { min-height: 44px; border-radius: 12px; background: rgba(255, 255, 255, .14); color: var(--court-ink); font: inherit; font-size: 15px; font-weight: 600; padding: 0 4px; }
+.feel-btn:active { background: var(--ball); color: var(--on-ball); }
+.court-stack .feel-said .link { color: var(--ball); }

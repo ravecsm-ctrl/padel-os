@@ -119,6 +119,7 @@ function hero() {
     return `<section class="card hero"><div class="hero-top">${tile(look.icon, look.color, true)}<div><p class="t-foot">Up next</p><h2>${esc(r.title)}</h2><p class="t-sub">${plural(r.blocks.length, 'exercise')} · about ${r.minutes} min</p></div></div>
       <p class="hero-note">${esc(r.focus)}${last ? '' : ' Your first session sets your starting weights.'}</p>
       ${(() => { const h = recoveringHint(plan); return h ? `<p class="hero-note orange" style="margin-top:-6px">${esc(h)}</p>` : ''; })()}
+      ${S.active ? '' : feelCard()}
       ${S.active ? '' : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>`}</section>`;
   }
   if (plan === 'Padel') {
@@ -132,6 +133,23 @@ function hero() {
     <button class="btn tinted" data-action="${rec ? 'go' : 'log-activity'}" ${rec ? 'data-to="court"' : 'data-kind="mobility"'}>${rec ? 'Browse Routines' : 'Log an Activity'}</button></section>`;
 }
 
+// ── One-tap check-in on Today: how you feel sets today's workout before you press Start.
+// Each answer stands for a full check-in (sleep, energy, soreness: 1–5) so the workout adapts as it did from the sheet.
+export const FEELS = {
+  great: { label: 'Great', r: { sleep: 5, energy: 5, soreness: 1 }, says: 'Feeling great. Training as planned.' },
+  good: { label: 'Good', r: { sleep: 4, energy: 4, soreness: 1 }, says: 'Feeling good. Training as planned.' },
+  tired: { label: 'Tired', r: { sleep: 2, energy: 2, soreness: 2 }, says: 'Feeling tired. Today’s workout will be lighter: one fewer set and easier effort.' },
+  sore: { label: 'Sore', r: { sleep: 3, energy: 3, soreness: 4 }, says: 'Feeling sore. When you start, tap where so we go easy there.' },
+};
+// Today's answer, or null (yesterday's doesn't count).
+export const todayFeel = () => { const c = S.settings.checkin; return c?.date === isoDate() && FEELS[c.feel] ? c : null; };
+function feelCard() {
+  if (!S.settings.readinessPrompt) return '';
+  const c = todayFeel();
+  if (c) return `<p class="hero-note feel-said">${esc(FEELS[c.feel].says)} <button class="link" data-action="feel-clear">Change</button></p>`;
+  return `<div class="feel"><p class="feel-q">How do you feel today?</p><div class="feel-row">${Object.entries(FEELS).map(([k, f]) => `<button class="feel-btn" data-action="feel" data-feel="${k}">${f.label}</button>`).join('')}</div></div>`;
+}
+
 // ── The court panel's rings: how ready you are for today, this week's workouts, your streak.
 const UPPER = ['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serratus', 'upper_chest', 'chest', 'lower_chest', 'traps', 'mid_back', 'lats', 'biceps', 'triceps', 'forearms'];
 const CORE = ['abs', 'obliques', 'lower_back', 'hip_flexors'];
@@ -141,7 +159,8 @@ function rings() {
   if (!S.sessions.length) return '';
   const rec = currentRecovery(), plan = S.schedule[dayKey()];
   const muscles = isRoutine(plan) ? [...new Set(app.routine(plan).blocks.flatMap(b => getExercise(b.ex)?.primary || []))] : [...UPPER, ...CORE, ...LEGS];
-  const ready = readyPct(rec, muscles), planned = Object.values(S.schedule).filter(isRoutine).length;
+  const feel = isRoutine(plan) ? todayFeel()?.feel : null;
+  const ready = Math.round(readyPct(rec, muscles) * (feel === 'tired' ? 0.75 : feel === 'sore' ? 0.85 : 1)), planned = Object.values(S.schedule).filter(isRoutine).length;
   const done = app.strength.filter(s => s.startedAt >= mondayOf().getTime()).length, streak = weekStreak(S.sessions);
   const readyColor = ready >= 75 ? 'var(--ball)' : ready >= 50 ? '#FFD60A' : '#FF9F0A';
   return `<button class="court-rings" data-action="go" data-to="recovery" aria-label="Ready ${ready}%, ${done} of ${planned} workouts this week, ${streak} week streak">
@@ -201,6 +220,8 @@ export const today = {
   },
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
+    async feel(el) { S.settings.checkin = { date: isoDate(), feel: el.dataset.feel }; await app.save('settings'); app.render({ keepScroll: true }); },
+    async 'feel-clear'() { delete S.settings.checkin; await app.save('settings'); app.render({ keepScroll: true }); },
     'quick-backup'() { saveBackup(); },
     async 'backup-later'() { S.settings.backupSnooze = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); app.toast('Reminder again in a week. Back up any time in Settings.'); },
     async 'quick-start'() {
@@ -230,11 +251,14 @@ const SCALE = {
 function startFlow(routineId) {
   if (S.active) return app.go('workout');
   if (!S.settings.readinessPrompt) return begin(routineId, null, false);
+  // Answered on Today already: start straight away. Sore still asks where, so it can go easy there.
+  const said = todayFeel();
+  if (said && said.feel !== 'sore') { const r = FEELS[said.feel].r; return begin(routineId, r, readinessScore(r).label === 'Low'); }
   // Muscles this workout relies on, most tired first, so you can flag soreness.
   const rec = currentRecovery();
   const muscles = [...new Set(app.routine(routineId).blocks.flatMap(b => getExercise(b.ex)?.primary || []))].sort((a, b) => rec[b].level - rec[a].level).slice(0, 8);
   // Nothing is pre-selected: unanswered questions count as average, and if you answer none it's a skip.
-  S.form = { sleep: null, energy: null, soreness: null, light: null, sore: [] };
+  S.form = { sleep: null, energy: null, soreness: null, ...(said ? FEELS[said.feel].r : {}), light: null, sore: [] };
   const answered = () => ['sleep', 'energy', 'soreness'].some(k => S.form[k] != null);
   const filled = () => ({ sleep: +(S.form.sleep ?? 3), energy: +(S.form.energy ?? 3), soreness: +(S.form.soreness ?? 1) });
   const draw = () => {
