@@ -8,7 +8,8 @@ export const volumeKg = s => (s.exercises || []).reduce((n, e) => n + doneSets(e
 // Session-RPE load (Foster): minutes × session RPE, in arbitrary units.
 // Guided routines (stretching, mobility, warm-ups, prevention) are logged too, but they are
 // light work: they shouldn't count as training sessions or keep a streak alive on their own.
-export const isRoutineLog = s => s.kind === 'activity' && !!s.routine;
+// Guided routines (warm-ups, prevention) don't count as sessions, except mobility done as a recovery day.
+export const isRoutineLog = s => s.kind === 'activity' && !!s.routine && !s.recoveryDay;
 export const sessionLoad = s => (s.durationMin > 0 && s.rpe > 0) ? Math.round(s.durationMin * s.rpe) : 0;
 
 export function weeklySeries(history, weeks = 8, now = new Date()) {

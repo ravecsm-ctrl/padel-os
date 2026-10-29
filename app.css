@@ -658,3 +658,13 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .week-tip { margin-bottom: 24px; }
 .week-tip .hero-top b { font-size: 17px; }
 .week-moves { margin: 0 0 14px; padding-left: 20px; color: var(--label); font-size: 15px; line-height: 22px; }
+/* Today's call */
+.call-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; padding: 4px 11px 4px 9px; border-radius: 999px; margin-bottom: 12px; position: relative; }
+.call-chip .ic, .call-chip svg { width: 15px; height: 15px; }
+.call-chip.full { background: var(--ball); color: var(--on-ball); }
+.call-chip.easier { background: #FFD60A; color: #3A2A00; }
+.call-chip.reshaped { background: #63E6BE; color: #053B2C; }
+.call-chip.recovery { background: #FFB3C7; color: #4B1528; }
+.court-stack .call-why { margin-bottom: 8px; color: var(--court-ink); }
+.call-list { margin: 0 0 16px; padding-left: 20px; color: var(--court-ink-2); font-size: 15px; line-height: 21px; }
+.court-stack .call-alt { display: block; margin: 12px auto 0; color: var(--ball); font-size: 15px; }

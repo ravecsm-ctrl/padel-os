@@ -109,7 +109,9 @@ export const court = {
     'cp-exit'() { P = null; clearInterval(tick); wake?.release?.(); app.go('court'); },
     async 'cp-log'() {
       const r = COURT_ROUTINES[P.id], dur = Math.max(1, Math.round((Date.now() - P.startedAt) / 60000));
-      const rec = { ...createActivity({ activity: 'mobility', startedAt: P.startedAt, durationMin: dur, rpe: 3, notes: '' }), title: r.title, routine: r.id };
+      const rec = { ...createActivity({ activity: 'mobility', startedAt: P.startedAt, durationMin: dur, rpe: 3, notes: '' }), title: r.title, routine: r.id,
+        // Mobility on a recovery day is the day's session: it keeps your weekly streak going.
+        ...(app.planOn() === 'Recovery' ? { recoveryDay: true } : {}) };
       await db.putSession(rec); await app.reloadSessions();
       P = null; wake?.release?.(); app.go('court'); app.toast(`${r.title} saved`);
     },
