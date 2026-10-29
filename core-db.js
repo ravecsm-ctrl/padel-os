@@ -5,6 +5,11 @@ const VERSION = 1;
 let dbp = null;
 const mem = { sessions: new Map(), meta: new Map() };
 export let persistent = true;
+// Told about every saved change except the ones that aren't your data (the online copy listens).
+const QUIET = new Set(['active', 'timer', 'cloud', 'lastBackup']);
+let changed = null;
+export const onChange = fn => { changed = fn; };
+const notify = key => { if (!QUIET.has(key)) changed?.(key); };
 
 const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 const done = tx => new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
@@ -46,13 +51,13 @@ export async function getMeta(key, fallback) {
 }
 export async function setMeta(key, value) {
   const t = await store('meta', 'readwrite');
-  if (!t) { mem.meta.set(key, value); return value; }
-  t.s.put({ key, value }); await done(t.tx); return value;
+  if (!t) { mem.meta.set(key, value); notify(key); return value; }
+  t.s.put({ key, value }); await done(t.tx); notify(key); return value;
 }
 export async function delMeta(key) {
   const t = await store('meta', 'readwrite');
-  if (!t) { mem.meta.delete(key); return; }
-  t.s.delete(key); await done(t.tx);
+  if (!t) { mem.meta.delete(key); notify(key); return; }
+  t.s.delete(key); await done(t.tx); notify(key);
 }
 export async function allMeta() {
   const t = await store('meta');
@@ -67,14 +72,14 @@ export async function allSessions() {
 }
 export async function putSessions(list) {
   const t = await store('sessions', 'readwrite');
-  if (!t) { list.forEach(s => mem.sessions.set(s.id, s)); return; }
-  list.forEach(s => t.s.put(s)); await done(t.tx);
+  if (!t) { list.forEach(s => mem.sessions.set(s.id, s)); notify('sessions'); return; }
+  list.forEach(s => t.s.put(s)); await done(t.tx); notify('sessions');
 }
 export const putSession = s => putSessions([s]);
 export async function deleteSession(id) {
   const t = await store('sessions', 'readwrite');
-  if (!t) { mem.sessions.delete(id); return; }
-  t.s.delete(id); await done(t.tx);
+  if (!t) { mem.sessions.delete(id); notify('sessions'); return; }
+  t.s.delete(id); await done(t.tx); notify('sessions');
 }
 export async function clearAll() {
   const d = await open();

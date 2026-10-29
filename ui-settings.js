@@ -3,13 +3,12 @@ import { app, S, DEFAULT_SETTINGS, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as timer from './core-timer.js';
 import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
-import { validateBackup, normalizeBackup, toCSV, restoreMeta, backupSummary } from './domain-backup.js';
-import { saveBackup, saveFile } from './ui-backup.js';
+import { toCSV } from './domain-backup.js';
+import { saveBackup, saveFile, restoreFromData, contents } from './ui-backup.js';
+import * as cloud from './core-cloud.js';
+import { cloudRows, cloudActions } from './ui-cloudui.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
-import { setCustomExercises, setStartWeights, applyExerciseEdits } from './domain-catalog.js';
-import { upgradeSaved } from './domain-muscles.js';
-import { setCustomRoutines } from './domain-program.js';
 
 let persist = '…';
 const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
@@ -36,11 +35,12 @@ export const settings = {
         + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'During workouts' })}
       <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>
       <section class="grp"><h2 class="grp-h">Appearance</h2>${seg('appearance', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.settings.appearance || 'system')}</section>
+      ${group(cloudRows(), { header: 'Online copy', footer: cloud.configured() ? 'Saved after every change while the app is open. Changes made without signal go up next time you’re online.' : 'Never lose a workout if this phone is reset, lost or replaced.' })}
       ${group(row({ title: 'Back up now', sub: `${esc(contents(S.sessions))}, plus your plan, goals, exercises and settings · last: ${esc(lb)}`, icon: 'download', color: 'blue', action: 'export-json' })
         + row({ title: 'Export for spreadsheets', sub: 'CSV file of every set', icon: 'share', color: 'green', action: 'export-csv' })
         + `<label class="row has-icon" style="cursor:pointer"><span class="tile teal">${icon('plus')}</span><span class="row-main"><span class="row-title">Restore from backup</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg><input id="importIn" type="file" accept="application/json,.json" hidden></label>`
-        + (persist !== 'granted' ? row({ title: 'Protect my data', sub: 'Ask the browser not to clear it', icon: 'shield', color: 'indigo', action: 'persist' }) : ''),
-        { header: 'Your data', footer: `Everything stays on this device. Nothing is uploaded.${db.persistent ? '' : ' <b class="red">Storage is unavailable, so data won’t be kept.</b>'}` })}
+        + row({ title: 'Storage on this phone', sub: persist === 'granted' ? '' : 'Tap to ask iPhone to keep it', value: persist === 'granted' ? 'Protected' : persist === '…' ? '…' : 'Not protected', icon: 'shield', color: 'indigo', action: persist === 'granted' ? '' : 'persist', chevron: persist !== 'granted' }),
+        { header: 'Your data', footer: `${cloud.configured() ? 'Your data is on this phone, with a copy in your private GitHub repository.' : 'Everything stays on this device. Nothing is uploaded.'}${db.persistent ? '' : ' <b class="red">Storage is unavailable, so data won’t be kept.</b>'}` })}
       ${group(row({ title: 'Add to Home Screen', sub: 'In Safari, tap Share, then Add to Home Screen. It then works offline.', icon: 'phone', color: 'gray' })
         + row({ title: 'Health notice', sub: 'General training guidance, not medical advice. Stop if you feel sharp or worsening pain.', icon: 'heart', color: 'red' }), { header: 'About' })}
       ${group(`<button class="row danger" data-action="reset">Erase All Data</button>`)}
@@ -60,6 +60,7 @@ export const settings = {
     if (name === 'appearance') { S.settings.appearance = value; applyTheme(); await app.save('settings'); }
   },
   actions: {
+    ...cloudActions,
     async notif() { try { await Notification.requestPermission(); } catch {} app.render({ keepScroll: true }); },
     async persist() { persist = await db.requestPersistence(); app.toast(persist === 'granted' ? 'Your data is protected' : 'Not allowed. Add to Home Screen and back up regularly.'); app.render({ keepScroll: true }); },
     'export-json'() { saveBackup(); },
@@ -72,48 +73,9 @@ export const settings = {
   },
 };
 
-// "12 workouts, 5 matches" (and other activities), in plain words.
-const n = (k, w) => `${k} ${w}${k === 1 ? '' : w.endsWith('ch') ? 'es' : 's'}`;
-function contents(sessions) {
-  const b = backupSummary(sessions), other = b.sessions - b.workouts - b.matches;
-  const parts = [b.workouts && n(b.workouts, 'workout'), b.matches && n(b.matches, 'match'), other && n(other, 'other activity').replace('activitys', 'activities')].filter(Boolean);
-  return parts.length ? parts.join(', ') : 'no sessions yet';
-}
-const day = ts => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-
 async function importFile(file) {
   if (!file) return;
   let data;
   try { data = JSON.parse(await file.text()); } catch { return app.toast('That file isn’t a backup'); }
-  const v = validateBackup(data);
-  if (!v.ok) return app.toast(v.errors.join(' '));
-  const norm = normalizeBackup(data);
-  const existing = new Set(S.sessions.map(s => s.id)), inFile = new Set(norm.sessions.map(s => s.id));
-  const fresh = norm.sessions.filter(s => !existing.has(s.id)).length, lost = S.sessions.filter(s => !inFile.has(s.id)).length;
-  const fb = backupSummary(norm.sessions);
-  const made = data.exportedAt ? `Made ${day(Date.parse(data.exportedAt))}. ` : '';
-  const range = !fb.first ? '' : day(fb.first) === day(fb.last) ? ` on ${day(fb.first)}` : ` from ${day(fb.first)} to ${day(fb.last)}`;
-  app.sheet(`<h2 class="sheet-title">Restore backup</h2>
-    <p class="sheet-sub">${esc(made)}It holds ${esc(contents(norm.sessions))}${esc(range)}. ${fresh} ${fresh === 1 ? 'is' : 'are'} new to this phone.${v.version === 1 ? ' It’s from the original PADEL OS and will be converted.' : ''}</p>
-    ${v.errors.length ? `<p class="t-sub ${v.incomplete ? 'red' : 'orange'}" style="margin:-8px 4px 16px">${v.errors.map(esc).join(' ')}</p>` : ''}
-    ${group(row({ title: 'Add to what’s here', sub: 'Keeps everything on this phone and adds what’s missing. Safe.', action: 'noop', data: { mode: 'merge' }, chevron: false }).replace('data-action="noop"', '')
-      + row({ title: 'Replace everything', sub: lost ? `Erases this phone first. ${lost} session${lost === 1 ? '' : 's'} here ${lost === 1 ? 'is' : 'are'} not in the backup and will be lost.` : 'Erases this phone first. Everything here is also in the backup.', action: 'noop', data: { mode: 'replace' }, chevron: false, cls: 'red' }).replace('data-action="noop"', ''))}
-    ${S.sessions.length ? '<button class="btn tinted" id="safeCopy">Back Up This Phone First</button>' : ''}
-    <button class="btn gray" data-action="close-sheet">Cancel</button>`, body => {
-    body.querySelector('#safeCopy')?.addEventListener('click', () => saveBackup());
-    body.querySelectorAll('[data-mode]').forEach(b => b.onclick = async () => {
-      if (b.dataset.mode === 'replace' && (lost || v.incomplete)) {
-        const why = [lost ? `${lost} session${lost === 1 ? '' : 's'} on this phone ${lost === 1 ? 'isn’t' : 'aren’t'} in the backup` : '', v.incomplete ? 'the file looks incomplete' : ''].filter(Boolean).join(' and ');
-        if (!(await app.confirm(`Replace everything? ${esc(why[0].toUpperCase() + why.slice(1))}. Back up this phone first if you’re not sure.`, { ok: 'Replace Anyway', danger: true }))) return;
-      }
-      if (b.dataset.mode === 'replace') { await db.clearAll(); }
-      const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
-      await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
-      for (const [k, v] of Object.entries(restoreMeta(S, norm.meta, b.dataset.mode, DEFAULT_SETTINGS))) { S[k] = v; await app.save(k); }
-      if (b.dataset.mode === 'replace' && S.active) await app.saveActive(true);
-      for (const k of upgradeSaved(S)) await app.save(k);
-      applyTheme(); setCustomExercises(S.customExercises); applyExerciseEdits(S.exerciseEdits); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
-      await app.reloadSessions(); app.closeSheet(); app.toast('Backup restored'); app.render();
-    });
-  });
+  restoreFromData(data);
 }

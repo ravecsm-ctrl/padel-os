@@ -17,6 +17,7 @@ import { phaseFor, DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { saveBackup } from './ui-backup.js';
+import * as cloud from './core-cloud.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
@@ -49,11 +50,15 @@ export function banners({ resumeOnly = false } = {}) {
   if (recent >= TOO_MANY_RECOVERY_DAYS && Date.now() - (S.settings.recWarnSnooze || 0) > 30 * 86400000)
     out += `<div class="banner warn">${tile('heart', 'orange')}<span><b>${recent} recovery days in 2 weeks</b><small>Your gym plan may be too heavy for how much padel you play. Try one fewer gym day, or shorter workouts.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="go" data-to="welcome" style="font-size:15px;white-space:nowrap">Change plan</button><button class="link" data-action="rec-warn-later" style="font-size:13px">Later</button></span></div>`;
   // Everything lives on this phone, so nudge a backup from the first saved session, then weekly.
-  if (S.sessions.length) {
+  // With the online copy working, no backup nudge; if it stops, say so (a broken key is the one thing to fix).
+  const cs = cloud.status();
+  if (cs.on && ['key', 'access'].includes(cs.error)) out += `<button class="banner warn" data-action="go" data-to="settings">${tile('shield', 'orange')}<span><b>Online copy stopped</b><small>${cs.error === 'key' ? 'Your GitHub key no longer works. Add a new one in Settings.' : 'The key can’t reach your repository any more. Check it in Settings.'}</small></span>${chev}</button>`;
+  const cloudOk = cs.on && cs.lastOk && Date.now() - cs.lastOk < 7 * 86400000;
+  if (S.sessions.length && !cloudOk) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
     const snoozed = Date.now() - (S.settings.backupSnooze || 0) < 7 * 86400000;
     // A slim strip, not a card: it matters, but it shouldn't compete with today's workout.
-    if ((days == null || days >= 7) && !snoozed) out += `<div class="strip">${icon('download')}<span>${days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`;
+    if ((days == null || days >= 7) && !snoozed) out += `<div class="strip">${icon('download')}<span>${cs.on ? `Online copy hasn’t saved for ${cs.lastOk ? Math.floor((Date.now() - cs.lastOk) / 86400000) : 'several'} days.` : days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`;
   }
   return out;
 }
@@ -343,7 +348,8 @@ export const today = {
         + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
         + row({ title: 'Warm up before playing', sub: `${routineMinutes(COURT_ROUTINES.warmup)} min, guided`, icon: 'flame', color: 'orange', to: 'court/warmup' }),
         { header: 'More', big: true })}
-      ${S.sessions.length ? `<p class="t-foot" style="text-align:center;margin:8px 0 4px">${S.lastBackup ? `Last backup ${esc(relDay(S.lastBackup).toLowerCase())}` : 'Not backed up yet'} · <button class="link" data-action="quick-backup" style="font-size:inherit">Back up now</button></p>` : ''}`;
+      ${S.sessions.length ? (cloud.status().on && cloud.status().lastOk ? `<p class="t-foot" style="text-align:center;margin:8px 0 4px">Copied online ${esc(relDay(cloud.status().lastOk).toLowerCase())}</p>`
+        : `<p class="t-foot" style="text-align:center;margin:8px 0 4px">${S.lastBackup ? `Last backup ${esc(relDay(S.lastBackup).toLowerCase())}` : 'Not backed up yet'} · <button class="link" data-action="quick-backup" style="font-size:inherit">Back up now</button></p>`) : ''}`;
   },
   actions: {
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },

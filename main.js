@@ -1,5 +1,6 @@
 import { app, S, DEFAULT_SETTINGS, parseHash, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
+import * as cloud from './core-cloud.js';
 import * as timer from './core-timer.js';
 import { DEFAULT_SCHEDULE } from './domain-program.js';
 import { today } from './ui-today.js';
@@ -127,6 +128,14 @@ async function boot() {
   if (!S.profile.onboarded && !S.sessions.length && !S.active && ['today', 'overview'].includes(S.route)) S.route = 'welcome';
   // A workout in progress always opens first.
   if (S.active && S.route !== 'workout') { S.route = 'workout'; S.params = []; window.history.replaceState(null, "", "#/workout"); }
+  // Online copy: save after every change, and catch up on anything that waited for signal.
+  try { await cloud.load(); } catch {}
+  db.onChange(() => cloud.markChanged());
+  cloud.onStatus(() => { if (S.route === 'settings') app.render({ keepScroll: true }); });
+  const catchUp = () => { if (cloud.status().waiting || cloud.status().error === 'offline') cloud.save(); };
+  addEventListener('online', catchUp);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') catchUp(); });
+  catchUp();
   app.render();
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
