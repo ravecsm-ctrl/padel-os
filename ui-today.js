@@ -100,7 +100,9 @@ function hero() {
   // Done: a compact line (the work is behind you), then what's coming next.
   if (doneToday.length && !S.active && tp?.phase !== 'day') {
     const next = nextPlanned();
-    return `<section class="card"><button class="done-card" data-action="go" data-to="history/session/${esc(doneToday[0].id)}" style="width:100%;text-align:left">${tile('check', 'green')}<span class="row-main"><b>Done today</b><small>${esc(doneToday.map(s => s.title).join(' + '))} · see summary</small></span>${chev}</button>
+    // With a workout and a match (or a warm-up) on the same day, the workout leads and is the summary you open.
+    const done = [...doneToday].sort((a, b) => (b.kind === 'strength') - (a.kind === 'strength'));
+    return `<section class="card"><button class="done-card" data-action="go" data-to="history/session/${esc(done[0].id)}" style="width:100%;text-align:left">${tile('check', 'green')}<span class="row-main"><b>Done today</b><small>${esc(done.map(s => s.title).join(' + '))} · see summary</small></span>${chev}</button>
       ${next ? `<button class="done-next" data-action="go" data-to="plan/routine/${esc(next.id)}">${tile(routineLook(next.id).icon, 'gray')}<span class="row-main"><span class="row-title">Next: ${esc(app.routine(next.id).title)}</span><small>${esc(next.when)}</small></span>${chev}</button>` : ''}</section>`;
   }
   if (tp?.noGym) {
