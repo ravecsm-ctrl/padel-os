@@ -85,7 +85,7 @@ export const app = {
   sheet(html, onMount) {
     const d = $('#sheet');
     $('#sheetBody').innerHTML = html;
-    if (!d.open) d.showModal();
+    if (!d.open) { d.style.transform = ''; d.style.transition = ''; d.showModal(); }   // never reopen still slid down from a swipe
     onMount?.($('#sheetBody'));
   },
   closeSheet() { const d = $('#sheet'); if (d.open) d.close(); },

@@ -169,7 +169,7 @@ function sheetSwipe(d) {
     const fast = dy / Math.max(1, Date.now() - t0) > 0.5;
     if (dy > Math.min(140, d.offsetHeight * 0.3) || (fast && dy > 40)) {
       d.style.transition = 'transform .18s ease-in'; d.style.transform = `translateY(${d.offsetHeight}px)`;
-      setTimeout(() => app.closeSheet(), 170);
+      setTimeout(() => { app.closeSheet(); d.style.transition = ''; d.style.transform = ''; }, 170);
     } else { d.style.transition = 'transform .2s ease-out'; d.style.transform = ''; }
   };
   d.addEventListener('touchend', end);
