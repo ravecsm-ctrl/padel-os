@@ -8,7 +8,7 @@ import { doneSets, recomputePRs, heaviest, looksOff } from './domain-progression
 import { isoDate, mondayOf, relDay, parseISO } from './domain-calendar.js';
 import { fmtW, fmtNum, toDisplay, fromDisplay, fmtEst } from './domain-units.js';
 import { activitySheet } from './ui-today.js';
-import { padelSummary, padelInsights, PADEL_TYPES, SIDES } from './domain-padel.js';
+import { padelSummary, padelInsights, PADEL_TYPES, PADEL_FOCUS, SIDES } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { painAreasOf } from './domain-pain.js';
 import { routineFromWorkout, setCustomRoutines } from './domain-program.js';
@@ -60,6 +60,7 @@ function padelGroup() {
   const side = Object.entries(p.sides).sort((a, b) => b[1] - a[1])[0];
   const sore = Object.entries(p.sore).sort((a, b) => b[1] - a[1]);
   const rows = row({ title: 'Matches', value: String(p.matches) })
+    + (p.practice ? row({ title: 'Lessons, training and ball machine', value: `${p.practice} · ${Math.round(p.practiceMin / 60 * 10) / 10} h` }) : '')
     + (p.winRate != null ? row({ title: 'Win rate', value: `${p.winRate}% <span class="t-foot">(${p.won}–${p.lost})</span>` }) : '')
     + (side ? row({ title: 'Usual side', value: esc(SIDES[side[0]].split(' ')[0] === 'Drive' ? 'Right' : SIDES[side[0]].startsWith('Rev') ? 'Left' : 'Both') }) : '')
     + (sore.length ? row({ title: 'Sore after playing', value: sore.map(([a, n]) => `${esc(AREAS[a].split(' ')[0])} ${n}×`).join(', ') }) : '')
@@ -185,7 +186,7 @@ function sessionView(id) {
     <p style="text-align:center;margin-top:14px"><button class="link" data-action="feels-off-session" data-id="${esc(s.id)}">Something feels off?</button></p>`;
   if (!gym) {
     const pd = s.padel;
-    const details = pd ? [['Event', pd.event], ['Type', PADEL_TYPES[pd.type]], ['Result', pd.result === 'won' ? 'Won' : pd.result === 'lost' ? 'Lost' : ''], ['Score', pd.score], ['Partner', pd.partner], ['Side', pd.side === 'drive' ? 'Right' : pd.side === 'reves' ? 'Left' : pd.side === 'both' ? 'Both' : ''], ['Sore', pd.sore?.length ? pd.sore.map(a => AREAS[a]).join(', ') : 'Nothing']].filter(r => r[1]) : [];
+    const details = pd ? [['Event', pd.event], ['Type', PADEL_TYPES[pd.type]], ['Focus', PADEL_FOCUS[pd.focus]], ['Result', pd.result === 'won' ? 'Won' : pd.result === 'lost' ? 'Lost' : ''], ['Score', pd.score], ['Partner', pd.partner], ['Side', pd.side === 'drive' ? 'Right' : pd.side === 'reves' ? 'Left' : pd.side === 'both' ? 'Both' : ''], ['Sore', pd.sore?.length ? pd.sore.map(a => AREAS[a]).join(', ') : 'Nothing']].filter(r => r[1]) : [];
     return `${nav}${head}<div class="tiles three">${stat(s.durationMin, 'Minutes')}${stat(esc(effortWord(s.rpe)), 'Effort')}${stat(sessionLoad(s), 'Load')}</div>
       ${details.length ? group(details.map(([k, v]) => row({ title: k, value: esc(v) })).join('')) : ''}
       ${s.notes ? group(row({ title: esc(s.notes) }), { header: 'Notes' }) : ''}${actions}`;

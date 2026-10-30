@@ -6,7 +6,7 @@ import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, star
 import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-analytics.js';
 import { createWorkout, createActivity, workoutStats, applySupersets, createQuickWorkout } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
-import { prehabFor, PADEL_TYPES } from './domain-padel.js';
+import { prehabFor, PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { sessionEffortChips, mname } from './ui-words.js';
 import { recoveryCard, currentRecovery } from './ui-recovery.js';
@@ -125,7 +125,7 @@ function adjustPreview(routineId) {
   const parts = [by('down').length && `one set fewer on ${names(by('down'))}`, by('hold').length && `same weight on ${names(by('hold'))}`,
     by('ease').length && `Solid effort on ${names(by('ease'))}`, by('up').length && `an extra set on ${names(by('up'))}`].filter(Boolean);
   const regions = [...new Set(ch.filter(c => c.dir !== 'up' && c.muscle).map(c => regionOf(c.muscle)))];
-  const head = regions.length ? `${regions.join(' and ')} still recovering${afterPadel() ? ' after your match' : ''}` : 'Fully recovered';
+  const head = regions.length ? `${regions.join(' and ')} still recovering${afterPadel() ? ' after padel' : ''}` : 'Fully recovered';
   return { text: `${head}: ${parts.join(', ')}.`, head, parts, changes: ch };
 }
 // A workout later this week that suits today better: its muscles are ready while today's are still recovering.
@@ -234,13 +234,13 @@ function todayCall(plan) {
   } else if (call.level === 'reshaped') {
     const alt = app.routine(swap.to);
     const mine = routineRegion(plan), theirs = routineRegion(swap.to);
-    why = mine !== theirs ? `Your ${mine.toLowerCase()} ${mine === 'Legs' ? 'are' : 'is'} still recovering${afterPadel() ? ' after your match' : ''}, and your ${theirs.toLowerCase()} ${theirs === 'Legs' ? 'are' : 'is'} ready.`
-      : `Today’s muscles are still recovering${afterPadel() ? ' after your match' : ''}; ${alt.title} works ones that are ready.`;
+    why = mine !== theirs ? `Your ${mine.toLowerCase()} ${mine === 'Legs' ? 'are' : 'is'} still recovering${afterPadel() ? ' after padel' : ''}, and your ${theirs.toLowerCase()} ${theirs === 'Legs' ? 'are' : 'is'} ready.`
+      : `Today’s muscles are still recovering${afterPadel() ? ' after padel' : ''}; ${alt.title} works ones that are ready.`;
     bullets = [`${alt.title} today`, `${r0.title} moves to ${weekday(swap.back)}`];
     extra = { to: swap.to, back: swap.back, alt };
   } else {
     const back = moveDay(plan), reasons = [];
-    if (call.tiredShare >= 0.5) reasons.push(`most of today’s muscles are still tired${afterPadel() ? ' after your match' : ''}`);
+    if (call.tiredShare >= 0.5) reasons.push(`most of today’s muscles are still tired${afterPadel() ? ' after padel' : ''}`);
     if (tp?.phase === 'recover') reasons.push('you’re just after a tournament');
     // Your check-in answer is shown just above, so the reason line doesn't repeat it.
     why = `${cap(reasons.join(', and ') || (feel === 'tired' ? 'you said you’re tired' : 'you said you’re sore'))}. A gym session today would cost more than it gives.`;
@@ -561,20 +561,23 @@ export async function startPast(routineId, iso) {
 }
 
 // ── Activity (padel etc.) logging
+// A new padel log starts as your last one (a weekly lesson stays a lesson).
+const lastPadelType = () => { const l = S.sessions.find(s => s.activity === 'padel' && s.padel?.type); return { ptype: l?.padel.type || 'match', focus: l?.padel.focus || 'mixed' }; };
 export function activitySheet(kind = 'padel', existing = null, date = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
-    ptype: pd.type || 'match', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
-    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ptype: 'match', result: 'none', score: '', partner: '', side: '', sore: [] };
+    ptype: pd.type || 'match', focus: pd.focus || 'mixed', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
+    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ...lastPadelType(), result: 'none', score: '', partner: '', side: '', sore: [] };
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);
     return `<h2 class="sheet-title">${existing ? 'Edit' : padel ? 'Log Padel' : 'Log Activity'}</h2>
     <div style="height:8px"></div>${seg('activity', ACTIVITIES, f().activity)}
-    ${padel ? `<label class="field-l">Type</label>${seg('ptype', Object.entries(PADEL_TYPES), f().ptype)}` : ''}
+    ${padel ? `<label class="field-l">Type</label>${chips('ptype', Object.keys(PADEL_TYPES), f().ptype, k => PADEL_TYPES[k])}` : ''}
+    ${padel && hasFocus(f().ptype) ? `<label class="field-l">What did you work on?</label>${chips('focus', Object.keys(PADEL_FOCUS), f().focus, k => PADEL_FOCUS[k])}` : ''}
     ${match ? `<label class="field-l">Result</label>${seg('result', [['won', 'Won'], ['lost', 'Lost'], ['none', 'Skip']], f().result)}
       <div class="grid2"><input class="input" id="scoreIn" placeholder="Score (optional)" value="${esc(f().score)}" aria-label="Score"><input class="input" id="partnerIn" placeholder="Partner (optional)" value="${esc(f().partner)}" aria-label="Partner"></div>` : ''}
-    ${padel ? `<label class="field-l">Side you played</label>${seg('side', [['drive', 'Right'], ['reves', 'Left'], ['both', 'Both']], f().side)}` : ''}
+    ${padel && f().ptype !== 'machine' ? `<label class="field-l">Side you played</label>${seg('side', [['drive', 'Right'], ['reves', 'Left'], ['both', 'Both']], f().side)}` : ''}
     <label class="field-l">How long?</label>${chips('duration', [30, 45, 60, 90, 120], f().duration, v => `${v} min`)}
     <input class="input" id="durIn" type="number" inputmode="numeric" min="1" max="600" value="${esc(f().duration)}" aria-label="Minutes" style="margin-top:8px">
     <label class="field-l">How hard was it?</label>${sessionEffortChips('rpe', f().rpe)}
@@ -596,7 +599,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
       if (isoDate(d) === isoDate(now)) d.setTime(Math.max(parseISO(isoDate(now)).getTime(), now.getTime() - dur * 60000));
       else d.setHours(12);
       const t = S.settings.tournament, event = t?.date && t.date === isoDate(d) ? t.name || 'Tournament' : existing?.padel?.event;
-      const padel = f().activity === 'padel' ? { type: f().ptype, result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().side, sore: f().sore, ...(event ? { event } : {}) } : undefined;
+      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(event ? { event } : {}) } : undefined;
       const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];
       const base = existing ? { ...existing, activity: f().activity, durationMin: dur, rpe: +f().rpe, notes: f().notes, startedAt: d.getTime(), endedAt: d.getTime() + dur * 60000 }
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });

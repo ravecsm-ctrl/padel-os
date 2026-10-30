@@ -19,6 +19,21 @@ const BASE_HOURS = {
 // pushing and push-offs; overheads and volleys load the front of the shoulder and grip.
 const PADEL_LOAD = { calves: 1.2, soleus: 1.0, quads: 1.1, adductors: 1.1, glutes: 0.8, glute_med: 0.9, hip_flexors: 0.5, front_delts: 0.6, side_delts: 0.3, rear_delts: 0.3,
   forearms: 0.9, rotator_cuff: 0.6, serratus: 0.4, obliques: 0.7, abs: 0.5, shins: 0.6 };
+// Not every padel session loads the body like a match. Each type, and the focus of a lesson,
+// training or ball-machine session, scales the legs, arms and trunk parts of PADEL_LOAD.
+// Estimates from how each session moves you; personal calibration corrects them over time.
+const REGION = { calves: 'legs', soleus: 'legs', quads: 'legs', adductors: 'legs', glutes: 'legs', glute_med: 'legs', hip_flexors: 'legs', shins: 'legs',
+  front_delts: 'arms', side_delts: 'arms', rear_delts: 'arms', forearms: 'arms', rotator_cuff: 'arms', serratus: 'arms', obliques: 'trunk', abs: 'trunk' };
+const TYPE_LOAD = { match: { legs: 1, arms: 1, trunk: 1 }, americano: { legs: 1, arms: 1, trunk: 1 }, lesson: { legs: 0.8, arms: 1.1, trunk: 1 },
+  training: { legs: 0.8, arms: 1.1, trunk: 1 }, machine: { legs: 0.35, arms: 1.3, trunk: 0.9 } };
+const FOCUS_LOAD = { overheads: { legs: 0.8, arms: 1.4, trunk: 1.1 }, groundstrokes: { legs: 0.9, arms: 1.1, trunk: 1.1 }, footwork: { legs: 1.35, arms: 0.6, trunk: 0.9 }, mixed: { legs: 1, arms: 1, trunk: 1 } };
+export function padelProfile(type = 'match', focus = null) {
+  const t = TYPE_LOAD[type] || TYPE_LOAD.match, f = (type === 'match' || type === 'americano') ? FOCUS_LOAD.mixed : FOCUS_LOAD[focus] || FOCUS_LOAD.mixed;
+  return { legs: Math.min(1.6, t.legs * f.legs), arms: Math.min(1.6, t.arms * f.arms), trunk: Math.min(1.6, t.trunk * f.trunk) };
+}
+// Sessions that load the legs like a match: these move leg days and shape match levels.
+export const legsLikeMatch = s => !!s && (s.activity ?? 'padel') === 'padel' && padelProfile(s.padel?.type, s.padel?.focus).legs >= 0.9;
+
 export const READY_BELOW = 0.2;     // fatigue level under which a muscle counts as ready
 export const TIRED_FROM = 0.6;
 
@@ -47,7 +62,8 @@ export function events(sessions, since, now = Date.now()) {
       for (const [m, dose] of Object.entries(by)) out.push({ t, muscle: m, dose });
     } else if (s.kind === 'activity' && (s.activity === 'padel' || s.activity === 'cardio')) {
       const k = (s.durationMin || 0) / 30 * effort(s.rpe) * (s.activity === 'cardio' ? 0.5 : 1);
-      for (const [m, w] of Object.entries(PADEL_LOAD)) if (s.activity === 'padel' || ['calves', 'soleus', 'quads', 'glutes'].includes(m)) out.push({ t, muscle: m, dose: w * k });
+      const pf = s.activity === 'padel' ? padelProfile(s.padel?.type, s.padel?.focus) : null;
+      for (const [m, w] of Object.entries(PADEL_LOAD)) if (pf || ['calves', 'soleus', 'quads', 'glutes'].includes(m)) out.push({ t, muscle: m, dose: w * k * (pf ? pf[REGION[m]] : 1) });
     }
   }
   return out;

@@ -88,7 +88,7 @@ function liftSheet(exId, i = -1) {
   app.sheet(`<h2 class="sheet-title">${esc(ex.name)}</h2><p class="sheet-sub">${best ? `Your best so far: ${esc(fmtW(best, u))}.` : 'You haven’t logged this one yet.'} Progress uses the heaviest weight you log.</p>
     ${group(row({ title: `Goal (${u})`, right: `<input class="input num" id="gKg" type="number" inputmode="decimal" step="any" min="0" value="${g ? fmtNum(toDisplay(g.kg, u)) : ''}" style="width:90px;text-align:right;background:none;padding:0" aria-label="Goal weight">` }))}
     <div class="btns"><button class="btn filled" id="gSave">Save</button>${g ? '<button class="btn destructive" id="gDel">Remove Goal</button>' : '<button class="btn plain" data-action="close-sheet">Cancel</button>'}</div>`, b => {
-    setTimeout(() => b.querySelector('#gKg').focus(), 50);
+    setTimeout(() => b.querySelector('#gKg')?.focus(), 50);
     b.querySelector('#gSave').onclick = async () => {
       const v = Number(String(b.querySelector('#gKg').value).replace(',', '.'));
       if (!(v > 0)) return app.toast('Enter a weight');

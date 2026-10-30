@@ -4,7 +4,10 @@ import { mondayOf, isoDate } from './domain-calendar.js';
 import { AREA_ROUTINE } from './domain-court.js';
 import { recentPain } from './domain-pain.js';
 
-export const PADEL_TYPES = { match: 'Match', training: 'Training', lesson: 'Lesson', americano: 'Americano' };
+export const PADEL_TYPES = { match: 'Match', americano: 'Americano', lesson: 'Lesson', training: 'Training', machine: 'Ball machine' };
+// What a lesson, training or ball-machine session worked on (it changes which muscles it tires).
+export const PADEL_FOCUS = { overheads: 'Overheads', groundstrokes: 'Groundstrokes and volleys', footwork: 'Footwork', mixed: 'Mixed' };
+export const hasFocus = type => ['lesson', 'training', 'machine'].includes(type);
 export const SIDES = { drive: 'Drive (right)', reves: 'Revés (left)', both: 'Both' };
 export const RESULTS = { won: 'Won', lost: 'Lost', none: '—' };
 
@@ -35,8 +38,10 @@ export function padelSummary(sessions, now = Date.now(), days = 60) {
   const avg = arr => arr.length ? Math.round(arr.reduce((n, w) => n + w.min, 0) / arr.length) : null;
   const soreWeeks = [...weeks.values()].filter(w => w.sore), okWeeks = [...weeks.values()].filter(w => !w.sore);
 
+  const practice = recent.filter(s => hasFocus(s.padel?.type));
   return {
     sessions: recent.length, matches: matches.length, won, lost,
+    practice: practice.length, practiceMin: practice.reduce((n, s) => n + (s.durationMin || 0), 0),
     winRate: won + lost ? Math.round((won / (won + lost)) * 100) : null,
     minutes: recent.reduce((n, s) => n + (s.durationMin || 0), 0),
     sides, sore, topSore,

@@ -4,6 +4,7 @@
 //   easy    social game, lesson, drilling: train as usual around it
 //   normal  a regular match
 //   hard    competitive, league, Americano or a long session: keep legs fresh before, give them time after
+import { legsLikeMatch } from './domain-recovery.js';
 export const MATCH_LEVELS = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 export const LEVEL_HINT = { easy: 'Social game, lesson, drilling', normal: 'A regular match', hard: 'Competitive, league, Americano or long' };
 const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -18,13 +19,14 @@ export function loggedLevel(s) {
   const rpe = s.rpe ?? 7, min = s.durationMin || 0;
   return rpe >= 8 || (rpe >= 7 && min >= 110) ? 'hard' : rpe <= 5 ? 'easy' : 'normal';
 }
-// Only a match that turned out hard when it wasn't planned that way changes the days after it.
-export const harderThanPlanned = (s, expected) => loggedLevel(s) === 'hard' && expected !== 'hard';
+// Only a match (or a session as tough on the legs) that turned out hard when it wasn't planned that way changes the days after it.
+// A ball-machine or overheads session doesn't count: it barely loads the legs (see recovery.legsLikeMatch).
+export const harderThanPlanned = (s, expected) => legsLikeMatch(s) && loggedLevel(s) === 'hard' && expected !== 'hard';
 
 // Your last three matches on this weekday (within 6 weeks) all went one way that isn't the setting:
 // suggest it. Returns 'easy' | 'normal' | 'hard' | null.
 export function suggestLevel(sessions, weekday, current = 'normal', now = Date.now()) {
-  const recent = sessions.filter(s => s.activity === 'padel' && now - s.startedAt < 42 * DAY && WEEK[new Date(s.startedAt).getDay()] === weekday)
+  const recent = sessions.filter(s => legsLikeMatch(s) && now - s.startedAt < 42 * DAY && WEEK[new Date(s.startedAt).getDay()] === weekday)
     .sort((a, b) => b.startedAt - a.startedAt).slice(0, 3);
   if (recent.length < 3) return null;
   const lv = recent.map(loggedLevel);
