@@ -12,6 +12,7 @@ import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.
 import { MATCH_LEVELS, LEVEL_HINT, suggestLevel } from './domain-matchlevel.js';
 import { bodySummary } from './ui-body.js';
 import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
+import { thisWeekSection, weekPick, weekStrip } from './ui-week.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const usual = d => S.settings.padelLevel?.[d] || 'normal';
@@ -78,11 +79,11 @@ function overview() {
     <div class="court-stack">${pos.block ? blockHero(pos.block) : `<button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
       <p class="t-foot">This cycle</p><h2>Week ${pos.week}: ${esc(ph.name)}</h2><p class="t-sub">${esc(ph.note)}</p>
       <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>`}
-      <div class="court-days">${DAYS.map(d => { const v = S.schedule[d], kind = isRoutine(v) ? 'gym' : v === 'Padel' ? 'padel' : v === 'Recovery' ? 'rec' : 'rest';
-        return `<button class="${kind} ${d === today ? 'today' : ''}" data-action="day-sheet" data-day="${d}" aria-label="${DAY_NAME[d]}: ${esc(optLabel(v))}"><small>${d[0]}</small><span>${kind === 'gym' ? icon(routineLook(v).icon) : kind === 'padel' ? icon('racket') : kind === 'rec' ? icon('heart') : ''}</span></button>`; }).join('')}</div></div>
-    <p class="grp-f" style="margin:8px 4px 24px">${pos.block ? 'Your goal block moves forward on its own every Monday.' : 'Each cycle is 4 weeks and moves forward on its own every Monday.'} Tap a day to change it.</p>
+${weekStrip()}</div>
+    <p class="grp-f" style="margin:8px 4px 20px">${pos.block ? 'Your goal block moves forward on its own every Monday.' : 'Each cycle is 4 weeks and moves forward on its own every Monday.'}</p>
+    ${thisWeekSection()}
     ${blockCard()}${betterWeekCard()}${levelTipCard()}
-    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
+    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Your usual week', footer: 'Used for any week you don’t plan. Padel you add for a date changes only that week.' })}
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'Start a goal', sub: 'A 4 to 8 week plan toward one goal', icon: 'target', color: 'teal', action: 'goal-new' })
       + row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
@@ -135,8 +136,12 @@ function routineView(id) {
 export const plan = {
   tab: 'plan',
   render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : S.params[0] === 'goal' ? goalView() : overview(); },
-  mounted() { const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; goalMounted(); },
-  onPick(name, value) { goalPick(name, value); },
+  mounted() {
+    const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; goalMounted();
+    // Asked from a day of this week: open your usual weekday.
+    if (S.openDay && !S.params.length) { const day = S.openDay; delete S.openDay; plan.actions['day-sheet']({ dataset: { day } }); }
+  },
+  onPick(name, value) { goalPick(name, value) || weekPick(name, value); },
   actions: {
     ...goalActions,
     'new-workout'() { NEW = { title: '', blocks: [] }; app.go('plan/new'); },

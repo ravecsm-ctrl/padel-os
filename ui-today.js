@@ -22,6 +22,7 @@ import * as cloud from './core-cloud.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { blockBanner } from './ui-goal.js';
+import { weekActions, weekAskCard } from './ui-week.js';
 import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
 
@@ -40,6 +41,7 @@ export function banners({ resumeOnly = false } = {}) {
   // During a goal block the weeks follow the block, so no "restart at week 1" offer.
   const br = app.position().block ? null : breakInfo(S.sessions, app.position().week, { acknowledged: S.settings.breakAck || 0 });
   if (br) out += `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`;
+  out += weekAskCard();
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
   const tp = taperFor(S.settings.tournament);
@@ -108,7 +110,7 @@ function buildWorkout(routineId, { readiness = null, light = false, sore = [] } 
   const w = createWorkout({ routineId, week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
   const rec = currentRecovery();
   if (S.settings.adaptive !== false) {
-    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: !!app.matchLevel(isoIn(1)) && app.matchLevel(isoIn(1)) !== 'easy', hardSoon: app.matchLevel(isoIn(2)) === 'hard', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
+    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: !!app.legLevel(isoIn(1)) && app.legLevel(isoIn(1)) !== 'easy', hardSoon: app.legLevel(isoIn(2)) === 'hard', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
       deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit, afterPadel: afterPadel() });
   }
   return { w, rec };
@@ -151,13 +153,13 @@ function swapOffer(routineId) {
 // from: days from today of the workout being moved (0 = today).
 function moveDay(routineId, from = 0) {
   let fallback = null;
-  const beforeMatch = iso => !!app.matchLevel(iso) && app.matchLevel(iso) !== 'easy';
+  const beforeMatch = iso => !!app.legLevel(iso) && app.legLevel(iso) !== 'easy';
   for (let i = from + 1; i < 7; i++) {
     const iso = isoIn(i);
     if (parseISO(iso).getDay() === 1) break;
     const v = app.planOn(iso);
     if ((v !== 'Rest' && v !== 'Recovery') || S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso) || beforeMatch(isoIn(i + 1))) continue;
-    if (i === from + 1 || (isLegHeavy(routineId) && app.planOn(isoIn(i - 1)) === 'Padel' && app.matchLevel(isoIn(i - 1)) !== 'easy')) { fallback ??= iso; continue; }
+    if (i === from + 1 || (isLegHeavy(routineId) && app.planOn(isoIn(i - 1)) === 'Padel' && app.legLevel(isoIn(i - 1)) !== 'easy')) { fallback ??= iso; continue; }
     return iso;
   }
   return fallback;
@@ -166,13 +168,13 @@ function moveDay(routineId, from = 0) {
 // Hard match tomorrow and legs planned today: swap in a non-leg workout from later this week, or move
 // the leg day to a free one. { to, back } for a swap, { move } for a move, or null.
 function prepOffer(routineId) {
-  if (S.active || S.settings.adaptive === false || !isLegHeavy(routineId) || app.matchLevel(isoIn(1)) !== 'hard' || S.settings.swap?.date === isoDate()) return null;
+  if (S.active || S.settings.adaptive === false || !isLegHeavy(routineId) || app.legLevel(isoIn(1)) !== 'hard' || S.settings.swap?.date === isoDate()) return null;
   for (let i = 2; i < 7; i++) {
     const iso = isoIn(i);
     if (parseISO(iso).getDay() === 1) break;
     const alt = app.planOn(iso);
     if (!isRoutine(alt) || isLegHeavy(alt) || S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso)) continue;
-    if (!(app.matchLevel(isoIn(i + 1)) && app.matchLevel(isoIn(i + 1)) !== 'easy')) return { to: alt, back: iso };
+    if (!(app.legLevel(isoIn(i + 1)) && app.legLevel(isoIn(i + 1)) !== 'easy')) return { to: alt, back: iso };
   }
   const move = moveDay(routineId);
   return move && move !== isoIn(1) ? { move } : null;
@@ -278,6 +280,8 @@ function nextPlanned() {
   return null;
 }
 
+// Today's planned padel in words: "Ball machine · Overheads. Warm up, play, then log it".
+const padelToday = () => { const p = app.padelOn(); return p && p.type !== 'match' ? `${PADEL_TYPES[p.type]}${p.focus && p.focus !== 'mixed' ? ` · ${PADEL_FOCUS[p.focus]}` : ''}. Warm up, then log it` : 'Warm up, play, then log it'; };
 function hero() {
   const plan = app.planOn();
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
@@ -304,10 +308,10 @@ function hero() {
   }
   if (isRoutine(plan)) return callCard(plan);
   if (plan === 'Padel') {
-    return `<section class="card hero"><div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">Warm up, play, then log it</p></div></div>
+    return `<section class="card hero"><div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">${esc(padelToday())}</p></div></div>
       ${levelLine(isoDate())}
       <div class="btns"><button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button>
-      <button class="btn tinted" data-action="log-activity" data-kind="padel">Log Match</button></div></section>`;
+      <button class="btn tinted" data-action="log-activity" data-kind="padel">Log ${app.padelOn()?.type === 'match' ? 'Match' : 'Padel'}</button></div></section>`;
   }
   const rec = plan === 'Recovery', sw = S.settings.swap;
   if (plan === 'Rest' && sw?.date === isoDate() && isRoutine(sw.from)) {
@@ -416,6 +420,7 @@ export const today = {
         : `<p class="t-foot" style="text-align:center;margin:8px 0 4px">${S.lastBackup ? `Last backup ${esc(relDay(S.lastBackup).toLowerCase())}` : 'Not backed up yet'} · <button class="link" data-action="quick-backup" style="font-size:inherit">Back up now</button></p>`) : ''}`;
   },
   actions: {
+    ...weekActions,
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     async 'swap-today'(el) {
       S.settings.swap = { date: isoDate(), from: app.planOn(), to: el.dataset.r, back: el.dataset.back };
@@ -561,13 +566,16 @@ export async function startPast(routineId, iso) {
 }
 
 // ── Activity (padel etc.) logging
-// A new padel log starts as your last one (a weekly lesson stays a lesson).
-const lastPadelType = () => { const l = S.sessions.find(s => s.activity === 'padel' && s.padel?.type); return { ptype: l?.padel.type || 'match', focus: l?.padel.focus || 'mixed' }; };
+// A new padel log starts as what you planned for that day, else as your last one (a weekly lesson stays a lesson).
+const lastPadelType = (iso = isoDate()) => {
+  const p = S.settings.padelPlan?.[iso]; if (p) return { ptype: p.type, focus: p.focus || 'mixed' };
+  const l = S.sessions.find(s => s.activity === 'padel' && s.padel?.type); return { ptype: l?.padel.type || 'match', focus: l?.padel.focus || 'mixed' };
+};
 export function activitySheet(kind = 'padel', existing = null, date = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
     ptype: pd.type || 'match', focus: pd.focus || 'mixed', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
-    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ...lastPadelType(), result: 'none', score: '', partner: '', side: '', sore: [] };
+    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ...lastPadelType(date || isoDate()), result: 'none', score: '', partner: '', side: '', sore: [] };
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);

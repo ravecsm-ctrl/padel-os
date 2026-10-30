@@ -23,6 +23,7 @@ import { review } from './ui-review.js';
 import { feedback } from './ui-feedback.js';
 import { pickerActions } from './ui-picker.js';
 import { startPendingBlock } from './ui-goal.js';
+import { pruneDated } from './ui-week.js';
 import './domain-pack.js'; // expansion pack: adds its exercises to the library
 import { upgradeSaved } from './domain-muscles.js';
 import { overview } from './ui-overview.js';
@@ -141,6 +142,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { catchUp(); blockDay(); } });
   catchUp();
   await startPendingBlock();
+  pruneDated();
   app.render();
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});

@@ -608,6 +608,18 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .cycle b { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); }
 .cycle .past b { background: rgba(255, 255, 255, .45); }
 .cycle .on b { background: var(--ball); }
+/* This week: one cell per day with what's on */
+.wk-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 10px 8px 12px; background: var(--court-2); }
+.wk-strip button { display: grid; justify-items: center; gap: 4px; color: var(--court-ink); min-width: 0; }
+.wk-strip small { font-size: 11px; color: var(--court-ink-2); font-weight: 600; }
+.wk-strip span { width: 100%; min-height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 10.5px; line-height: 12px; padding: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; text-overflow: ellipsis; word-break: break-word; }
+.wk-strip .gym span { background: rgba(80, 140, 255, .32); }
+.wk-strip .padel span { background: rgba(40, 200, 160, .36); }
+.wk-strip .rec span { background: rgba(255, 120, 170, .22); }
+.wk-strip .today small { color: var(--ball); }
+.wk-strip .today span { box-shadow: inset 0 0 0 1.5px var(--ball); }
+.wk-strip .mark span { box-shadow: inset 0 0 0 2px var(--ball); }
+.wk-strip .past span { opacity: .55; }
 /* Goal block weeks: one bar per week, phase names under their weeks */
 .blk-bar { display: grid; column-gap: 4px; row-gap: 6px; margin-top: 14px; }
 .blk-bar b { height: 6px; border-radius: 3px; background: var(--fill); }

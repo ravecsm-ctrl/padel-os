@@ -7,6 +7,7 @@ import { isoDate, mondayOf, programPosition, parseISO } from './domain-calendar.
 import { levelOn } from './domain-matchlevel.js';
 import { blockPosition, BLOCK_PHASES } from './domain-block.js';
 import { recentPain } from './domain-pain.js';
+import { legsLikeMatch } from './domain-recovery.js';
 
 export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, adaptive: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
@@ -64,12 +65,17 @@ export const app = {
   location: () => S.locations.find(l => l.id === S.activeLocation) || S.locations[0] || null,
   owned: () => new Set(app.location()?.equipment || []),
   // What's planned on a date: the weekly schedule, unless today's workout was swapped with a later day this week.
+  // A date's own plan (this week's padel and where workouts moved) comes before the usual week.
   planOn(iso = isoDate()) {
-    const sw = S.settings.swap, plan = S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
+    const sw = S.settings.swap, plan = S.settings.dated?.[iso] ?? S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
     return sw && iso === sw.date ? sw.to : sw && iso === sw.back ? sw.from : plan;
   },
   // How hard padel is expected to be on a date ('easy' | 'normal' | 'hard'); null if it isn't a padel day.
   matchLevel(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? levelOn(iso, S.settings) : null; },
+  // What kind of padel is planned on a date: { type, focus } (a match unless you said otherwise).
+  padelOn(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? { type: 'match', focus: null, ...(S.settings.padelPlan?.[iso] || {}) } : null; },
+  // The level for leg rules (Match prep, legs before and after): a ball machine or an overheads lesson counts as easy.
+  legLevel(iso = isoDate()) { const lv = app.matchLevel(iso); return lv && !legsLikeMatch({ activity: 'padel', padel: app.padelOn(iso) }) ? 'easy' : lv; },
   routine: id => resolveRoutine(id, S.overrides, app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile),
 
   async save(key) { try { await db.setMeta(key, S[key]); } catch { S.storageOk = false; app.toast('Could not save — storage unavailable'); } },
