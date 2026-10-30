@@ -6,7 +6,7 @@ import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, star
 import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-analytics.js';
 import { createWorkout, createActivity, workoutStats, applySupersets, createQuickWorkout } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
-import { prehabFor, PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
+import { prehabFor, PADEL_TYPES, PADEL_FOCUS, hasFocus, LEGS_FELT } from './domain-padel.js';
 import { AREAS } from './domain-personalize.js';
 import { sessionEffortChips, mname } from './ui-words.js';
 import { recoveryCard, currentRecovery } from './ui-recovery.js';
@@ -592,8 +592,8 @@ const lastPadelType = (iso = isoDate()) => {
 export function activitySheet(kind = 'padel', existing = null, date = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
-    ptype: pd.type || 'match', focus: pd.focus || 'mixed', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
-    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ...lastPadelType(date || isoDate()), result: 'none', score: '', partner: '', side: '', sore: [] };
+    ptype: pd.type || 'match', focus: pd.focus || 'mixed', legs: pd.legs || '', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
+    : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ...lastPadelType(date || isoDate()), legs: '', result: 'none', score: '', partner: '', side: '', sore: [] };
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);
@@ -607,6 +607,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
     <label class="field-l">How long?</label>${chips('duration', [30, 45, 60, 90, 120], f().duration, v => `${v} min`)}
     <input class="input" id="durIn" type="number" inputmode="numeric" min="1" max="600" value="${esc(f().duration)}" aria-label="Minutes" style="margin-top:8px">
     <label class="field-l">How hard was it?</label>${sessionEffortChips('rpe', f().rpe)}
+    ${padel ? `<label class="field-l">How did your legs feel? (optional)</label>${chips('legs', Object.keys(LEGS_FELT), f().legs, k => LEGS_FELT[k])}` : ''}
     ${padel ? `<label class="field-l">Anything sore afterwards?</label><div class="chipset">${Object.entries(AREAS).map(([k, v]) => `<button type="button" class="chip-btn ${f().sore.includes(k) ? 'warn-on' : ''}" data-sore="${k}" aria-pressed="${f().sore.includes(k)}">${esc(v)}</button>`).join('')}</div>` : ''}
     <label class="field-l" for="dateIn">Date</label><input class="input" id="dateIn" type="date" value="${esc(f().date)}" max="${isoDate()}">
     <label class="field-l" for="notesIn">Notes</label><textarea class="input" id="notesIn" rows="2" placeholder="Optional">${esc(f().notes)}</textarea>
@@ -625,7 +626,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
       if (isoDate(d) === isoDate(now)) d.setTime(Math.max(parseISO(isoDate(now)).getTime(), now.getTime() - dur * 60000));
       else d.setHours(12);
       const t = S.settings.tournament, event = t?.date && t.date === isoDate(d) ? t.name || 'Tournament' : existing?.padel?.event;
-      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(event ? { event } : {}) } : undefined;
+      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(LEGS_FELT[f().legs] ? { legs: f().legs } : {}), ...(event ? { event } : {}) } : undefined;
       const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];
       const base = existing ? { ...existing, activity: f().activity, durationMin: dur, rpe: +f().rpe, notes: f().notes, startedAt: d.getTime(), endedAt: d.getTime() + dur * 60000 }
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });

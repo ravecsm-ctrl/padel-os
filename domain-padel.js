@@ -7,6 +7,10 @@ import { recentPain } from './domain-pain.js';
 export const PADEL_TYPES = { match: 'Match', americano: 'Americano', lesson: 'Lesson', training: 'Training', machine: 'Ball machine' };
 // What a lesson, training or ball-machine session worked on (it changes which muscles it tires).
 export const PADEL_FOCUS = { overheads: 'Overheads', groundstrokes: 'Groundstrokes and volleys', footwork: 'Footwork', mixed: 'Mixed' };
+// How your legs felt playing (one optional tap when you log padel). Over time this shows whether a leg
+// workout in the 2 days before makes a difference for you.
+export const LEGS_FELT = { fresh: 'Fresh', ok: 'OK', heavy: 'Heavy' };
+export const LEGS_NEEDED = 20;
 export const hasFocus = type => ['lesson', 'training', 'machine'].includes(type);
 export const SIDES = { drive: 'Drive (right)', reves: 'Revés (left)', both: 'Both' };
 export const RESULTS = { won: 'Won', lost: 'Lost', none: '—' };
@@ -83,4 +87,16 @@ export function padelInsights(sessions, { minEach = 3 } = {}) {
   const areas = [...new Set(last.flatMap(s => s.padel?.sore || []))];
   const recurring = areas.map(a => ({ area: a, n: count(last, a), of: last.length, trend: last.length >= 6 ? Math.sign(count(last.slice(half), a) - count(last.slice(0, half), a)) : 0 })).filter(r => r.n >= 2).sort((a, b) => b.n - a.n);
   return { total: rate(matches), matches: matches.length, bySide, byPartner, gymCompare, gymCounts: { afterGym: afterGym?.n || 0, fresh: fresh?.n || 0 }, recurring, minEach };
+}
+
+// Your legs at padel after a leg workout in the 48 hours before, vs otherwise: how often they felt heavy.
+// Says nothing until there are LEGS_NEEDED rated sessions with at least `minEach` on both sides; it
+// describes your log, it doesn't prove cause (opponents, sleep and the match itself matter too).
+export function legsPattern(sessions, isLegSession, { minEach = 5 } = {}) {
+  const rated = sessions.filter(s => isPadel(s) && LEGS_FELT[s.padel?.legs]);
+  const legsBefore = m => sessions.some(s => s.kind === 'strength' && s.startedAt < m.startedAt && m.startedAt - s.startedAt <= 2 * DAY && isLegSession(s));
+  const after = rated.filter(legsBefore), other = rated.filter(m => !legsBefore(m));
+  const heavy = list => list.length ? Math.round(list.filter(s => s.padel.legs === 'heavy').length / list.length * 100) : null;
+  return { rated: rated.length, needed: LEGS_NEEDED, ready: rated.length >= LEGS_NEEDED && after.length >= minEach && other.length >= minEach,
+    afterLegs: { n: after.length, heavyPct: heavy(after) }, otherwise: { n: other.length, heavyPct: heavy(other) } };
 }
