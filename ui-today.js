@@ -22,7 +22,7 @@ import * as cloud from './core-cloud.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { blockBanner } from './ui-goal.js';
-import { weekActions, weekAskCard } from './ui-week.js';
+import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js';
 import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
 
@@ -378,7 +378,8 @@ function recoveryStrip() {
 
 function weekCard() {
   const days = trainingDays(S.sessions), today = isoDate();
-  const planned = Object.values(S.schedule).filter(isRoutine).length;
+  // This week's plan (dated changes and busy weeks included), not the usual week.
+  const planned = weekDates().filter(d => isRoutine(app.planOn(d.iso))).length, busy = weekTargets(weekWindow()).busy;
   const mon = mondayOf().getTime();
   const done = app.strength.filter(s => s.startedAt >= mon).length, matches = S.sessions.filter(s => s.activity === 'padel' && s.startedAt >= mon).length;
   const restDays = S.sessions.filter(s => s.recoveryDay && s.startedAt >= mon).length;
@@ -387,7 +388,7 @@ function weekCard() {
     const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : isRoutine(plan) ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : 'rest';
     return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(plan)}">${did.length ? icon('check') : ''}</span></div>`;
   }).join('')}</div>
-  <p class="week-foot"><b>${done}</b> of ${plural(planned || done, 'workout')}${matches ? ` · <b>${matches}</b> ${matches === 1 ? 'match' : 'matches'}` : ''}${restDays ? ` · <b>${restDays}</b> recovery ${restDays === 1 ? 'day' : 'days'}` : ''}</p>
+  <p class="week-foot"><b>${done}</b> of ${plural(planned || done, 'workout')}${matches ? ` · <b>${matches}</b> ${matches === 1 ? 'match' : 'matches'}` : ''}${restDays ? ` · <b>${restDays}</b> recovery ${restDays === 1 ? 'day' : 'days'}` : ''}${busy ? ' · busy padel week' : ''}</p>
   <div class="week-key"><span><i style="background:var(--blue)"></i>Gym</span><span><i style="background:var(--teal)"></i>Padel</span><span><i class="ring"></i>Planned</span></div></div></section>`;
 }
 

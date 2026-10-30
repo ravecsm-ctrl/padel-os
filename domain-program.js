@@ -33,7 +33,10 @@ export const ROUTINES = {
 // Workouts you create (e.g. from an import) sit next to the built-in A/B/C.
 const CUSTOM_ROUTINES = {};
 export function setCustomRoutines(map) { for (const k of Object.keys(CUSTOM_ROUTINES)) delete CUSTOM_ROUTINES[k]; Object.assign(CUSTOM_ROUTINES, map || {}); }
-export const getRoutine = id => ROUTINES[id] || CUSTOM_ROUTINES[id] || null;
+// Workouts worked out from your others (busy weeks' Strength session): the app registers how to build them.
+const DERIVED = {};
+export const setDerivedRoutine = (id, build) => { DERIVED[id] = build; };
+export const getRoutine = id => ROUTINES[id] || CUSTOM_ROUTINES[id] || DERIVED[id]?.() || null;
 export const isRoutine = id => !!getRoutine(id);
 // Leg-heavy: at least 40% of its exercises work the legs as a main muscle. The weekly plan keeps these off
 // the day after padel (and, more strongly, the day before).

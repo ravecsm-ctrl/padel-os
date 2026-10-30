@@ -178,7 +178,7 @@ export const plan = {
     'day-sheet'(el) {
       const d = el.dataset.day;
       app.sheet(`<h2 class="sheet-title">${DAY_NAME[d]}</h2><div style="height:12px"></div>
-        ${group([...DAY_OPTIONS.slice(0, 3), ...allRoutineIds().filter(isCustomRoutine), ...DAY_OPTIONS.slice(3)].map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
+        ${group([...DAY_OPTIONS.slice(0, 3), 'S', ...allRoutineIds().filter(isCustomRoutine), ...DAY_OPTIONS.slice(3)].map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
           { footer: S.schedule[d] === 'Padel' ? '' : 'Tip: avoid your hardest leg workout the day before an important match.' })}
         ${S.schedule[d] === 'Padel' ? group(Object.entries(MATCH_LEVELS).map(([k, label]) => row({ title: label, sub: LEVEL_HINT[k], action: 'set-level', data: { day: d, level: k }, chevron: false, right: usual(d) === k ? icon('check', 'check-mark') : '' })).join(''),
           { header: `How hard is padel on ${DAY_NAME[d]}s?`, footer: 'Hard days keep your legs fresh the day before and give them time after. Change it for one date from the calendar or Today.' }) : ''}`);

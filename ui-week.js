@@ -9,8 +9,9 @@ import { PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
 import { MATCH_LEVELS, loggedLevel } from './domain-matchlevel.js';
 import { planWeek, withPadel, suggestPadelDays, workoutsLeft } from './domain-weekplan.js';
 import { padelProfile } from './domain-recovery.js';
+import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 
-const OPTS = { legs: isLegHeavy, upper: isUpperHeavy };
+const OPTS = { legs: id => id === ANCHOR_ID || isLegHeavy(id), upper: isUpperHeavy, anchor: ANCHOR_ID };
 // Your usual padel weekdays as load factors, for planning the usual week (personalize.bestWeek).
 export const usualKinds = (usual = S.settings.padelUsual || {}) => ({ upper: isUpperHeavy, kinds: Object.fromEntries(Object.entries(usual).map(([d, p]) => [d, padelProfile(p.type, p.focus)])) });
 export const isoAdd = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoDate(d); };
@@ -41,6 +42,32 @@ export function weekWindow(iso = isoDate()) {
     return { iso: d, v, padel, fixed, noGym };
   });
 }
+
+// The gym workouts a week still needs, and whether padel makes it busy. A busy week: Strength plus the
+// first of your usual workouts that's light on the legs, less what's already done. Back from busy: the
+// Strength session turns back into your usual leg workouts.
+const legWork = id => id === ANCHOR_ID || isLegHeavy(id);
+export function weekTargets(days) {
+  const inWeek = days.slice(1, 8), { busy } = busyWeek(inWeek.filter(d => d.v === 'Padel').map(d => d.padel || {}));
+  const usual = DAYS.map(d => S.schedule[d]).filter(isRoutine);
+  if (busy) {
+    const flex = usual.find(id => !legWork(id)), list = [ANCHOR_ID, ...(flex ? [flex] : [])];
+    for (const d of inWeek) if (d.fixed && d.v !== 'Padel' && (isRoutine(d.v) || d.v === 'Quick')) {
+      const i = list.indexOf(d.v) >= 0 ? list.indexOf(d.v) : list.findIndex(x => legWork(x) === legWork(d.v));
+      if (i >= 0) list.splice(i, 1);
+    }
+    return { busy, list };
+  }
+  let list = workoutsLeft(days, isRoutine);
+  if (list.includes(ANCHOR_ID) && !usual.includes(ANCHOR_ID)) {
+    const done = inWeek.filter(d => d.fixed).map(d => d.v);
+    const legs = usual.filter(id => legWork(id) && !done.includes(id));
+    list = [...list.filter(id => id !== ANCHOR_ID), ...legs.filter(id => !list.includes(id))];
+  }
+  return { busy, list };
+}
+const busyNote = (from, to) => to.busy && !from.busy ? 'Busy padel week: 2 gym sessions, Strength and one that’s light on the legs, and a full rest day.'
+  : from.busy && !to.busy ? 'Not a busy padel week any more: your usual workouts are back.' : '';
 
 // Save a planned week: every day you can still change gets its own entry.
 async function applyWeek(days, padelIso = null) {
@@ -80,10 +107,10 @@ export function thisWeekSection() {
   const padel = days.slice(1, 8).filter(d => d.v === 'Padel');
   const rows = padel.map(d => row({ title: `${dayName(d.iso)} · ${esc(padelLabel(d.padel))}`, sub: d.iso < today || (d.fixed && d.iso === today && S.sessions.some(s => isoDate(new Date(s.startedAt)) === today)) ? 'Done' : esc(MATCH_LEVELS[d.padel?.level || 'normal']), icon: 'racket', color: 'teal', action: 'wk-day', data: { iso: d.iso } })).join('')
     + row({ title: 'Add padel', sub: 'A match, lesson, training or ball machine', icon: 'plus', color: 'green', action: 'week-add', chevron: false, cls: 'action' });
-  const left = workoutsLeft(days, isRoutine);
-  const sug = days.some((d, i) => i > 0 && i < 8 && !d.fixed && d.v !== 'Padel') ? suggestPadelDays(days, { type: SUG, focus: 'mixed', level: 'normal' }, left, OPTS) : [];
-  const sugRows = sug.map(s => row({ title: `${dayName(s.iso)}${s.rank === 'best' ? ' · best' : s.rank === 'good' ? ' · good' : ''}`, sub: esc(moveLines(s).join('. ') || 'Nothing moves'), action: 'week-add', data: { iso: s.iso, type: SUG } })).join('');
-  return `${group(rows, { header: 'This week', footer: 'Tap a day to see or change it. Workouts fit around your padel; anything that moves asks you first.' })}
+  const now = weekTargets(days);
+  const sug = days.some((d, i) => i > 0 && i < 8 && !d.fixed && d.v !== 'Padel') ? suggestPadelDays(days, { type: SUG, focus: 'mixed', level: 'normal' }, weekTargets, OPTS) : [];
+  const sugRows = sug.map(s => row({ title: `${dayName(s.iso)}${s.rank === 'best' ? ' · best' : s.rank === 'good' ? ' · good' : ''}`, sub: esc([...(s.busy && !now.busy ? ['Makes it a busy week: 2 gym sessions'] : []), ...moveLines(s)].join('. ') || 'Nothing moves'), action: 'week-add', data: { iso: s.iso, type: SUG } })).join('');
+  return `${group(rows, { header: now.busy ? 'This week · busy padel week' : 'This week', footer: now.busy ? 'Lots of padel this week: 2 gym sessions (Strength, and one light on the legs) and a full rest day. Strength stays put unless it has to move.' : 'Tap a day to see or change it. Workouts fit around your padel; anything that moves asks you first.' })}
     ${sug.length ? `<div class="grp"><h2 class="grp-h">Best day for another session</h2>${seg('sug-type', [['match', 'Match'], ['lesson', 'Lesson'], ['machine', 'Ball machine']], SUG)}<div style="height:8px"></div>${group(sugRows)}</div>` : ''}`;
 }
 export function weekPick(name, value) { if (name !== 'sug-type') return false; SUG = value; app.render({ keepScroll: true }); return true; }
@@ -126,25 +153,29 @@ let PROPOSAL = null;
 async function savePadel(p, edit) {
   const today = isoDate();
   if (!p.iso || p.iso < today || p.iso > isoAdd(today, MAX_AHEAD)) return app.toast('Pick a day from today on');
-  const before = weekWindow(p.iso), left = workoutsLeft(before, isRoutine);
+  const before = weekWindow(p.iso), padel = { type: p.type, focus: p.focus, level: p.level };
   const at = before.find(d => d.iso === p.iso);
   if (at?.fixed && at.v !== 'Padel') return app.toast('You’ve already trained that day');
+  const was = weekTargets(before), t = weekTargets(before.map(d => d.iso === p.iso ? { ...d, v: 'Padel', padel, fixed: true } : d));
+  // The workouts to place: on a busy-week switch, the new set; otherwise what's left (incl. the one on that day).
+  const list = was.busy !== t.busy ? t.list : workoutsLeft(before, isRoutine).map(id => !t.busy || id === ANCHOR_ID || !legWork(id) ? id : null).filter(Boolean);
   setPadelDetails(p.iso, p);
   S.settings.dated = { ...(S.settings.dated || {}), [p.iso]: 'Padel' };
-  const r = withPadel(before, p.iso, { type: p.type, focus: p.focus, level: p.level }, left, OPTS);
-  if (!r || (!r.moved.length && !r.dropped.length)) {
+  const r = withPadel(before, p.iso, padel, list, { ...OPTS, busy: t.busy });
+  const note = busyNote(was, t);
+  if (!r || (!r.moved.length && !r.dropped.length && !note)) {
     await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true });
     return app.toast(`${edit ? 'Saved' : `${padelLabel(p)} on ${dayName(p.iso)} added`}. Your workouts already fit.`);
   }
   await app.save('settings');
-  proposal(r, p.iso, `${padelLabel(p)} on ${dayName(p.iso)}`, isRoutine(at?.v) ? at.v : null);
+  proposal(r, p.iso, `${padelLabel(p)} on ${dayName(p.iso)}`, isRoutine(at?.v) ? at.v : null, note);
 }
 
 // A re-planned week to accept or not.
 // lost: the workout that was on the new padel day (skipped this week if you keep the rest as it is).
-function proposal(r, mark, what, lost = null) {
+function proposal(r, mark, what, lost = null, note = '') {
   PROPOSAL = { days: r.days, mark, lost };
-  app.sheet(`<h2 class="sheet-title">Your week with ${esc(what)}</h2><p class="sheet-sub">Workouts placed around your padel.</p>
+  app.sheet(`<h2 class="sheet-title">Your week with ${esc(what)}</h2><p class="sheet-sub">${esc(note || 'Workouts placed around your padel.')}</p>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px">${strip(r.days, { mark })}</div>
     <ul class="week-moves">${moveLines(r).map(l => `<li>${esc(l)}</li>`).join('')}</ul>
     <div class="btns"><button class="btn filled" data-action="wk-use">Use This Week</button><button class="btn plain" data-action="wk-keep">Keep Workouts Where They Are</button></div>`);
@@ -156,11 +187,11 @@ async function removePadel(iso) {
   if (S.settings.matchLevel) delete S.settings.matchLevel[iso];
   S.settings.dated = { ...(S.settings.dated || {}), [iso]: 'Rest' };
   const days = before.map(d => d.iso === iso ? { ...d, v: 'Rest', padel: null, fixed: false } : d);
-  const left = workoutsLeft(days, isRoutine);
-  const r = planWeek(days, left, OPTS);
+  const was = weekTargets(before), t = weekTargets(days), note = busyNote(was, t);
+  const r = planWeek(days, t.list, { ...OPTS, busy: t.busy });
   await app.save('settings');
-  if (!r.moved.length) { app.closeSheet(); app.render({ keepScroll: true }); return app.toast(`Padel on ${dayName(iso)} removed`); }
-  proposal(r, iso, `no padel on ${dayName(iso)}`);
+  if (!r.moved.length && !note) { app.closeSheet(); app.render({ keepScroll: true }); return app.toast(`Padel on ${dayName(iso)} removed`); }
+  proposal(r, iso, `no padel on ${dayName(iso)}`, null, note);
 }
 
 function daySheet(iso) {

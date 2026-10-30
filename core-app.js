@@ -1,7 +1,8 @@
 // Application state, persistence wiring, hash router, toasts and sheets.
 // Views import `app` and `S`; main.js registers views and boots.
 import * as db from './core-db.js';
-import { DEFAULT_SCHEDULE, resolveRoutine, DAYS, setPhaseSource } from './domain-program.js';
+import { DEFAULT_SCHEDULE, resolveRoutine, DAYS, setPhaseSource, setDerivedRoutine, isLegHeavy, getRoutine } from './domain-program.js';
+import { buildAnchor, ANCHOR_ID } from './domain-busy.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition, parseISO } from './domain-calendar.js';
 import { levelOn } from './domain-matchlevel.js';
@@ -38,6 +39,13 @@ export const S = {
 };
 
 const views = {};
+// Busy weeks' Strength session, built from the leg workouts in your usual week (Legs & Footwork and
+// Power & Agility unless you've changed them), with your exercise changes.
+setDerivedRoutine(ANCHOR_ID, () => {
+  let ids = [...new Set(Object.values(S.schedule))].filter(id => id !== ANCHOR_ID && getRoutine(id) && isLegHeavy(id));
+  if (!ids.length) ids = ['A', 'C'];
+  return buildAnchor(ids.map(id => resolveRoutine(id, S.overrides).blocks));
+});
 setPhaseSource(week => {
   const b = app.blockPos();
   if (b?.state !== 'active') return null;

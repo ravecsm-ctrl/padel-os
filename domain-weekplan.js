@@ -25,8 +25,9 @@ export function weekPenalty(days, { legs, upper = () => false }) {
       const nx = days[i + 1], pv = days[i - 1];
       if (isPadel(nx)) { const c = padelCost(nx.padel); sc += legs(d.v) ? c.before : c.other; if (upper(d.v)) sc += c.arms * SCORE.armsBefore; }
       if (isPadel(pv)) { const c = padelCost(pv.padel); if (legs(d.v)) sc += c.after; if (upper(d.v)) sc += c.arms * SCORE.armsAfter; }
-      const n = days[i + 1], ng = n && !isPadel(n) && n.v !== 'Rest' && n.v !== 'Recovery' && n.v != null;
-      if (ng) { sc += SCORE.backToBack; if (legs(d.v) && legs(n.v)) sc += SCORE.legsTwoDays; }
+      // Next Monday's workout can still move (that week adapts too), so it counts half.
+      const n = days[i + 1], ng = n && !isPadel(n) && n.v !== 'Rest' && n.v !== 'Recovery' && n.v != null, w = i + 1 === days.length - 1 ? 0.5 : 1;
+      if (ng) { sc += SCORE.backToBack * w; if (legs(d.v) && legs(n.v)) sc += SCORE.legsTwoDays * w; }
     }
     if (isPadel(d) && isPadel(days[i + 1]) && padelCost(d.padel).legs >= 0.9 && padelCost(days[i + 1].padel).legs >= 0.9) sc += SCORE.padelTwoDays;
   });
@@ -56,7 +57,8 @@ export function planWeek(days, workouts, opts) {
   for (const pick of keep) for (const slots of choose(free, n)) for (const order of orders(pick)) {
     const trial = base.map(d => ({ ...d }));
     let moves = 0;
-    slots.forEach((s, k) => { const id = workouts[order[k]]; trial[s].v = id; if (was.get(id) !== s) moves++; });
+    // The anchor (busy weeks' Strength session) is protected: moving it costs three times as much.
+    slots.forEach((s, k) => { const id = workouts[order[k]]; trial[s].v = id; if (was.get(id) !== s) moves += id === opts.anchor ? 3 : 1; });
     const score = weekPenalty(trial, opts) + moves * SCORE.moved;
     if (!best || score < best.score - 1e-9) best = { trial, score, dropped: workouts.filter((_, i) => !pick.includes(i)) };
   }
@@ -67,6 +69,11 @@ export function planWeek(days, workouts, opts) {
     const rest = free.filter(i => best.trial[i].v === 'Rest');
     const at = rest.includes(orig) ? orig : rest.find(i => isPadel(best.trial[i - 1])) ?? rest[0];
     if (at != null) best.trial[at].v = 'Recovery';
+  }
+  // A busy week always keeps one day with nothing at all.
+  if (opts.busy && !best.trial.slice(1, -1).some(d => d.v === 'Rest')) {
+    const spare = free.filter(i => best.trial[i].v === 'Recovery').concat(days.map((d, i) => i).filter(i => i > 0 && i < days.length - 1 && !days[i].fixed && days[i].noGym && best.trial[i].v === 'Recovery'));
+    if (spare.length) best.trial[spare[0]].v = 'Rest';
   }
   const moved = workouts.filter(id => !best.dropped.includes(id)).map(id => ({ id, from: was.has(id) ? days[was.get(id)].iso : null, to: best.trial.find((d, i) => free.includes(i) && d.v === id)?.iso }))
     .filter(m => m.from !== m.to);
@@ -87,12 +94,15 @@ export function withPadel(days, iso, padel, workouts, opts) {
 
 // The best days for one more padel session of this kind: each free day tried in turn, best first.
 // [{ iso, score, moved, dropped, rank: 'best' | 'good' | 'ok' }], at most `max`.
-export function suggestPadelDays(days, padel, workouts, opts, max = 3) {
+// targets: the workouts to place, or a function of the week with the new session that returns
+// { list, busy } (a session that makes the week busy changes which workouts there are).
+export function suggestPadelDays(days, padel, targets, opts, max = 3) {
   const out = [];
   days.forEach((d, i) => {
     if (i === 0 || i === days.length - 1 || d.fixed || isPadel(d)) return;
-    const r = withPadel(days, d.iso, padel, workouts, opts);
-    out.push({ iso: d.iso, score: r.score + r.dropped.length * 10, moved: r.moved, dropped: r.dropped, days: r.days });
+    const t = typeof targets === 'function' ? targets(days.map(x => x.iso === d.iso ? { ...x, v: 'Padel', padel, fixed: true } : x)) : { list: targets, busy: !!opts.busy };
+    const r = withPadel(days, d.iso, padel, t.list, { ...opts, busy: t.busy });
+    out.push({ iso: d.iso, score: r.score + r.dropped.length * 10, moved: r.moved, dropped: r.dropped, days: r.days, busy: t.busy });
   });
   out.sort((a, b) => a.score - b.score || a.iso.localeCompare(b.iso));
   const top = out[0]?.score ?? 0;

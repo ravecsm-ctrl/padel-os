@@ -11,6 +11,7 @@ import { PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
 import { MATCH_LEVELS } from './domain-matchlevel.js';
 import { openGoal } from './ui-goal.js';
 import { usualKinds } from './ui-week.js';
+import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 
 let step = 0;
 const STEPS = 8;   // questions 1–7, then your plan
@@ -25,7 +26,10 @@ const q = (title, sub = '') => `<div class="wiz-q"><h1>${esc(title)}</h1>${sub ?
 const gymRoom = f => f.trainDays.filter(d => !f.padelDays.includes(d)).length;
 const levels = f => Object.fromEntries(f.padelDays.map(d => [d, f.padelLevel]));
 const usualOf = f => Object.fromEntries(f.padelDays.map(d => [d, { type: f.padelType, ...(hasFocus(f.padelType) ? { focus: f.padelFocus } : {}) }]));
-const schedFor = f => generateSchedule(f.days, f.padelDays, null, isLegHeavy, f.trainDays, levels(f), usualKinds(usualOf(f)));
+// Fixed padel days that make every week busy: the usual week gets Strength plus Upper Body, and a rest day.
+const usualBusy = f => busyWeek(f.padelDays.map(() => ({ type: f.padelType, focus: f.padelFocus }))).busy;
+const schedFor = f => usualBusy(f) ? generateSchedule(2, f.padelDays, [ANCHOR_ID, 'B'], id => id === ANCHOR_ID || isLegHeavy(id), f.trainDays, levels(f), usualKinds(usualOf(f)))
+  : generateSchedule(f.days, f.padelDays, null, isLegHeavy, f.trainDays, levels(f), usualKinds(usualOf(f)));
 
 function body() {
   const f = F();
@@ -61,15 +65,16 @@ function body() {
     case 7: return `${q('Anything that bothers you?', 'Optional. Workouts go easier on these areas and we’ll suggest short routines.')}${group(Object.entries(AREAS).map(([k, v]) => multi('injuries', k, v)).join(''), { footer: 'This isn’t medical advice.' })}`;
     case 8: {
       const sched = schedFor(f);
-      const ids = [...new Set(Object.values(sched).filter(v => ROUTINES[v]))], room = gymRoom(f);
+      const ids = [...new Set(Object.values(sched).filter(v => ROUTINES[v] || v === ANCHOR_ID))], room = gymRoom(f), busy = usualBusy(f);
       const padelLine = !f.padelPerWeek ? 'No padel planned' : f.padelDays.length ? `${listDays(f.padelDays.map(d => DAY_LONG[d]))} · usually ${PADEL_TYPES[f.padelType].toLowerCase()}, ${MATCH_LEVELS[f.padelLevel].toLowerCase()}`
         : `${f.padelPerWeek}${f.padelPerWeek === 4 ? '+' : ''} a week on changing days · add them each week on Plan`;
       return `${q('Your plan is ready', 'You can change any of this later.')}
-        <div class="plan-week" style="margin-bottom:8px">${DAYS.map(d => `<div>${d[0]}<b>${ROUTINES[sched[d]] ? '●' : sched[d] === 'Padel' ? '<span style="color:var(--teal)">●</span>' : sched[d] === 'Recovery' ? '<span style="color:var(--pink)">●</span>' : '–'}</b></div>`).join('')}</div>
+        <div class="plan-week" style="margin-bottom:8px">${DAYS.map(d => `<div>${d[0]}<b>${ROUTINES[sched[d]] || sched[d] === ANCHOR_ID ? '●' : sched[d] === 'Padel' ? '<span style="color:var(--teal)">●</span>' : sched[d] === 'Recovery' ? '<span style="color:var(--pink)">●</span>' : '–'}</b></div>`).join('')}</div>
         <p class="t-foot" style="text-align:center;margin-bottom:24px">● Workout &nbsp; <span style="color:var(--teal)">●</span> Padel &nbsp; <span style="color:var(--pink)">●</span> Recovery &nbsp; – Rest</p>
+        ${busy ? `<p class="t-sub" style="padding:0 4px 16px">With ${f.padelDays.length} padel days, every week is a busy one: 2 shorter gym sessions and a full rest day keep you fresh for your matches.</p>` : ''}
         ${group(ids.map(id => { const r = resolveRoutine(id, {}, { ...f, owned: f.gear }), look = routineLook(id);
           return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min · ${DAYS.filter(d => sched[d] === id).map(d => DAY_LONG[d]).join(', ')}`, icon: look.icon, color: look.color }); }).join(''),
-          { header: 'Your workouts', footer: ids.length < f.days ? `<span class="orange">Only ${room} gym day${room === 1 ? '' : 's'} free, so ${ids.length} workout${ids.length === 1 ? '' : 's'} a week. Add training days to fit more.</span>` : '' })}
+ { header: 'Your workouts', footer: !busy && ids.length < f.days ? `<span class="orange">Only ${room} gym day${room === 1 ? '' : 's'} free, so ${ids.length} workout${ids.length === 1 ? '' : 's'} a week. Add training days to fit more.</span>` : '' })}
         ${group(row({ title: 'Padel', sub: esc(padelLine), icon: 'racket', color: 'teal' }) + (f.goalBlock !== 'none' ? row({ title: `Next: ${esc(BLOCK_GOALS[f.goalBlock].label)}`, sub: 'You’ll see the weeks and start it on the next screen', icon: 'target', color: 'teal' }) : ''))}
         ${group(row({ title: 'Simple mode', sub: 'Plain words instead of training terms', right: `<input type="checkbox" class="switch" id="wSimple" ${f.simple ? 'checked' : ''} aria-label="Simple mode">` })
           + (S.profile.onboarded ? row({ title: 'Update my weekly schedule', right: '<input type="checkbox" class="switch" id="wSched" checked aria-label="Update my weekly schedule">' }) : ''))}`;
