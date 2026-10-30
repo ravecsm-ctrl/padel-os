@@ -23,7 +23,7 @@ import { review } from './ui-review.js';
 import { feedback } from './ui-feedback.js';
 import { pickerActions } from './ui-picker.js';
 import { startPendingBlock } from './ui-goal.js';
-import { pruneDated } from './ui-week.js';
+import { pruneDated, resetWeekView } from './ui-week.js';
 import './domain-pack.js'; // expansion pack: adds its exercises to the library
 import { upgradeSaved } from './domain-muscles.js';
 import { overview } from './ui-overview.js';
@@ -76,7 +76,10 @@ document.addEventListener('input', e => app.view().onInput?.(e.target));
 // Select the whole value when focusing a number in the set table — faster edits on phones.
 document.addEventListener('focusin', e => { if (e.target.matches?.('.set-in')) setTimeout(() => e.target.select?.(), 0); });
 
-addEventListener('hashchange', () => { parseHash(); app.closeSheet(); app.render(); });
+addEventListener('hashchange', e => {
+  if (!String(e.oldURL).includes('#/plan')) resetWeekView();
+  parseHash(); app.closeSheet(); app.render();
+});
 
 // Workout clock.
 setInterval(() => {

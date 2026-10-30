@@ -2,8 +2,9 @@
 // day for another session. Adding or removing padel proposes a re-planned week you accept or not.
 // Dates live in S.settings.dated / padelPlan / matchLevel; the usual week (S.schedule) is the fallback.
 import { app, S } from './core-app.js';
-import { esc, icon, tile, group, row, seg, chips } from './ui-kit.js';
-import { DAYS, isRoutine, isLegHeavy, isUpperHeavy } from './domain-program.js';
+import { esc, icon, tile, group, row, seg, chips, pageHead } from './ui-kit.js';
+import { DAYS, isRoutine, isLegHeavy, isUpperHeavy, allRoutineIds, phaseFor } from './domain-program.js';
+import { goalLabel } from './domain-block.js';
 import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
 import { MATCH_LEVELS, loggedLevel } from './domain-matchlevel.js';
@@ -126,19 +127,97 @@ const moveLines = r => [...(r.swapped ? [swapLine(r)] : []), ...r.moved.filter(m
 
 // ── Plan tab: this week
 export const weekStrip = () => strip(weekWindow());
-let SUG = 'match';
-export function thisWeekSection() {
-  const days = weekWindow(), today = isoDate();
-  const padel = days.slice(1, 8).filter(d => d.v === 'Padel');
-  const rows = padel.map(d => row({ title: `${dayName(d.iso)} · ${esc(padelLabel(d.padel))}`, sub: d.iso < today || (d.fixed && d.iso === today && S.sessions.some(s => isoDate(new Date(s.startedAt)) === today)) ? 'Done' : esc(MATCH_LEVELS[d.padel?.level || 'normal']), icon: 'racket', color: 'teal', action: 'wk-day', data: { iso: d.iso } })).join('')
-    + row({ title: 'Add padel', sub: 'A match, lesson, training or ball machine', icon: 'plus', color: 'green', action: 'week-add', chevron: false, cls: 'action' });
-  const now = weekTargets(days);
-  const sug = days.some((d, i) => i > 0 && i < 8 && !d.fixed && d.v !== 'Padel') ? suggestPadelDays(days, { type: SUG, focus: 'mixed', level: 'normal' }, weekTargets, OPTS) : [];
-  const sugRows = sug.map(s => row({ title: `${dayName(s.iso)}${s.rank === 'best' ? ' · best' : s.rank === 'good' ? ' · good' : ''}`, sub: esc([...(s.busy && !now.busy ? ['Makes it a busy week: 2 gym sessions'] : []), ...moveLines(s)].join('. ') || 'Nothing moves'), action: 'week-add', data: { iso: s.iso, type: SUG } })).join('');
-  return `${group(rows, { header: now.busy ? 'This week · busy padel week' : 'This week', footer: now.busy ? 'Lots of padel this week: 2 gym sessions (Strength, and one light on the legs) and a full rest day. Strength stays put unless it has to move.' : 'Tap a day to see or change it. Workouts fit around your padel; anything that moves asks you first.' })}
-    ${sug.length ? `<div class="grp"><h2 class="grp-h">Best day for another session</h2>${seg('sug-type', [['match', 'Match'], ['lesson', 'Lesson'], ['machine', 'Ball machine']], SUG)}<div style="height:8px"></div>${group(sugRows)}</div>` : ''}`;
+
+// ── The Week tab: one week at a time (this week and up to 3 ahead), day by day.
+let WK_OFF = 0;
+// Coming back to the Week tab from elsewhere starts at this week again.
+export const resetWeekView = () => { WK_OFF = 0; };
+const dayNum = iso => parseISO(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const weekTitle = off => off === 0 ? 'This week' : off === 1 ? 'Next week' : `Week of ${dayNum(isoAdd(monIso(isoDate()), 7 * off))}`;
+// Goal phase (or the 4-week cycle) and a busy padel week, for the week you're looking at.
+function weekContext(mon, days) {
+  const pos = app.position(parseISO(isoAdd(mon, 3))), b = pos.block, busy = weekTargets(days).busy;
+  const where = b ? `${goalLabel(S.settings.block)} · week ${b.week} of ${b.weeks} · ${b.phase.name}` : `4-week cycle · week ${pos.week} · ${phaseFor(pos.week).name}`;
+  return { text: [where, busy && 'busy padel week'].filter(Boolean).join(' · '), action: b ? 'block-sheet' : 'week-sheet' };
 }
-export function weekPick(name, value) { if (name !== 'sug-type') return false; SUG = value; app.render({ keepScroll: true }); return true; }
+export function weekView() {
+  const today = isoDate(), mon = isoAdd(monIso(today), 7 * WK_OFF), days = weekWindow(mon), ctx = weekContext(mon, days);
+  const free = days.some((d, i) => i > 0 && i < 8 && !d.fixed && d.v !== 'Padel');
+  const sug = free ? suggestPadelDays(days, { type: 'match', focus: 'mixed', level: 'normal' }, weekTargets, OPTS, 1)[0] : null;
+  const rows = days.slice(1, 8).map(d => {
+    const logged = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === d.iso), planned = app.planOn(d.iso);
+    const missed = d.iso < today && !logged.length && isRoutine(planned), unplayed = d.iso < today && !logged.length && planned === 'Padel';
+    const label = logged.length ? logged.map(s => s.title).join(' + ') : missed ? `${titleOf(planned)} · missed` : unplayed ? 'Padel · not logged'
+      : d.v === 'Padel' ? `${padelLabel(d.padel)} · ${MATCH_LEVELS[d.padel?.level || 'normal']}` : titleOf(d.v);
+    const padel = logged.length ? logged.some(s => s.activity === 'padel') : d.v === 'Padel';
+    const gym = logged.length ? logged.some(s => s.kind === 'strength') : !missed && (isRoutine(d.v) || d.v === 'Quick');
+    // A day that differs from your usual week says so (the reason this week can look different).
+    const changed = !logged.length && d.iso >= today && S.settings.dated?.[d.iso] != null;
+    return `<button class="wk-day ${d.iso === today ? 'today' : ''}" data-action="day-edit" data-iso="${d.iso}" aria-label="${esc(dayName(d.iso))}: ${esc(label)}">
+      <span class="wk-d"><b>${shortDay(d.iso)}</b>${d.iso === today ? 'today' : dayNum(d.iso)}</span>
+      <span class="wk-what ${padel || unplayed ? 'p' : gym ? 'g' : 'r'} ${missed || unplayed ? 'missed' : ''}">${esc(label)}${changed ? '<em>changed</em>' : ''}</span>
+      <span class="wk-st">${logged.length ? icon('check') : ''}</span></button>
+      ${sug?.iso === d.iso ? `<button class="wk-sug" data-action="week-add" data-iso="${d.iso}" data-type="match">+ Best day for another padel session${sug.moved.length ? ` · ${sug.moved.length} workout${sug.moved.length > 1 ? 's' : ''} would move` : ''}</button>` : ''}`;
+  }).join('');
+  return `${pageHead('Week')}
+    <div class="wk-nav"><button data-action="wk-nav" data-d="-1" ${WK_OFF <= 0 ? 'disabled' : ''} aria-label="Previous week">‹</button><h2>${weekTitle(WK_OFF)}</h2><button data-action="wk-nav" data-d="1" ${WK_OFF >= 3 ? 'disabled' : ''} aria-label="Next week">›</button></div>
+    <button class="wk-ctx" data-action="${ctx.action}">${esc(ctx.text)}</button>
+    <div class="card wk-list">${rows}</div>
+    <div class="quick-row"><button class="btn filled" data-action="week-add">${icon('plus')}Add Padel</button><button class="btn tinted" data-action="usual-week">Your Usual Week</button></div>`;
+}
+
+// Change one date: the day becomes what you picked, and the workouts still to do this week are re-placed
+// around it. Returns the planned week (r) for a proposal.
+export function planDayChange(iso, v) {
+  const before = weekWindow(iso), t = weekTargets(before), list = [...t.list];
+  if (isRoutine(v) && list.includes(v)) list.splice(list.indexOf(v), 1);
+  const next = before.map(d => d.iso === iso ? { ...d, v, padel: null, fixed: true } : d);
+  return planWeek(next, list, { ...OPTS, busy: t.busy, alt: t.alt });
+}
+async function commitDay(iso, v) {
+  if (v !== 'Padel') { delete S.settings.padelPlan?.[iso]; if (S.settings.matchLevel) delete S.settings.matchLevel[iso]; }
+  setDated(iso, v); await app.save('settings');
+}
+// Your usual weekday changes, and this week's (and later) matching days follow; padel you booked for this
+// week's date stays unless you say so (you're asked).
+export async function setUsualDay(d, v) {
+  S.schedule[d] = v; await app.save('schedule');
+  const kept = followUsualWeek(d); await app.save('settings');
+  app.closeSheet(); app.render({ keepScroll: true });
+  const iso = kept[0], name = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }[d];
+  if (iso && v !== 'Padel') app.sheet(`<h2 class="sheet-title">This ${name} still has padel</h2><p class="sheet-sub">Your usual ${name} is now ${esc(titleOf(v).toLowerCase())}, but you added padel for this date (${esc(PADEL_TYPES[app.padelOn(iso)?.type] || 'Match')}). Remove it too?</p>
+    <div class="btns"><button class="btn destructive" data-action="wk-remove" data-iso="${iso}">Remove This ${name}’s Padel</button><button class="btn plain" data-action="close-sheet">Keep It</button></div>`);
+  else app.toast(`Every ${name}: ${titleOf(v)}`);
+}
+
+// One sheet for a day: what it is, and whether a change is for this week only or every week.
+function dayEditSheet(iso) {
+  const today = isoDate(), wd = DAYS[(parseISO(iso).getDay() + 6) % 7], done = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === iso);
+  if (iso < today || done.length) {
+    const planned = app.planOn(iso);
+    return app.sheet(`<h2 class="sheet-title">${esc(fmtDay(iso))}</h2><div style="height:12px"></div>
+      ${done.length ? group(done.map(s => row({ title: esc(s.title), sub: `${s.durationMin || '—'} min`, to: `history/session/${s.id}` })).join(''))
+        : `<p class="t-sub" style="text-align:center;margin:8px 0 18px">${isRoutine(planned) ? `${esc(titleOf(planned))} was planned; nothing logged.` : 'Nothing logged.'}</p>`}
+      <div class="btns">${iso === today ? '<button class="btn tinted" data-action="log-activity" data-kind="padel">Log Padel or Activity</button>' : ''}<button class="btn plain" data-action="close-sheet">Close</button></div>`);
+  }
+  S.form = { dayScope: 'just' };
+  const draw = () => {
+    const every = S.form.dayScope === 'every', d = weekWindow(iso).find(x => x.iso === iso), cur = every ? S.schedule[wd] : d.v;
+    const from = isBooked(iso) ? 'Padel added for this date' : S.settings.dated?.[iso] != null ? 'Changed for this week' : `From your usual ${dayName(iso)}`;
+    const opts = [...new Set([...allRoutineIds(), ANCHOR_ID])].filter(isRoutine);
+    const tick = v => cur === v ? icon('check', 'check-mark') : '';
+    return `<h2 class="sheet-title">${esc(fmtDay(iso))}</h2><p class="sheet-sub">${esc(from)}</p>
+      ${seg('dayScope', [['just', `Just this ${dayName(iso)}`], ['every', `Every ${dayName(iso)}`]], S.form.dayScope)}<div style="height:12px"></div>
+      ${group(opts.map(v => row({ title: esc(titleOf(v)), action: 'day-set', data: { iso, v }, chevron: false, right: tick(v) })).join('')
+        + row({ title: 'Padel', sub: !every && d.v === 'Padel' ? esc(`${padelLabel(d.padel)} · ${MATCH_LEVELS[d.padel?.level || 'normal']} · change`) : every ? 'Your usual padel day' : 'Match, lesson, training or ball machine', action: 'day-set', data: { iso, v: 'Padel' }, chevron: false, right: tick('Padel') })
+        + row({ title: 'Recovery', sub: 'Light movement and mobility', action: 'day-set', data: { iso, v: 'Recovery' }, chevron: false, right: tick('Recovery') })
+        + row({ title: 'Rest', action: 'day-set', data: { iso, v: 'Rest' }, chevron: false, right: tick('Rest') }),
+        { footer: every ? `Changes every ${dayName(iso)} from now on.` : 'If a workout has to move, you see the new week before anything changes.' })}
+      ${!every && S.settings.dated?.[iso] != null ? `<button class="btn plain" data-action="day-reset" data-iso="${iso}">Back to Your Usual ${esc(dayName(iso))}</button>` : ''}`;
+  };
+  app.onPick = () => app.sheet(draw());
+  app.sheet(draw());
+}
 
 // ── Today: once a week, ask what's booked.
 export function weekAskCard() {
@@ -199,8 +278,9 @@ async function savePadel(p, edit) {
 
 // A re-planned week to accept or not.
 // lost: the workout that was on the new padel day (skipped this week if you keep the rest as it is).
-function proposal(r, mark, what, lost = null, note = '') {
-  PROPOSAL = { days: r.days, mark, lost };
+// keep: what "Keep Workouts Where They Are" does (a day you changed still changes; only the others stay put).
+function proposal(r, mark, what, lost = null, note = '', keep = null) {
+  PROPOSAL = { days: r.days, mark, lost, keep };
   app.sheet(`<h2 class="sheet-title">Your week with ${esc(what)}</h2><p class="sheet-sub">${esc(note || 'Workouts placed around your padel.')}</p>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px">${strip(r.days, { mark })}</div>
     <ul class="week-moves">${moveLines(r).map(l => `<li>${esc(l)}</li>`).join('')}</ul>
@@ -237,14 +317,30 @@ function daySheet(iso) {
 
 export const removeBooking = iso => removePadel(iso);
 export const weekActions = {
+  'wk-nav'(el) { WK_OFF = Math.max(0, Math.min(3, WK_OFF + +el.dataset.d)); app.render(); },
+  'day-edit'(el) { dayEditSheet(el.dataset.iso); },
+  async 'day-set'(el) {
+    const { iso, v } = el.dataset, wd = DAYS[(parseISO(iso).getDay() + 6) % 7];
+    if (S.form.dayScope === 'every') return setUsualDay(wd, v);
+    if (v === 'Padel') return addPadelSheet(iso);
+    const r = planDayChange(iso, v);
+    if (!r.moved.length && !r.dropped.length) { await commitDay(iso, v); app.closeSheet(); app.render({ keepScroll: true }); return app.toast(`${dayName(iso)}: ${titleOf(v)} this week`); }
+    proposal(r, iso, `${titleOf(v)} on ${dayName(iso)}`, null, '', () => commitDay(iso, v));
+  },
+  async 'day-reset'(el) {
+    const iso = el.dataset.iso;
+    delete S.settings.padelPlan?.[iso]; if (S.settings.matchLevel) delete S.settings.matchLevel[iso];
+    if (S.settings.dated) delete S.settings.dated[iso];
+    await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(`${dayName(iso)} is back to your usual week`);
+  },
   'week-add'(el) { addPadelSheet(el.dataset.iso || null, el.dataset.type || null); },
   'week-ask-off'() { S.settings.weekAsked = monIso(isoDate()); app.save('settings'); app.render({ keepScroll: true }); },
   'wk-day'(el) { daySheet(el.dataset.iso); },
   'wk-remove'(el) { removePadel(el.dataset.iso); },
-  async 'wk-use'() { if (!PROPOSAL) return app.closeSheet(); await applyWeek(PROPOSAL.days, PROPOSAL.mark); PROPOSAL = null; app.closeSheet(); app.render({ keepScroll: true }); app.toast('Week updated'); },
-  'wk-keep'() {
+  async 'wk-use'() { if (!PROPOSAL) return app.closeSheet(); await applyWeek(PROPOSAL.days, PROPOSAL.mark); if (PROPOSAL.keep) await PROPOSAL.keep(); PROPOSAL = null; app.closeSheet(); app.render({ keepScroll: true }); app.toast('Week updated'); },
+  async 'wk-keep'() {
     // Padel stays; a workout that was on that day is skipped this week.
-    const lost = PROPOSAL?.lost; PROPOSAL = null; app.closeSheet(); app.render({ keepScroll: true });
+    const lost = PROPOSAL?.lost, keep = PROPOSAL?.keep; PROPOSAL = null; if (keep) await keep(); app.closeSheet(); app.render({ keepScroll: true });
     app.toast(lost ? `Workouts kept where they were; ${titleOf(lost)} is skipped this week` : 'Workouts kept where they were');
   },
   // Your usual weekday lives on Plan: open its sheet there.

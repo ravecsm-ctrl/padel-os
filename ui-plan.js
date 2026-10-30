@@ -7,12 +7,12 @@ import { exercisePicker } from './ui-picker.js';
 import { allExercises } from './domain-catalog.js';
 import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { getExercise } from './domain-catalog.js';
-import { startForWeek, dayKey } from './domain-calendar.js';
+import { startForWeek, dayKey, isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.js';
 import { MATCH_LEVELS, LEVEL_HINT, suggestLevel } from './domain-matchlevel.js';
 import { bodySummary } from './ui-body.js';
 import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
-import { thisWeekSection, weekPick, weekStrip, usualKinds, followUsualWeek } from './ui-week.js';
+import { weekView, usualKinds, followUsualWeek, setUsualDay } from './ui-week.js';
 import { PADEL_TYPES } from './domain-padel.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
@@ -74,28 +74,40 @@ function betterWeekCard() {
     <div class="btns"><button class="btn filled" data-action="week-better">Use Better Week</button><button class="btn plain" data-action="week-tip-off">Not now</button></div></section>`;
 }
 
+// The Week tab: this week day by day (week.js), then your workouts and goals one level down.
 function overview() {
-  const pos = app.position(), ph = phaseFor(pos.week), today = dayKey();
+  return `${weekView()}${blockCard()}
+    ${group(row({ title: 'Workouts and goals', sub: 'Your workouts, goals, programs and the exercise library', icon: 'dumbbell', color: 'blue', to: 'plan/more' }))}`;
+}
+function moreView() {
+  const pos = app.position(), ph = phaseFor(pos.week);
   const setup = `${app.location()?.name || EQUIPMENT[S.profile.equipment]} · ${S.profile.minutes} min · ${S.profile.days}× a week`;
-  return `${pageHead('Plan', { sub: `Week ${pos.week} of ${pos.block ? pos.block.weeks : 4} · ${esc(ph.name)}` })}
+  return `${navBar({ back: 'Week', backTo: 'plan', title: 'Workouts and goals' })}<div style="height:12px"></div>
     <div class="court-stack">${pos.block ? blockHero(pos.block) : `<button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
       <p class="t-foot">This cycle</p><h2>Week ${pos.week}: ${esc(ph.name)}</h2><p class="t-sub">${esc(ph.note)}</p>
-      <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>`}
-${weekStrip()}</div>
+      <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>`}</div>
     <p class="grp-f" style="margin:8px 4px 20px">${pos.block ? 'Your goal block moves forward on its own every Monday.' : 'Each cycle is 4 weeks and moves forward on its own every Monday.'}</p>
-    ${thisWeekSection()}
-    ${blockCard()}${betterWeekCard()}${levelTipCard()}
-    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Your usual week', footer: 'Used for any week you don’t plan. Padel you add for a date changes only that week.' })}
-    ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'Start a goal', sub: 'A 4 to 8 week plan toward one goal', icon: 'target', color: 'teal', action: 'goal-new' })
       + row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
       + row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
     ${group(allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id);
       return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')
       + row({ title: 'Exercise library', sub: 'Browse, filter by equipment, import your own', icon: 'dumbbell', color: 'gray', to: 'library' }), { header: 'Workouts' })}
+    ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'Your setup', sub: esc(setup), icon: 'sliders', color: 'gray', to: 'welcome' })
       + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' }), { header: 'About your plan' })}`;
 }
+
+// Your usual week: the 7 days used for any week you don't change, plus the suggestions about it.
+function usualWeekSheet() {
+  const today = dayKey(), mon = isoDate(mondayOf()), now = isoDate();
+  const diff = Object.keys(S.settings.dated || {}).filter(iso => iso >= now && iso <= isoAdd7(mon)).sort().map(iso => DAY_NAME[DAYS[(parseISO(iso).getDay() + 6) % 7]]);
+  app.sheet(`<h2 class="sheet-title">Your usual week</h2><p class="sheet-sub">Used for any week you don’t change.${diff.length ? ` This week differs on ${esc(diff.join(', '))}.` : ''}</p>
+    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { footer: 'Tap a day to change it, and how hard padel usually is that day.' })}
+    ${betterWeekCard()}${levelTipCard()}
+    <button class="btn plain" data-action="close-sheet">Close</button>`);
+}
+const isoAdd7 = iso => { const d = parseISO(iso); d.setDate(d.getDate() + 6); return isoDate(d); };
 
 // ── New workout: name it, pick exercises, set the order. Sets and reps come from sensible
 // defaults for each exercise and can be changed afterwards like any workout.
@@ -137,13 +149,13 @@ function routineView(id) {
 
 export const plan = {
   tab: 'plan',
-  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : S.params[0] === 'goal' ? goalView() : overview(); },
+  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : S.params[0] === 'goal' ? goalView() : S.params[0] === 'more' ? moreView() : overview(); },
   mounted() {
     const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; goalMounted();
     // Asked from a day of this week: open your usual weekday.
     if (S.openDay && !S.params.length) { const day = S.openDay; delete S.openDay; plan.actions['day-sheet']({ dataset: { day } }); }
   },
-  onPick(name, value) { goalPick(name, value) || weekPick(name, value); },
+  onPick(name, value) { goalPick(name, value); },
   actions: {
     ...goalActions,
     'new-workout'() { NEW = { title: '', blocks: [] }; app.go('plan/new'); },
@@ -191,25 +203,17 @@ export const plan = {
       if (el.dataset.tip) { app.render({ keepScroll: true }); return app.toast(`${DAY_NAME[d]}: ${MATCH_LEVELS[lv].toLowerCase()} padel`); }
       plan.actions['day-sheet']({ dataset: { day: d } }); app.render({ keepScroll: true });
     },
-    async 'level-tip-off'(el) { S.settings.levelTipOff = { ...(S.settings.levelTipOff || {}), [el.dataset.day]: el.dataset.level }; await app.save('settings'); app.render({ keepScroll: true }); },
+    async 'level-tip-off'(el) { S.settings.levelTipOff = { ...(S.settings.levelTipOff || {}), [el.dataset.day]: el.dataset.level }; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); },
     async 'week-better'() {
       const b = betterWeek(); if (!b) return;
       const old = { ...S.schedule };
-      S.schedule = b.next; await app.save('schedule'); followUsualWeek(); await app.save('settings'); app.render({ keepScroll: true });
+      S.schedule = b.next; await app.save('schedule'); followUsualWeek(); await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true });
       app.toast('Week updated', async () => { S.schedule = old; await app.save('schedule'); app.render({ keepScroll: true }); });
     },
-    async 'week-tip-off'() { S.settings.weekTipOff = JSON.stringify(S.schedule); await app.save('settings'); app.render({ keepScroll: true }); },
-    // Changing a usual weekday changes this week's (and later) matching days too. Padel booked for this
-    // week's date stays unless you say so: you're asked.
-    async 'set-day'(el) {
-      const d = el.dataset.day, v = el.dataset.v;
-      S.schedule[d] = v; await app.save('schedule');
-      const kept = followUsualWeek(d); await app.save('settings');
-      app.closeSheet(); app.render({ keepScroll: true });
-      const iso = kept[0];
-      if (iso && v !== 'Padel') app.sheet(`<h2 class="sheet-title">This ${DAY_NAME[d]} still has padel</h2><p class="sheet-sub">Your usual ${DAY_NAME[d]} is now ${esc(optLabel(v).toLowerCase())}, but you added padel for this date (${esc(PADEL_TYPES[app.padelOn(iso)?.type] || 'Match')}). Remove it too?</p>
-        <div class="btns"><button class="btn destructive" data-action="wk-remove" data-iso="${iso}">Remove This ${DAY_NAME[d]}’s Padel</button><button class="btn plain" data-action="close-sheet">Keep It</button></div>`);
-    },
+    async 'week-tip-off'() { S.settings.weekTipOff = JSON.stringify(S.schedule); await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); },
+    // Changing a usual weekday also changes this week's (and later) matching days (week.setUsualDay).
+    async 'set-day'(el) { await setUsualDay(el.dataset.day, el.dataset.v); },
+    'usual-week'() { usualWeekSheet(); },
     'how-sheet'() {
       app.sheet(`<h2 class="sheet-title">How your plan adapts</h2><div style="height:12px"></div>
         ${group(row({ title: 'Getting stronger', sub: 'Each exercise has a target range, like 8–10 reps. When you reach the top on every set, the app suggests a little more weight next time.' })
