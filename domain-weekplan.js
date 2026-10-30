@@ -4,8 +4,9 @@
 import { NEXT_TO } from './domain-matchlevel.js';
 import { padelProfile } from './domain-recovery.js';
 
-// days: [{ iso, v, fixed, padel? }] — v: routine id | 'Padel' | 'Rest' | 'Recovery';
-// padel: { type, focus, level }. fixed days (past, done, swapped, neighbours) never change.
+// days: [{ iso, v, fixed, padel?, noGym? }] — v: routine id | 'Padel' | 'Rest' | 'Recovery';
+// padel: { type, focus, level }. fixed days (past, done, swapped, neighbours) never change;
+// noGym days (ones you can't train) take padel but no workout.
 const isPadel = d => d?.v === 'Padel';
 export const SCORE = { backToBack: 1.5, legsTwoDays: 2, armsBefore: 2, armsAfter: 1, padelTwoDays: 1, moved: 0.3 };
 
@@ -44,11 +45,12 @@ function* orders(arr) {
 // Place `workouts` (routine ids still to do this week) on the free days. Keeps workouts where they
 // already are unless moving them is clearly better. Returns { days, moved, dropped, score }.
 export function planWeek(days, workouts, opts) {
-  const free = days.map((d, i) => i).filter(i => i > 0 && i < days.length - 1 && !days[i].fixed && !isPadel(days[i]));
+  const free = days.map((d, i) => i).filter(i => i > 0 && i < days.length - 1 && !days[i].fixed && !isPadel(days[i]) && !days[i].noGym);
   // Where each workout is now (opts.was adds one that sat on a day that just became padel).
   const was = new Map([...days.map((d, i) => [d.v, i]).filter(([v], i) => workouts.includes(v) && !days[i].fixed), ...Object.entries(opts.was || {})]);
   const n = Math.min(workouts.length, free.length);
-  const base = days.map(d => !d.fixed && !isPadel(d) ? { ...d, v: 'Rest' } : d);
+  // Days you can't train keep what they have (a Recovery day stays), unless it's a workout to re-place.
+  const base = days.map(d => !d.fixed && !isPadel(d) && (!d.noGym || workouts.includes(d.v)) ? { ...d, v: 'Rest' } : d);
   let best = null;
   const keep = [...choose(workouts.map((_, i) => i), n)];
   for (const pick of keep) for (const slots of choose(free, n)) for (const order of orders(pick)) {

@@ -9,6 +9,7 @@ import { DAYS, isRoutine, legHeavyBlocks, isLegHeavy, setCustomRoutines } from '
 import { bestWeek, AREAS } from './domain-personalize.js';
 import { isoDate, mondayOf, parseISO, daysBetween } from './domain-calendar.js';
 import { lands } from './domain-adaptive.js';
+import { usualKinds } from './ui-week.js';
 
 const fmtDay = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const weeksLabel = (a, b) => a === b ? `Week ${a}` : `Weeks ${a}–${b}`;
@@ -50,7 +51,7 @@ function newSessions() {
 // Your week with the new workouts: padel stays where it is, the workouts go on the best free days.
 function placeNew(ids, legs) {
   const padel = DAYS.filter(d => S.schedule[d] === 'Padel');
-  const w = bestWeek(ids, padel, legs, S.settings.padelLevel || {});
+  const w = bestWeek(ids, padel, legs, S.settings.padelLevel || {}, S.profile.trainDays, usualKinds());
   const sched = Object.fromEntries(DAYS.map(d => [d, S.schedule[d] === 'Padel' ? 'Padel' : 'Rest']));
   w.days.forEach((d, i) => { sched[d] = w.ids[i]; });
   const rest = DAYS.filter(d => sched[d] === 'Rest');
@@ -251,3 +252,5 @@ export function retimeTournamentBlock() {
   return 'moved';
 }
 export const resetGoal = () => { G = null; built = null; };
+// Straight to one goal's setup (from the end of first-run setup).
+export function openGoal(goal) { if (!GOALS[goal]) return; G = fresh(goal); built = null; app.go('plan/goal'); }

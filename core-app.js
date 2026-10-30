@@ -73,7 +73,8 @@ export const app = {
   // How hard padel is expected to be on a date ('easy' | 'normal' | 'hard'); null if it isn't a padel day.
   matchLevel(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? levelOn(iso, S.settings) : null; },
   // What kind of padel is planned on a date: { type, focus } (a match unless you said otherwise).
-  padelOn(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? { type: 'match', focus: null, ...(S.settings.padelPlan?.[iso] || {}) } : null; },
+  // The date's own details first, then your usual session on that weekday (from setup).
+  padelOn(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? { type: 'match', focus: null, ...(S.settings.padelUsual?.[DAYS[(parseISO(iso).getDay() + 6) % 7]] || {}), ...(S.settings.padelPlan?.[iso] || {}) } : null; },
   // The level for leg rules (Match prep, legs before and after): a ball machine or an overheads lesson counts as easy.
   legLevel(iso = isoDate()) { const lv = app.matchLevel(iso); return lv && !legsLikeMatch({ activity: 'padel', padel: app.padelOn(iso) }) ? 'easy' : lv; },
   routine: id => resolveRoutine(id, S.overrides, app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile),

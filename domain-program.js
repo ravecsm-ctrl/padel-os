@@ -40,9 +40,9 @@ export const isRoutine = id => !!getRoutine(id);
 const LEG_MUSCLES = new Set(['quads', 'hamstrings', 'glutes', 'glute_med', 'adductors', 'calves', 'soleus']);
 export const legHeavyBlocks = (blocks = []) => blocks.length > 0 && blocks.filter(b => (getExercise(b.ex)?.primary || []).some(m => LEG_MUSCLES.has(m))).length / blocks.length >= 0.4;
 export const isLegHeavy = id => legHeavyBlocks(getRoutine(id)?.blocks);
-// Pressing and overhead work: kept away from a session of overheads (see weekplan).
-const UPPER_MUSCLES = new Set(['chest', 'upper_chest', 'lower_chest', 'front_delts', 'side_delts', 'triceps', 'rotator_cuff', 'serratus']);
-export const isUpperHeavy = id => { const b = getRoutine(id)?.blocks || []; return b.length > 0 && b.filter(x => (getExercise(x.ex)?.primary || []).some(m => UPPER_MUSCLES.has(m))).length / b.length >= 0.4; };
+// Mostly upper body (shoulders, chest, back, arms): kept away from a session of overheads (see weekplan).
+const UPPER_MUSCLES = new Set(['chest', 'upper_chest', 'lower_chest', 'front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serratus', 'traps', 'mid_back', 'lats', 'biceps', 'triceps', 'forearms']);
+export const isUpperHeavy = id => { const b = getRoutine(id)?.blocks || []; return b.length > 0 && b.filter(x => (getExercise(x.ex)?.primary || []).some(m => UPPER_MUSCLES.has(m))).length / b.length >= 0.5; };
 export const allRoutineIds = () => [...Object.keys(ROUTINES), ...Object.keys(CUSTOM_ROUTINES)];
 export const isCustomRoutine = id => !!CUSTOM_ROUTINES[id];
 

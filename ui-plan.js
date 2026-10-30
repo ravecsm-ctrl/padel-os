@@ -12,7 +12,7 @@ import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.
 import { MATCH_LEVELS, LEVEL_HINT, suggestLevel } from './domain-matchlevel.js';
 import { bodySummary } from './ui-body.js';
 import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
-import { thisWeekSection, weekPick, weekStrip } from './ui-week.js';
+import { thisWeekSection, weekPick, weekStrip, usualKinds } from './ui-week.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const usual = d => S.settings.padelLevel?.[d] || 'normal';
@@ -27,8 +27,9 @@ function betterWeek() {
   if (!gym.length || S.settings.weekTipOff === JSON.stringify(sched)) return null;
   const padel = DAYS.filter(d => sched[d] === 'Padel');
   const levels = S.settings.padelLevel || {};
-  const best = bestWeek(gym.map(d => sched[d]), padel, isLegHeavy, levels);
-  if (scheduleScore(sched, isRoutine, isLegHeavy, levels) - best.score < 1.9) return null;
+  const kinds = usualKinds();
+  const best = bestWeek(gym.map(d => sched[d]), padel, isLegHeavy, levels, S.profile.trainDays, kinds);
+  if (scheduleScore(sched, isRoutine, isLegHeavy, levels, kinds) - best.score < 1.9) return null;
   const next = { ...sched };
   gym.forEach(d => { next[d] = 'Rest'; });
   const hadRecovery = DAYS.filter(d => sched[d] === 'Recovery').length;

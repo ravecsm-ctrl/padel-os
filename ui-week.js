@@ -8,8 +8,11 @@ import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
 import { MATCH_LEVELS, loggedLevel } from './domain-matchlevel.js';
 import { planWeek, withPadel, suggestPadelDays, workoutsLeft } from './domain-weekplan.js';
+import { padelProfile } from './domain-recovery.js';
 
 const OPTS = { legs: isLegHeavy, upper: isUpperHeavy };
+// Your usual padel weekdays as load factors, for planning the usual week (personalize.bestWeek).
+export const usualKinds = (usual = S.settings.padelUsual || {}) => ({ upper: isUpperHeavy, kinds: Object.fromEntries(Object.entries(usual).map(([d, p]) => [d, padelProfile(p.type, p.focus)])) });
 export const isoAdd = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoDate(d); };
 const monIso = iso => isoDate(mondayOf(parseISO(iso)));
 const dayName = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'long' });
@@ -34,7 +37,8 @@ export function weekWindow(iso = isoDate()) {
       else if (d < today) { v = 'Rest'; padel = null; }
     }
     const fixed = k === 0 || k === 8 || past || !!(sw && (d === sw.date || d === sw.back)) || v === 'Padel';
-    return { iso: d, v, padel, fixed };
+    const can = S.profile.trainDays, noGym = !!can?.length && !can.includes(DAYS[(parseISO(d).getDay() + 6) % 7]);
+    return { iso: d, v, padel, fixed, noGym };
   });
 }
 
