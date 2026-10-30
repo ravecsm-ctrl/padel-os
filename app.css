@@ -325,7 +325,9 @@ body[data-route="welcome"] main, body[data-route="builder"] main { padding-top: 
 .sheet { color: var(--label); background: var(--bg); border: 0; border-radius: 14px 14px 0 0; width: 100%; max-width: 560px; max-height: 90dvh; margin: auto auto 0; padding: 6px 16px calc(20px + var(--safe-b)); overflow: auto; }
 .sheet::backdrop { background: rgba(0, 0, 0, .4); }
 .sheet[open] { animation: up .28s cubic-bezier(.2, .9, .3, 1); }
-.grip { width: 36px; height: 5px; border-radius: 3px; background: var(--fill-2); margin: 0 auto 12px; }
+.grip { width: 36px; height: 5px; border-radius: 3px; background: var(--fill-2); margin: 0 auto 12px; position: relative; }
+/* A bigger invisible target around the grip, so it's easy to grab and swipe down. */
+.grip::before { content: ''; position: absolute; inset: -14px -60px; }
 .sheet-title { font-size: 20px; font-weight: 700; margin: 4px 4px 4px; }
 .sheet-sub { font-size: 15px; color: var(--label-2); margin: 0 4px 16px; line-height: 20px; }
 .sheet .grp-b { background: var(--cell); }

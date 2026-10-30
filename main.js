@@ -123,6 +123,7 @@ async function boot() {
   applyTheme();
   await timer.initTimer(document.querySelector('#restbar'), S.settings);
   document.querySelector('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') app.closeSheet(); });
+  sheetSwipe(document.querySelector('#sheet'));
   parseHash();
   // First run: onboarding. Existing users keep their data and get a prompt on Today instead.
   if (!S.profile.onboarded && !S.sessions.length && !S.active && ['today', 'overview'].includes(S.route)) { S.route = 'welcome'; S.params = []; window.history.replaceState(null, '', '#/welcome'); }
@@ -140,4 +141,40 @@ async function boot() {
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
 }
+// Swipe a sheet down to close it, like iOS: from the grip, or from anywhere once the sheet is scrolled
+// to the top. Typing, sliders and scrolling inside the sheet are left alone; a short drag springs back.
+function sheetSwipe(d) {
+  let y0 = null, dy = 0, t0 = 0, dragging = false;
+  d.addEventListener('touchstart', e => {
+    const t = e.target;
+    if (e.touches.length !== 1 || t.closest('input, textarea, select') || (d.scrollTop > 0 && !t.closest('.grip'))) { y0 = null; return; }
+    y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); dragging = false;
+  }, { passive: true });
+  d.addEventListener('touchmove', e => {
+    if (y0 == null) return;
+    dy = e.touches[0].clientY - y0;
+    if (!dragging) {
+      if (dy < -4) { y0 = null; return; }   // moving up: it's a scroll
+      if (dy < 8) return;
+      dragging = true; d.style.transition = 'none';
+    }
+    e.preventDefault();
+    d.style.transform = `translateY(${Math.max(0, dy)}px)`;
+  }, { passive: false });
+  const end = () => {
+    if (y0 == null) return;
+    y0 = null;
+    if (!dragging) return;
+    dragging = false;
+    const fast = dy / Math.max(1, Date.now() - t0) > 0.5;
+    if (dy > Math.min(140, d.offsetHeight * 0.3) || (fast && dy > 40)) {
+      d.style.transition = 'transform .18s ease-in'; d.style.transform = `translateY(${d.offsetHeight}px)`;
+      setTimeout(() => app.closeSheet(), 170);
+    } else { d.style.transition = 'transform .2s ease-out'; d.style.transform = ''; }
+  };
+  d.addEventListener('touchend', end);
+  d.addEventListener('touchcancel', end);
+  d.addEventListener('close', () => { d.style.transition = ''; d.style.transform = ''; });
+}
+
 boot();
