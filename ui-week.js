@@ -117,7 +117,7 @@ function strip(days, { mark = null } = {}) {
   return `<div class="wk-strip">${days.slice(1, 8).map(d => {
     const kind = d.v === 'Padel' ? 'padel' : isRoutine(d.v) || d.v === 'Quick' ? 'gym' : d.v === 'Recovery' ? 'rec' : 'rest';
     const label = d.v === 'Padel' ? (d.padel?.type === 'machine' ? 'Machine' : PADEL_TYPES[d.padel?.type] || 'Padel') : isRoutine(d.v) ? app.routine(d.v).title.split(/[ &]/)[0] : d.v === 'Quick' ? 'Gym' : d.v === 'Recovery' ? 'Rec' : '–';
-    return `<button class="${kind} ${d.iso === today ? 'today' : ''} ${d.iso === mark ? 'mark' : ''} ${d.iso < today ? 'past' : ''}" data-action="wk-day" data-iso="${d.iso}" aria-label="${esc(dayName(d.iso))}: ${esc(titleOf(d.v))}"><small>${shortDay(d.iso).slice(0, 1)}</small><span>${esc(label)}</span></button>`;
+    return `<button class="${kind} ${d.iso === today ? 'today' : ''} ${d.iso === mark ? 'mark' : ''} ${d.iso < today ? 'past' : ''}" data-action="wk-day" data-iso="${d.iso}" aria-label="${esc(dayName(d.iso))}: ${esc(titleOf(d.v))}"><small>${shortDay(d.iso).slice(0, 1)}</small><span class="${label.length > 8 ? 'xs' : label.length > 6 ? 's' : ''}">${esc(label)}</span></button>`;
   }).join('')}</div>`;
 }
 const swapLine = r => { const at = r.days.find((d, i) => i > 0 && i < r.days.length - 1 && d.v === r.swapped.to)?.iso;
