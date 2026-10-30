@@ -2,6 +2,7 @@
 // rules that turn a block + week + readiness into today's prescription.
 import { getExercise } from './domain-catalog.js';
 import { adaptBlocks, estimateMinutes } from './domain-personalize.js';
+import { phaseRange } from './domain-block.js';
 
 export const PHASES = [
   { week: 1, name: 'Base', rpe: 7, rir: 3, setMult: 1, loadMult: 1, note: 'Learn the movements and find comfortable weights.' },
@@ -37,12 +38,16 @@ export const isRoutine = id => !!getRoutine(id);
 // Leg-heavy: at least 40% of its exercises work the legs as a main muscle. The weekly plan keeps these off
 // the day after padel (and, more strongly, the day before).
 const LEG_MUSCLES = new Set(['quads', 'hamstrings', 'glutes', 'glute_med', 'adductors', 'calves', 'soleus']);
-export const isLegHeavy = id => { const r = getRoutine(id); if (!r?.blocks?.length) return false;
-  return r.blocks.filter(b => (getExercise(b.ex)?.primary || []).some(m => LEG_MUSCLES.has(m))).length / r.blocks.length >= 0.4; };
+export const legHeavyBlocks = (blocks = []) => blocks.length > 0 && blocks.filter(b => (getExercise(b.ex)?.primary || []).some(m => LEG_MUSCLES.has(m))).length / blocks.length >= 0.4;
+export const isLegHeavy = id => legHeavyBlocks(getRoutine(id)?.blocks);
 export const allRoutineIds = () => [...Object.keys(ROUTINES), ...Object.keys(CUSTOM_ROUTINES)];
 export const isCustomRoutine = id => !!CUSTOM_ROUTINES[id];
 
-export const phaseFor = week => PHASES[(week - 1) % 4];
+// While a goal block runs, its phases replace the 4-week cycle (the app registers a source
+// that returns the block's phase for a week, or null).
+let phaseSource = null;
+export const setPhaseSource = fn => { phaseSource = fn; };
+export const phaseFor = week => phaseSource?.(week) || PHASES[(week - 1) % 4];
 
 // overrides: { [routineId]: { [blockIndex]: { ex?, sets?, min?, max?, rest? }, _extra?: [block + { after }] } }
 // `_extra` holds exercises you added to a built-in workout; each sits after the exercise
@@ -75,7 +80,8 @@ export function prescribe(block, week, { light = false } = {}) {
   let sets = Math.max(1, Math.round(block.sets * p.setMult));
   if (light && sets > 2) sets -= 1;
   const cap = Math.min(light ? 7 : 10, block.rpeCap || 10);
-  return { sets, min: block.min, max: block.max, rest: block.rest, rpe: Math.min(p.rpe, cap), rir: p.rir, loadMult: p.loadMult, phase: p.name };
+  const r = phaseRange(block, p) || block;
+  return { sets, min: r.min, max: r.max, rest: r.rest, rpe: Math.min(p.rpe, cap), rir: p.rir, loadMult: p.loadMult, phase: p.name };
 }
 
 export function rangeLabel(block) {

@@ -11,6 +11,7 @@ import { startForWeek, dayKey } from './domain-calendar.js';
 import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.js';
 import { MATCH_LEVELS, LEVEL_HINT, suggestLevel } from './domain-matchlevel.js';
 import { bodySummary } from './ui-body.js';
+import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const usual = d => S.settings.padelLevel?.[d] || 'normal';
@@ -73,17 +74,18 @@ function betterWeekCard() {
 function overview() {
   const pos = app.position(), ph = phaseFor(pos.week), today = dayKey();
   const setup = `${app.location()?.name || EQUIPMENT[S.profile.equipment]} · ${S.profile.minutes} min · ${S.profile.days}× a week`;
-  return `${pageHead('Plan', { sub: `Week ${pos.week} of 4 · ${esc(ph.name)}` })}
-    <div class="court-stack"><button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
+  return `${pageHead('Plan', { sub: `Week ${pos.week} of ${pos.block ? pos.block.weeks : 4} · ${esc(ph.name)}` })}
+    <div class="court-stack">${pos.block ? blockHero(pos.block) : `<button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
       <p class="t-foot">This cycle</p><h2>Week ${pos.week}: ${esc(ph.name)}</h2><p class="t-sub">${esc(ph.note)}</p>
-      <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>
+      <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>`}
       <div class="court-days">${DAYS.map(d => { const v = S.schedule[d], kind = isRoutine(v) ? 'gym' : v === 'Padel' ? 'padel' : v === 'Recovery' ? 'rec' : 'rest';
         return `<button class="${kind} ${d === today ? 'today' : ''}" data-action="day-sheet" data-day="${d}" aria-label="${DAY_NAME[d]}: ${esc(optLabel(v))}"><small>${d[0]}</small><span>${kind === 'gym' ? icon(routineLook(v).icon) : kind === 'padel' ? icon('racket') : kind === 'rec' ? icon('heart') : ''}</span></button>`; }).join('')}</div></div>
-    <p class="grp-f" style="margin:8px 4px 24px">Each cycle is 4 weeks and moves forward on its own every Monday. Tap a day to change it.</p>
-    ${betterWeekCard()}${levelTipCard()}
+    <p class="grp-f" style="margin:8px 4px 24px">${pos.block ? 'Your goal block moves forward on its own every Monday.' : 'Each cycle is 4 weeks and moves forward on its own every Monday.'} Tap a day to change it.</p>
+    ${blockCard()}${betterWeekCard()}${levelTipCard()}
     ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
-    ${group(row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
+    ${group(row({ title: 'Start a goal', sub: 'A 4 to 8 week plan toward one goal', icon: 'target', color: 'teal', action: 'goal-new' })
+      + row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
       + row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
     ${group(allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id);
       return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')
@@ -122,8 +124,8 @@ function routineView(id) {
         <button class="nw-btn down" data-action="ord-move" data-r="${esc(id)}" data-i="${i}" data-to="${i + 1}" ${i === r.blocks.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(ex.name)} down">${icon('down')}</button></div>`; }).join(''),
       { header: 'Exercise order', footer: 'Saved as you go. Tap Done when you’re finished.' }) + `<button class="btn filled" data-action="ord-done" style="margin-bottom:20px">Done</button>` : ''}
     ${ORDER === id ? '' : group(r.blocks.map(blk => { const ex = getExercise(blk.ex), rx = prescribe(blk, wk);
-      if (blk.extra) return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))} · added by you`, action: 'extra-sheet', data: { r: id, k: String(blk.index).slice(1) } });
-      return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel(blk))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
+      if (blk.extra) return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel({ ...blk, min: rx.min, max: rx.max }))} · added by you`, action: 'extra-sheet', data: { r: id, k: String(blk.index).slice(1) } });
+      return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel({ ...blk, min: rx.min, max: rx.max }))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
       { header: 'Exercises', footer: `${r.dropped.length ? `Left out to fit ${S.profile.minutes} minutes: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}. ` : ''}Tap an exercise to change it.${r.blocks.length > 1 ? ` <button class="link" data-action="ord-start" data-r="${esc(id)}">Change order</button>` : ''}` })}
     <div class="btns">${S.active ? '<button class="btn tinted" data-action="resume">Continue Current Workout</button>' : `<button class="btn filled" data-action="start" data-routine="${id}">${icon('play')}Start Workout</button>`}
     ${edited ? `<button class="btn plain" data-action="reset-routine" data-r="${id}">Restore Original Exercises</button>` : ''}
@@ -132,9 +134,11 @@ function routineView(id) {
 
 export const plan = {
   tab: 'plan',
-  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : overview(); },
-  mounted() { const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; },
+  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : S.params[0] === 'goal' ? goalView() : overview(); },
+  mounted() { const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; goalMounted(); },
+  onPick(name, value) { goalPick(name, value); },
   actions: {
+    ...goalActions,
     'new-workout'() { NEW = { title: '', blocks: [] }; app.go('plan/new'); },
     'nw-add'() {
       exercisePicker({ title: 'Add to workout', sub: 'Sets and reps are set for you; change them after saving.', inUse: NEW.blocks.map(b => b.ex), pick: id => {

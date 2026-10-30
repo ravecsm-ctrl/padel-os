@@ -21,6 +21,7 @@ import { saveBackup } from './ui-backup.js';
 import * as cloud from './core-cloud.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
+import { blockBanner } from './ui-goal.js';
 import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
 
@@ -36,7 +37,8 @@ export function banners({ resumeOnly = false } = {}) {
   }
   if (resumeOnly) return out;
   if (!S.profile.onboarded) out += `<button class="banner" data-action="go" data-to="welcome">${tile('sliders', 'blue')}<span><b>Personalise your plan</b><small>Takes 30 seconds. Your history is kept.</small></span>${chev}</button>`;
-  const br = breakInfo(S.sessions, app.position().week, { acknowledged: S.settings.breakAck || 0 });
+  // During a goal block the weeks follow the block, so no "restart at week 1" offer.
+  const br = app.position().block ? null : breakInfo(S.sessions, app.position().week, { acknowledged: S.settings.breakAck || 0 });
   if (br) out += `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`;
   const tr = loadTrend(weeklySeries(S.sessions, 5));
   if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
@@ -46,6 +48,7 @@ export function banners({ resumeOnly = false } = {}) {
     const res = sum?.matches ? `${plural(sum.matches, 'match')}${sum.won + sum.lost ? `, ${sum.won}–${sum.lost}` : ''}. ` : '';
     out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'teal')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`;
   }
+  out += blockBanner(!!(tp && !tp.noGym));
   const hm = hardMatchOffer();
   if (hm) out += `<div class="banner warn">${tile('racket', 'orange')}<span><b>That match was harder than planned</b><small>Move ${esc(app.routine(hm.routine).title)} from ${esc(weekday(hm.from))} to ${esc(weekday(hm.to))}, so your legs get more time?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="hard-move" data-r="${esc(hm.routine)}" data-from="${hm.from}" data-to="${hm.to}" data-id="${esc(hm.match.id)}" style="font-size:15px;white-space:nowrap">Move it</button><button class="link" data-action="hard-keep" data-id="${esc(hm.match.id)}" style="font-size:13px">Keep</button></span></div>`;
   // Recovery days keep coming: the plan is too much for how much padel you play.

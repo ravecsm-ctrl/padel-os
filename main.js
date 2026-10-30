@@ -22,6 +22,7 @@ import { body } from './ui-body.js';
 import { review } from './ui-review.js';
 import { feedback } from './ui-feedback.js';
 import { pickerActions } from './ui-picker.js';
+import { startPendingBlock } from './ui-goal.js';
 import './domain-pack.js'; // expansion pack: adds its exercises to the library
 import { upgradeSaved } from './domain-muscles.js';
 import { overview } from './ui-overview.js';
@@ -135,8 +136,11 @@ async function boot() {
   cloud.onStatus(() => { if (S.route === 'settings') app.render({ keepScroll: true }); });
   const catchUp = () => { if (cloud.status().waiting || cloud.status().error === 'offline') cloud.save(); };
   addEventListener('online', catchUp);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') catchUp(); });
+  // A goal block with new workouts that was waiting to start puts them on your week on its first day.
+  const blockDay = async () => { if (await startPendingBlock()) app.render({ keepScroll: true }); };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { catchUp(); blockDay(); } });
   catchUp();
+  await startPendingBlock();
   app.render();
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});

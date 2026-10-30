@@ -608,6 +608,17 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .cycle b { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); }
 .cycle .past b { background: rgba(255, 255, 255, .45); }
 .cycle .on b { background: var(--ball); }
+/* Goal block weeks: one bar per week, phase names under their weeks */
+.blk-bar { display: grid; column-gap: 4px; row-gap: 6px; margin-top: 14px; }
+.blk-bar b { height: 6px; border-radius: 3px; background: var(--fill); }
+.blk-bar small { font-size: 11px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk-bar b.ph-lighter { background: var(--fill); opacity: .5; }
+.blk-bar b.past { background: var(--label-3, rgba(127,127,127,.45)); }
+.blk-bar b.on { background: var(--ball); }
+.hero .blk-bar b { background: rgba(255, 255, 255, .16); }
+.hero .blk-bar b.past { background: rgba(255, 255, 255, .45); }
+.hero .blk-bar b.on { background: var(--ball); }
+.hero .blk-bar small { color: rgba(255, 255, 255, .7); }
 .cycle small { font-size: 11px; color: var(--court-ink-2); }
 .cycle .on small { color: var(--court-ink); font-weight: 600; }
 .court-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 12px 10px 14px; background: var(--court-2); }

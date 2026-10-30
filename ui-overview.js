@@ -11,6 +11,7 @@ import { weekStreak } from './domain-analytics.js';
 import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
 import { getExercise } from './domain-catalog.js';
 import { taperFor, taperText, daysUntil, liftProgress } from './domain-goals.js';
+import { retimeTournamentBlock } from './ui-goal.js';
 import { exercisePicker } from './ui-picker.js';
 import { currentStats, radar } from './ui-stats.js';
 import { activitySheet, pastWorkoutSheet } from './ui-today.js';
@@ -74,7 +75,9 @@ function tournamentSheet() {
       const date = b.querySelector('#tDate').value;
       if (!date) return app.toast('Pick the date');
       S.settings.tournament = { name: b.querySelector('#tName').value.trim() || 'Tournament', date };
-      await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(taperText(taperFor(S.settings.tournament)) || 'Tournament saved. Training eases off from a week before.');
+      const moved = retimeTournamentBlock();
+      await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true });
+      app.toast(moved === 'moved' ? 'Tournament saved. Your Tournament peak block now ends that week.' : moved === 'close' ? 'Tournament saved. Too close to re-plan your block; check it on Plan.' : taperText(taperFor(S.settings.tournament)) || 'Tournament saved. Training eases off from a week before.');
     };
     b.querySelector('#tDel')?.addEventListener('click', async () => { delete S.settings.tournament; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Tournament removed'); });
   });

@@ -4,7 +4,7 @@ import { esc, icon, navBar, group, row, stat } from './ui-kit.js';
 import { mname } from './ui-words.js';
 import { weekReview, reviewWeekStart } from './domain-review.js';
 import { fmtW, fmtNum, toDisplay, fmtEst } from './domain-units.js';
-import { isoDate, programPosition } from './domain-calendar.js';
+import { isoDate } from './domain-calendar.js';
 
 let offset = 0; // weeks back from the default review week
 const unit = () => S.settings.unit;
@@ -13,7 +13,7 @@ const delta = (a, b, fmt = String) => b == null || a === b ? '' : ` <span class=
 
 export const currentReview = (off = 0) => {
   const start = reviewWeekStart(); start.setDate(start.getDate() - 7 * off);
-  return weekReview(S.sessions, { weekStart: start, schedule: S.schedule, body: S.body, week: programPosition(S.settings.programStart, start).week, painClear: S.painClear, name: mname });
+  return weekReview(S.sessions, { weekStart: start, schedule: S.schedule, body: S.body, week: app.position(start).week, painClear: S.painClear, name: mname });
 };
 
 // For Today: a nudge on Sunday and Monday until you've opened the latest review.

@@ -1,10 +1,12 @@
 // Application state, persistence wiring, hash router, toasts and sheets.
 // Views import `app` and `S`; main.js registers views and boots.
 import * as db from './core-db.js';
-import { DEFAULT_SCHEDULE, resolveRoutine, DAYS } from './domain-program.js';
+import { DEFAULT_SCHEDULE, resolveRoutine, DAYS, setPhaseSource } from './domain-program.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition, parseISO } from './domain-calendar.js';
 import { levelOn } from './domain-matchlevel.js';
+import { blockPosition, BLOCK_PHASES } from './domain-block.js';
+import { recentPain } from './domain-pain.js';
 
 export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, adaptive: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
@@ -35,6 +37,12 @@ export const S = {
 };
 
 const views = {};
+setPhaseSource(week => {
+  const b = app.blockPos();
+  if (b?.state !== 'active') return null;
+  const id = week === b.week ? b.phaseId : b.plan[week - 1];
+  return id ? { week, id, ...BLOCK_PHASES[id] } : null;
+});
 const $ = s => document.querySelector(s);
 let saveTimer = null;
 
@@ -42,7 +50,17 @@ export const app = {
   register(name, view) { views[name] = view; },
   view: () => views[S.route] || views.today,
   get strength() { return S.sessions.filter(s => s.kind === 'strength'); },
-  position: () => programPosition(S.settings.programStart),
+  // A running goal block sets the week (week 1 to its length); after one ends, a fresh 4-week cycle starts.
+  blockPos(now = new Date()) {
+    const b = S.settings.block;
+    return b ? blockPosition(b, now, b.goal === 'injury' ? recentPain(S.sessions, { now: now.getTime(), cleared: S.painClear }) : {}) : null;
+  },
+  position(now = new Date()) {
+    const b = app.blockPos(now);
+    if (b?.state === 'active') return { week: b.week, cycle: 1, weeksIn: b.week - 1, block: b };
+    const start = b?.state === 'done' && b.nextStart > S.settings.programStart ? b.nextStart : S.settings.programStart;
+    return programPosition(start, now);
+  },
   location: () => S.locations.find(l => l.id === S.activeLocation) || S.locations[0] || null,
   owned: () => new Set(app.location()?.equipment || []),
   // What's planned on a date: the weekly schedule, unless today's workout was swapped with a later day this week.
