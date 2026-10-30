@@ -9,6 +9,7 @@ import * as cloud from './core-cloud.js';
 import { cloudRows, cloudActions } from './ui-cloudui.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
+import { bodySummary } from './ui-body.js';
 
 let persist = '…';
 const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
@@ -19,21 +20,21 @@ export const settings = {
   render() {
     const notif = globalThis.Notification ? Notification.permission : 'unsupported';
     const lb = S.lastBackup ? new Date(S.lastBackup).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'Never';
-    return `${navBar({ back: 'Today', backTo: 'today', title: 'Settings' })}
+    return `${navBar({ back: 'Back', backAction: 'nav-back', title: 'You' })}
       <div style="height:12px"></div>
       ${group(row({ title: '<input class="input" id="nameIn" value="' + esc(S.settings.name) + '" placeholder="Your name" style="padding:0;background:none;min-height:22px" aria-label="Your name">', icon: 'person', color: 'gray' }), { footer: 'Optional. Shown on Today.' })}
-      ${group(row({ title: 'Your plan', sub: `${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week`, icon: 'sliders', color: 'blue', to: 'welcome' })
+      ${group(row({ title: 'Your setup', sub: `${esc(EQUIPMENT[S.profile.equipment])} · ${S.profile.minutes} min · ${S.profile.days}× a week`, icon: 'sliders', color: 'blue', to: 'welcome' })
         + row({ title: 'Locations & equipment', sub: `Training at ${esc(app.location()?.name || '—')} · ${S.locations.length} location${S.locations.length === 1 ? '' : 's'}`, icon: 'target', color: 'teal', to: 'locations' })
-        + row({ title: 'Exercise library', sub: 'Browse and import exercises', icon: 'dumbbell', color: 'gray', to: 'library' })
-        + row({ title: 'Feedback notes', sub: S.feedback.length ? `${S.feedback.length} note${S.feedback.length > 1 ? 's' : ''} · share to get the app tuned` : 'Things that felt off while training', icon: 'note', color: 'orange', to: 'feedback' })
-        + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Training' })}
+        + row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' })
+        + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' })
+        + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Your plan' })}
       ${group(row({ title: 'Start rest timer automatically', icon: 'clock', color: 'orange', right: sw('autoRest', S.settings.autoRest, 'Start rest timer automatically') })
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
         + row({ title: 'Vibration', icon: 'phone', color: 'gray', right: sw('vibrate', S.settings.vibrate, 'Vibration') })
         + row({ title: 'Check-in before workouts', icon: 'heart', color: 'red', right: sw('readinessPrompt', S.settings.readinessPrompt, 'Check-in before workouts') })
         + row({ title: 'Match-day tips', sub: 'Sleep, food and warm-up around your padel', icon: 'racket', color: 'teal', right: sw('matchTips', S.settings.matchTips !== false, 'Match-day tips') })
         + row({ title: 'Adapt workouts to recovery', sub: 'Lighter when tired, a bit more when fresh', icon: 'sliders', color: 'green', right: sw('adaptive', S.settings.adaptive !== false, 'Adapt workouts to recovery') })
-        + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'During workouts' })}
+        + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'While training' })}
       <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>
       <section class="grp"><h2 class="grp-h">Appearance</h2>${seg('appearance', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.settings.appearance || 'system')}</section>
       ${group(cloudRows(), { header: 'Online copy', footer: cloud.configured() ? 'Saved after every change while the app is open. Changes made without signal go up next time you’re online.' : 'Never lose a workout if this phone is reset, lost or replaced.' })}
@@ -42,7 +43,8 @@ export const settings = {
         + `<label class="row has-icon" style="cursor:pointer"><span class="tile teal">${icon('plus')}</span><span class="row-main"><span class="row-title">Restore from backup</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg><input id="importIn" type="file" accept="application/json,.json" hidden></label>`
         + row({ title: 'Storage on this phone', sub: persist === 'granted' ? '' : 'Tap to ask iPhone to keep it', value: persist === 'granted' ? 'Protected' : persist === '…' ? '…' : 'Not protected', icon: 'shield', color: 'indigo', action: persist === 'granted' ? '' : 'persist', chevron: persist !== 'granted' }),
         { header: 'Your data', footer: `${cloud.configured() ? 'Your data is on this phone, with a copy in your private GitHub repository.' : 'Everything stays on this device. Nothing is uploaded.'}${db.persistent ? '' : ' <b class="red">Storage is unavailable, so data won’t be kept.</b>'}` })}
-      ${group(row({ title: 'Add to Home Screen', sub: 'In Safari, tap Share, then Add to Home Screen. It then works offline.', icon: 'phone', color: 'gray' })
+      ${group(row({ title: 'Feedback notes', sub: S.feedback.length ? `${S.feedback.length} note${S.feedback.length > 1 ? 's' : ''} · share to get the app tuned` : 'Things that felt off while training', icon: 'note', color: 'orange', to: 'feedback' })
+        + row({ title: 'Add to Home Screen', sub: 'In Safari, tap Share, then Add to Home Screen. It then works offline.', icon: 'phone', color: 'gray' })
         + row({ title: 'Health notice', sub: 'General training guidance, not medical advice. Stop if you feel sharp or worsening pain.', icon: 'heart', color: 'red' }), { header: 'About' })}
       ${group(`<button class="row danger" data-action="reset">Erase All Data</button>`)}
       <p class="fine">PADEL OS · ${S.sessions.length} sessions saved</p>`;

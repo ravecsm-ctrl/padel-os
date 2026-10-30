@@ -42,11 +42,13 @@ export const recovery = {
       return row({ title: `${esc(mname(m))}${tuned ? ' <span class="t-foot">· tuned to you</span>' : ''}`, right: `<span class="row-value" style="color:${r.key === 'ready' ? 'var(--label-2)' : colorFor(r.level)};font-weight:${r.key === 'ready' ? 400 : 600}">${r.label}${r.when ? ` · ${esc(r.when)}` : ''}</span>`, action: 'rec-sheet', data: { m } })
         .replace('<span class="row-main">', `${dot(r.level)}<span class="row-main">`);
     }).join('');
-    return `${navBar({ back: 'Today', backTo: 'today', title: 'Recovery' })}
-      <h1 class="t-title" style="padding:8px 4px 2px">Recovery</h1><p class="t-sub" style="padding:0 4px 16px">How rested each muscle is, based on your workouts and padel.</p>
+    // Reached from Today and from Progress, so Back goes wherever you came from.
+    return `${navBar({ back: 'Back', backAction: 'nav-back', title: 'Muscles & recovery' })}
+      <h1 class="t-title" style="padding:8px 4px 2px">Muscles & recovery</h1><p class="t-sub" style="padding:0 4px 16px">How rested each muscle is now, based on your workouts and padel.</p>
       <div class="card">${recoveryMapSvg(rec)}<div class="bm-legend">Tired <i style="background:linear-gradient(90deg,rgb(255,59,48),rgb(255,149,0),rgb(255,204,0),rgb(52,199,89))"></i> Ready</div></div>
-      <div style="height:24px"></div>
-      ${group(rows, { footer: 'Estimates based on how much and how hard each muscle worked, and how long ago. Tap a muscle to say how it really feels, so the app learns your recovery speed.' })}`;
+      <div style="height:16px"></div>
+      ${group(row({ title: 'Sets per muscle this week', sub: 'How much each muscle has worked, against a healthy weekly range', icon: 'target', color: 'blue', to: 'history/muscles' }))}
+      ${group(rows, { header: 'Ready now', footer: 'Estimates based on how much and how hard each muscle worked, and how long ago. Tap a muscle to say how it really feels, so the app learns your recovery speed.' })}`;
   },
   actions: {
     'rec-sheet'(el) { feedbackSheet(el.dataset.m); },

@@ -127,7 +127,7 @@ function musclesView() {
     return row({ title: esc(mname(m.id)), value: `<span class="mstat ${st.key}">${m.sets ? `${fmtSets(m.sets)} · ` : ''}${st.label}</span>`, action: 'muscle-sheet', data: { m: m.id },
       sub: `<span class="mbar"><span class="zone" style="left:${lo / scale * 100}%;width:${(hi - lo) / scale * 100}%"></span><b style="width:${Math.min(100, m.sets / scale * 100)}%"></b></span>` });
   }).join('');
-  return `${navBar({ back: 'Progress', backTo: 'overview', title: 'Muscles' })}
+  return `${navBar({ back: 'Back', backAction: 'nav-back', title: 'Muscles' })}
     <h1 class="t-title" style="padding:8px 4px 2px">Muscles</h1><p class="t-sub" style="padding:0 4px 16px">Sets per muscle over the last 7 days. <button class="link" data-action="go" data-to="recovery">See recovery</button></p>
     <div class="card">${bodyMap(map)}<div class="bm-legend">Fewer sets <i></i> More sets</div></div>
     <div style="height:24px"></div>

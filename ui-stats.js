@@ -5,6 +5,7 @@ import { pentagon, xpEvents, levelFor, achievements } from './domain-stats.js';
 import { isRoutine } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { relDay } from './domain-calendar.js';
+import { headed } from './ui-overview.js';
 
 const DAY = 86400000;
 const planned = () => Math.max(1, Object.values(S.schedule).filter(isRoutine).length);
@@ -68,7 +69,8 @@ export const stats = {
       <section class="grp"><h2 class="grp-h">Level</h2><div class="card">${levelBar(level)}</div><p class="grp-f">Points come from showing up and training well: finishing workouts, hitting your targets, records, prevention routines, logged matches and active weeks. Extra sets don’t earn more, so there’s no reward for overdoing it.</p></section>
       ${group(badges.map(b => row({ title: esc(b.label), value: b.done ? '' : b.progress, right: b.done ? icon('check', 'check-mark') : '', icon: b.done ? 'trophy' : 'target', color: b.done ? 'orange' : 'gray' })).join(''), { header: 'Milestones' })}
       ${xp.length ? group(xp.map(e => row({ title: esc(e.label), sub: esc(relDay(e.ts)), value: `+${e.xp}` })).join(''), { header: 'Recent points' }) : ''}
-      <p class="fine">Private to this device.</p>`;
+      <p class="fine">Private to this device.</p>
+      ${headed()}`;
   },
   actions: { 'axis-sheet'(el) { axisSheet(el.dataset.k); } },
 };

@@ -109,3 +109,18 @@ export function trackingSince(sessions, programStart) {
 }
 
 export { parseISO };
+
+// This month in four numbers: gym sessions, padel sessions, weeks in a row with training, and the biggest
+// jump in your best weight on any exercise you did this month (vs your best before it). Pure.
+export function monthNumbers(sessions, { now = new Date(), streak = 0 } = {}) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const month = sessions.filter(s => s.startedAt >= start && s.startedAt <= now.getTime());
+  const best = (list, exId) => Math.max(0, ...list.filter(s => s.kind === 'strength').flatMap(s => (s.exercises || []).filter(e => e.exId === exId).flatMap(e => (e.sets || []).filter(x => x.done).map(x => x.w || 0))));
+  const before = sessions.filter(s => s.startedAt < start);
+  let lift = null;
+  for (const id of new Set(month.filter(s => s.kind === 'strength').flatMap(s => (s.exercises || []).map(e => e.exId)))) {
+    const was = best(before, id), now_ = best(month, id);
+    if (was > 0 && now_ > was && (!lift || now_ - was > lift.gain)) lift = { exId: id, gain: now_ - was, best: now_ };
+  }
+  return { gym: month.filter(s => s.kind === 'strength').length, padel: month.filter(s => s.activity === 'padel').length, streak, lift };
+}

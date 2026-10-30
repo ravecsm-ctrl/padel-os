@@ -53,7 +53,7 @@ const asText = list => list.map(f => [
 
 function view() {
   const list = [...S.feedback].reverse();
-  return `${navBar({ back: 'Settings', backTo: 'settings', title: '' })}<h1 class="t-large" style="padding:8px 4px 2px">Feedback notes</h1>
+  return `${navBar({ back: 'You', backTo: 'settings', title: '' })}<h1 class="t-large" style="padding:8px 4px 2px">Feedback notes</h1>
     <p class="t-sub" style="padding:0 4px 18px">Things that felt off while training. Share them to get the app tuned to you.</p>
     ${list.length ? `<div class="btns" style="margin-bottom:20px"><button class="btn filled" data-action="fb-share">${icon('share')}Share All Notes</button><button class="btn tinted" data-action="fb-new">${icon('plus')}New Note</button></div>
       ${group(list.map(f => row({ title: esc(f.note || (f.tag ? TAGS[f.tag] : 'Note')), sub: esc([new Date(f.ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), f.tag && f.note ? TAGS[f.tag] : '', f.exercise, f.suggested && `suggested ${f.suggested}`].filter(Boolean).join(' · ')), action: 'fb-del', data: { ts: f.ts }, chevron: false, right: `<span class="t-foot">Delete</span>` })).join(''), { footer: 'Notes stay on this phone and are included in backups.' })}`

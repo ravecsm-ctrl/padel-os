@@ -74,30 +74,10 @@ function betterWeekCard() {
     <div class="btns"><button class="btn filled" data-action="week-better">Use Better Week</button><button class="btn plain" data-action="week-tip-off">Not now</button></div></section>`;
 }
 
-// The Week tab: this week day by day (week.js), then your workouts and goals one level down.
+// The Week tab: this week day by day (week.js). Workouts, goals and the library live on Train.
 function overview() {
-  return `${weekView()}${blockCard()}
-    ${group(row({ title: 'Workouts and goals', sub: 'Your workouts, goals, programs and the exercise library', icon: 'dumbbell', color: 'blue', to: 'plan/more' }))}`;
+  return `${weekView()}${blockCard()}`;
 }
-function moreView() {
-  const pos = app.position(), ph = phaseFor(pos.week);
-  const setup = `${app.location()?.name || EQUIPMENT[S.profile.equipment]} · ${S.profile.minutes} min · ${S.profile.days}× a week`;
-  return `${navBar({ back: 'Week', backTo: 'plan', title: 'Workouts and goals' })}<div style="height:12px"></div>
-    <div class="court-stack">${pos.block ? blockHero(pos.block) : `<button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
-      <p class="t-foot">This cycle</p><h2>Week ${pos.week}: ${esc(ph.name)}</h2><p class="t-sub">${esc(ph.note)}</p>
-      <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>`}</div>
-    <p class="grp-f" style="margin:8px 4px 20px">${pos.block ? 'Your goal block moves forward on its own every Monday.' : 'Each cycle is 4 weeks and moves forward on its own every Monday.'}</p>
-    ${group(row({ title: 'Start a goal', sub: 'A 4 to 8 week plan toward one goal', icon: 'target', color: 'teal', action: 'goal-new' })
-      + row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
-      + row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
-    ${group(allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id);
-      return row({ title: esc(r.title), sub: `${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('')
-      + row({ title: 'Exercise library', sub: 'Browse, filter by equipment, import your own', icon: 'dumbbell', color: 'gray', to: 'library' }), { header: 'Workouts' })}
-    ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
-    ${group(row({ title: 'Your setup', sub: esc(setup), icon: 'sliders', color: 'gray', to: 'welcome' })
-      + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' }), { header: 'About your plan' })}`;
-}
-
 // Your usual week: the 7 days used for any week you don't change, plus the suggestions about it.
 function usualWeekSheet() {
   const today = dayKey(), mon = isoDate(mondayOf()), now = isoDate();
@@ -149,7 +129,7 @@ function routineView(id) {
 
 export const plan = {
   tab: 'plan',
-  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : S.params[0] === 'goal' ? goalView() : S.params[0] === 'more' ? moreView() : overview(); },
+  render() { return S.params[0] === 'routine' ? routineView(S.params[1]) : S.params[0] === 'new' ? newView() : S.params[0] === 'goal' ? goalView() : overview(); },
   mounted() {
     const n = document.querySelector('#nwName'); if (n) n.oninput = () => { NEW.title = n.value; }; goalMounted();
     // Asked from a day of this week: open your usual weekday.
@@ -179,15 +159,6 @@ export const plan = {
       S.customRoutines = { ...S.customRoutines, [r.id]: r }; setCustomRoutines(S.customRoutines); await app.save('customRoutines');
       NEW = null; app.go(`plan/routine/${r.id}`); app.toast(`“${esc(r.title)}” saved. Set a day for it in the schedule.`);
     },
-    'week-sheet'() {
-      const pos = app.position();
-      app.sheet(`<h2 class="sheet-title">Which week are you in?</h2><p class="sheet-sub">Change this if you missed time, for example after illness or travel.</p>
-        ${group(PHASES.map(p => row({ title: `Week ${p.week}: ${esc(p.name)}`, sub: esc(p.note), action: 'set-week', data: { w: p.week }, chevron: false, right: p.week === pos.week ? icon('check', 'check-mark') : '' })).join(''))}`);
-    },
-    async 'set-week'(el) {
-      S.settings.programStart = startForWeek(+el.dataset.w, S.settings.programStart);
-      await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(`Now in week ${el.dataset.w}`);
-    },
     'day-sheet'(el) {
       const d = el.dataset.day;
       app.sheet(`<h2 class="sheet-title">${DAY_NAME[d]}</h2><div style="height:12px"></div>
@@ -214,14 +185,6 @@ export const plan = {
     // Changing a usual weekday also changes this week's (and later) matching days (week.setUsualDay).
     async 'set-day'(el) { await setUsualDay(el.dataset.day, el.dataset.v); },
     'usual-week'() { usualWeekSheet(); },
-    'how-sheet'() {
-      app.sheet(`<h2 class="sheet-title">How your plan adapts</h2><div style="height:12px"></div>
-        ${group(row({ title: 'Getting stronger', sub: 'Each exercise has a target range, like 8–10 reps. When you reach the top on every set, the app suggests a little more weight next time.' })
-          + row({ title: 'Bad days', sub: 'Miss the bottom of the range twice and it suggests a bit less, so you can rebuild.' })
-          + row({ title: '4-week cycles', sub: 'Three weeks build up, then a lighter recovery week with fewer sets.' })
-          + row({ title: 'Your setup', sub: 'Exercises are swapped to match your equipment and the time you have.' })
-          + row({ title: 'Warm-up', sub: 'Before your first heavy exercise, do 5 minutes of easy movement and 2–3 lighter practice sets.' }))}`);
-    },
     'ord-start'(el) { ORDER = el.dataset.r; app.render({ keepScroll: true }); },
     'ord-done'() { ORDER = null; app.render({ keepScroll: true }); app.toast('Order saved'); },
     async 'ord-move'(el) {

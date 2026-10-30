@@ -5,9 +5,9 @@ import { esc, icon, tile, chev, navBar, group, row, seg, chips } from './ui-kit.
 import { firstMonday, GOALS, WEEK_OPTIONS, JUMP_AREAS, BLOCK_PHASES, blockWeeks, tournamentPlan, makeBlock, phaseSpans, blockTitle, goalLabel } from './domain-block.js';
 import { buildProgram } from './domain-builder.js';
 import { allExercises } from './domain-catalog.js';
-import { DAYS, isRoutine, legHeavyBlocks, isLegHeavy, setCustomRoutines } from './domain-program.js';
+import { DAYS, isRoutine, legHeavyBlocks, isLegHeavy, setCustomRoutines, PHASES } from './domain-program.js';
 import { bestWeek, AREAS } from './domain-personalize.js';
-import { isoDate, mondayOf, parseISO, daysBetween } from './domain-calendar.js';
+import { isoDate, mondayOf, parseISO, daysBetween, startForWeek } from './domain-calendar.js';
 import { lands } from './domain-adaptive.js';
 import { usualKinds, followUsualWeek } from './ui-week.js';
 
@@ -215,7 +215,26 @@ async function endBlock(revert) {
   app.toast(revert ? 'Your previous week is back' : 'Block ended. Your 4-week cycle starts at week 1.');
 }
 
+// The 4-week cycle (no goal running): which week you're in, changeable after time off.
 export const goalActions = {
+  'week-sheet'() {
+    const pos = app.position();
+    app.sheet(`<h2 class="sheet-title">Which week are you in?</h2><p class="sheet-sub">Change this if you missed time, for example after illness or travel.</p>
+      ${group(PHASES.map(p => row({ title: `Week ${p.week}: ${esc(p.name)}`, sub: esc(p.note), action: 'set-week', data: { w: p.week }, chevron: false, right: p.week === pos.week ? icon('check', 'check-mark') : '' })).join(''))}`);
+  },
+  async 'set-week'(el) {
+    S.settings.programStart = startForWeek(+el.dataset.w, S.settings.programStart);
+    await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(`Now in week ${el.dataset.w}`);
+  },
+  'how-sheet'() {
+    app.sheet(`<h2 class="sheet-title">How your plan adapts</h2><div style="height:12px"></div>
+      ${group(row({ title: 'Getting stronger', sub: 'Each exercise has a target range, like 8–10 reps. When you reach the top on every set, the app suggests a little more weight next time.' })
+        + row({ title: 'Bad days', sub: 'Miss the bottom of the range twice and it suggests a bit less, so you can rebuild.' })
+        + row({ title: '4-week cycles', sub: 'Three weeks build up, then a lighter recovery week with fewer sets. A goal block replaces this with its own phases.' })
+        + row({ title: 'Around your padel', sub: 'Leg work stays away from hard matches, busy padel weeks drop to two gym sessions, and each day adjusts to how you feel and recover.' })
+        + row({ title: 'Your setup', sub: 'Exercises are swapped to match your equipment and the time you have.' })
+        + row({ title: 'Warm-up', sub: 'Before your first heavy exercise, do 5 minutes of easy movement and 2–3 lighter practice sets.' }))}`);
+  },
   'goal-new'() { G = null; built = null; app.go('plan/goal'); },
   'goal-pick'(el) { G = fresh(el.dataset.goal); built = null; app.render(); },
   'goal-back'() { G = null; app.render(); },

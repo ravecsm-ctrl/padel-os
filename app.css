@@ -608,6 +608,13 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .cycle b { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); }
 .cycle .past b { background: rgba(255, 255, 255, .45); }
 .cycle .on b { background: var(--ball); }
+/* Progress: this month, one highlight */
+.month-tiles { grid-template-columns: 1fr 1fr; }
+.highlight { display: grid; gap: 4px; padding: 12px 14px; }
+.hl-main { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; }
+.hl-main b { display: block; font-weight: 600; }
+.hl-main small { display: block; font-size: 13px; color: var(--label-2); margin-top: 2px; }
+.hl-next { justify-self: end; font-size: 13px; }
 /* Today: one heads-up, then quick actions */
 .heads { display: grid; margin-top: 16px; }
 .heads > .banner, .heads > .strip, .heads > .card { margin-bottom: 0; }

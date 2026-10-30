@@ -4,8 +4,10 @@ import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import { esc, icon, pageHead, navBar, group, row, tile } from './ui-kit.js';
 import { COURT_ROUTINES, expandSteps, routineMinutes, stretchFor } from './domain-court.js';
-import { isRoutine } from './domain-program.js';
-import { dayKey } from './domain-calendar.js';
+import { isRoutine, allRoutineIds, isCustomRoutine, phaseFor, PHASES } from './domain-program.js';
+import { dayKey, relDay } from './domain-calendar.js';
+import { routineLook } from './ui-kit.js';
+import { blockHero } from './ui-goal.js';
 import { prehabFor } from './domain-padel.js';
 import { createActivity } from './domain-workout.js';
 import { AREAS } from './domain-personalize.js';
@@ -58,30 +60,49 @@ function todaysStretch() {
   return null;
 }
 
+// The Train tab: your goal, your workouts, the guided routines and the exercise library: everything you
+// can do, whatever today's plan says. Routines play hands-free (playerView).
 function listView() {
   const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear }), rec = todaysStretch();
-  const item = r => { const [ic, color] = LOOK[r.id] || ['heart', 'pink'];
-    const note = rec?.id === r.id ? `<span class="blue">Recommended ${esc(rec.why)}</span>` : pre.ids.includes(r.id) ? '<span class="blue">Recommended for you</span>' : esc(r.tag);
-    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${note}`, icon: ic, color, to: `court/${r.id}` }); };
   const all = Object.values(COURT_ROUTINES), of = kind => all.filter(r => r.kind === kind);
-  const flagged = Object.entries(pre.flagged).filter(([, n]) => n >= 2);
-  // The court panel: one routine worth doing right now, with why.
-  const padelToday = app.planOn() === 'Padel';
-  const pick = rec ? { id: rec.id, why: `Recommended ${rec.why}` } : pre.ids[0] ? { id: pre.ids[0], why: 'Recommended for you' } : padelToday ? { id: 'warmup', why: 'Padel today' } : { id: 'mobility', why: 'Good any day' };
-  const pr = COURT_ROUTINES[pick.id];
-  const panel = `<div class="court-stack" style="margin-bottom:24px"><div class="card hero"><div class="hero-top">${tile((LOOK[pr.id] || ['heart'])[0], (LOOK[pr.id] || [0, 'orange'])[1], true)}<div><p class="t-foot">${esc(pick.why)}</p><h2>${esc(pr.title)}</h2><p class="t-sub">${routineMinutes(pr)} min · hands-free</p></div></div>
-    <p class="hero-note">${esc(pr.blurb)}</p><button class="btn filled" data-action="go" data-to="court/${pr.id}">${icon('play')}Start</button></div></div>`;
-  return `${pageHead('Mobility', { sub: 'Stretching, mobility and padel routines. They run hands-free.' })}${panel}
-    ${flagged.length ? `<div class="banner warn"><span class="tile orange">${icon('heart')}</span><span><b>You flagged ${flagged.map(([a]) => esc((AREAS[a] || a).toLowerCase())).join(' and ')} recently</b><small>Try the matching routine below. See a professional if it persists.</small></span></div>` : ''}
-    ${group(of('stretch').sort((a, b) => (b.id === rec?.id) - (a.id === rec?.id)).map(item).join(''), { header: 'After your workout', footer: 'Gentle holds, never into pain. Stretching after training helps you wind down and builds flexibility over weeks; it does little for next-day soreness.' })}
-    ${group(of('daily').map(item).join(''), { header: 'Every day' })}
-    ${group(of('court').map(item).join(''), { header: 'Padel days' })}
-    ${group(of('prehab').sort((a, b) => pre.ids.includes(b.id) - pre.ids.includes(a.id)).map(item).join(''), { header: 'Injury prevention', footer: 'Two or three times a week. Mild discomfort that settles by the next day is normal; sharp or worsening pain is not.' })}`;
+  const pos = app.position(), ph = phaseFor(pos.week);
+  const goal = pos.block ? blockHero(pos.block)
+    : `<button class="card hero" data-action="week-sheet" style="display:block;width:100%;text-align:left">
+        <p class="t-foot">No goal · 4-week cycle</p><h2>Week ${pos.week}: ${esc(ph.name)}</h2><p class="t-sub">${esc(ph.note)}</p>
+        <div class="cycle">${PHASES.map((p, i) => `<span class="${i + 1 === pos.week ? 'on' : i + 1 < pos.week ? 'past' : ''}"><b></b><small>${esc(p.name)}</small></span>`).join('')}</div></button>`;
+  const lastDone = id => app.strength.find(s => s.routineId === id);
+  const workouts = allRoutineIds().map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
+    return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}${isCustomRoutine(id) ? ' · yours' : ''}`, icon: look.icon, color: look.color, to: `plan/routine/${id}` }); }).join('');
+  // A routine worth doing now goes first, with why.
+  const pick = rec ? { id: rec.id, why: `Recommended ${rec.why}` } : pre.ids[0] ? { id: pre.ids[0], why: 'Recommended for you' } : null;
+  const play = (id, sub) => { const r = COURT_ROUTINES[id], [ic, color] = LOOK[id] || ['heart', 'pink']; return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${esc(sub)}`, icon: ic, color, to: `court/${id}` }); };
+  const more = (kind, title, sub, ic, color) => row({ title: esc(title), sub: esc(sub), value: String(of(kind).length + (kind === 'court' ? -1 : 0)), icon: ic, color, action: 'routines-sheet', data: { kind } });
+  return `${pageHead('Train', { sub: 'Your goal, your workouts and guided routines.' })}
+    <div class="court-stack" style="margin-bottom:12px">${goal}</div>
+    ${pos.block ? '' : `<p style="text-align:center;margin:0 0 20px"><button class="link" data-action="goal-new">Start a goal: a 4 to 8 week plan</button></p>`}
+    ${group(workouts + row({ title: 'New workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', to: 'plan/new' })
+      + row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'Workouts', footer: 'Tap a workout to see it, change it or start it.' })}
+    ${group((pick && !['warmup', 'mobility'].includes(pick.id) ? play(pick.id, pick.why) : '')
+      + play('warmup', 'Before you play') + play('mobility', 'Any day')
+      + more('court', 'More for padel days', 'Between matches and after playing', 'racket', 'teal')
+      + more('prehab', 'Injury prevention', 'Elbow, shoulder, knee, calf and back', 'heart', 'pink')
+      + more('stretch', 'Stretches', 'After your workout', 'wave', 'blue'), { header: 'Routines', footer: 'They run hands-free, step by step.' })}
+    ${group(row({ title: 'Exercise library', sub: 'Browse, filter by equipment, import your own', icon: 'dumbbell', color: 'gray', to: 'library' }))}`;
+}
+// One kind of routine in a sheet (injury prevention puts yours first).
+function routinesSheet(kind) {
+  const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear });
+  const list = Object.values(COURT_ROUTINES).filter(r => r.kind === kind && r.id !== 'warmup').sort((a, b) => pre.ids.includes(b.id) - pre.ids.includes(a.id));
+  const title = { court: 'Padel days', prehab: 'Injury prevention', stretch: 'Stretches' }[kind];
+  app.sheet(`<h2 class="sheet-title">${esc(title)}</h2><div style="height:12px"></div>
+    ${group(list.map(r => { const [ic, color] = LOOK[r.id] || ['heart', 'pink'];
+      return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${pre.ids.includes(r.id) ? '<span class="blue">Recommended for you</span>' : esc(r.tag)}`, icon: ic, color, to: `court/${r.id}` }); }).join(''),
+      { footer: kind === 'prehab' ? 'Two or three times a week. Mild discomfort that settles by the next day is normal; sharp pain is not.' : kind === 'stretch' ? 'Gentle holds, never into pain.' : '' })}`);
 }
 
 function playerView(r) {
   if (!P || P.id !== r.id) P = { id: r.id, steps: expandSteps(r), i: -1, startedAt: 0, done: false };
-  const nav = navBar({ back: 'Mobility', backAction: 'cp-exit', title: P.i >= 0 && !P.done ? r.title : '' });
+  const nav = navBar({ back: 'Train', backAction: 'cp-exit', title: P.i >= 0 && !P.done ? r.title : '' });
   if (P.i < 0) return `${nav}<h1 class="t-title" style="padding:8px 4px 4px">${esc(r.title)}</h1><p class="t-sub" style="padding:0 4px 20px">${routineMinutes(r)} min · ${esc(r.blurb)}</p>
     ${group(r.steps.map(st => row({ title: esc(st.name), sub: esc(st.cue), value: st.side ? `${st.sec}s × 2` : `${st.sec}s` })).join(''), { cls: 'steps', footer: 'A beep sounds 3 seconds before each change. The screen stays on.' })}
     <button class="btn filled" data-action="cp-start">${icon('play')}Start</button>`;
@@ -102,6 +123,7 @@ export const court = {
   render() { const r = COURT_ROUTINES[S.params[0]]; return r ? playerView(r) : listView(); },
   mounted() { if (P && P.i >= 0 && !P.done) { keepAwake(); loop(); } },
   actions: {
+    'routines-sheet'(el) { routinesSheet(el.dataset.kind); },
     'cp-start'() { P.startedAt = Date.now(); startStep(0); beep(true); app.render(); },
     'cp-pause'() { if (P.paused != null) { P.endAt = Date.now() + P.paused * 1000; P.paused = null; } else P.paused = remaining(); app.render({ keepScroll: true }); },
     'cp-next'() { if (P.i >= P.steps.length - 1) P.done = true; else startStep(P.i + 1); app.render({ keepScroll: true }); },

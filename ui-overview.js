@@ -5,7 +5,8 @@ import { padelSummary } from './domain-padel.js';
 import { isRoutine, getRoutine } from './domain-program.js';
 import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
 import { DAYS } from './domain-program.js';
-import { monthGrid, monthStats, liftProjections, levelEta, whatIf, trackingSince } from './domain-overview.js';
+import { monthGrid, monthStats, liftProjections, levelEta, whatIf, trackingSince, monthNumbers } from './domain-overview.js';
+import { legsPattern } from './domain-padel.js';
 import { xpEvents } from './domain-stats.js';
 import { weekStreak } from './domain-analytics.js';
 import { fmtW, fmtNum, toDisplay, fromDisplay } from './domain-units.js';
@@ -39,18 +40,6 @@ function calendar() {
 }
 
 // ── Court panel: where you stand, in three rings.
-function progressPanel() {
-  if (!S.sessions.length) return '';
-  const now = new Date(), month = S.sessions.filter(s => { const d = new Date(s.startedAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
-  const gym = app.strength.length, ready = gym >= SCORES_AFTER, { axes, level } = currentStats(), cons = axes.find(a => a.key === 'consistency')?.score || 0, pd = padelSummary(S.sessions);
-  const title = ready ? `Level ${level.level} · ${esc(level.name)}` : 'Getting started', sub = ready ? `${level.into} / ${level.need} points to level ${level.level + 1}` : `${Math.min(gym, SCORES_AFTER)} of ${SCORES_AFTER} workouts until your scores unlock`;
-  return `<div class="court-stack" style="margin-bottom:24px"><button class="card hero" data-action="go" data-to="${ready ? 'stats' : 'overview'}" style="display:block;width:100%;text-align:left">
-      <p class="t-foot">Your progress</p><h2>${title}</h2><p class="t-sub">${esc(sub)}</p>
-      <span class="mbar court-bar"><b style="width:${Math.round((ready ? level.progress : gym / SCORES_AFTER) * 100)}%"></b></span></button>
-    <div class="court-rings">${ringStat(Math.min(1, month / 12), '#64D2FF', String(month), '', 'This month')}
-      ${ringStat(cons / 100, 'var(--ball)', ready ? String(cons) : '—', '', 'Consistency')}
-      ${ringStat((pd.winRate ?? 0) / 100, '#FFFFFF', pd.winRate != null ? `${pd.winRate}%` : '—', '', 'Win rate')}</div></div>`;
-}
 
 // ── Goals: a tournament to peak for, and lift targets.
 function goals() {
@@ -119,7 +108,38 @@ function gettingStarted() {
 }
 
 // ── How you're going: direction
-function headed() {
+// ── This month in four numbers: the two-second answer to "how's it going?".
+function monthCard() {
+  if (!S.sessions.length) return '';
+  const m = monthNumbers(S.sessions, { streak: weekStreak(S.sessions) }), ex = m.lift && getExercise(m.lift.exId);
+  const name = new Date().toLocaleDateString(undefined, { month: 'long' });
+  const cell = (v, label) => `<div class="tile-stat"><b class="num">${v}</b><small>${esc(label)}</small></div>`;
+  return `<section class="grp"><h2 class="grp-h">${esc(name)} so far</h2><div class="tiles month-tiles">
+    ${cell(m.gym, m.gym === 1 ? 'gym session' : 'gym sessions')}${cell(m.padel, m.padel === 1 ? 'padel session' : 'padel sessions')}
+    ${cell(m.streak ? `${m.streak} wk${m.streak === 1 ? '' : 's'}` : '—', 'training in a row')}
+    ${cell(m.lift ? `+${fmtNum(toDisplay(m.lift.gain, S.settings.unit))} ${S.settings.unit}` : '—', m.lift ? `${ex?.name || 'best lift'} best` : 'new best lift')}</div></section>`;
+}
+// ── One highlight at a time (tap for the next): new records, the weekly review, what your legs say, or getting started.
+let HL = 0;
+function highlights() {
+  const out = [], week = Date.now() - 7 * 86400000;
+  const prs = S.sessions.filter(s => s.startedAt >= week && s.prs?.length).flatMap(s => s.prs);
+  if (prs.length) out.push({ title: prs.length === 1 ? `New record: ${prs[0].name}` : `${prs.length} new records this week`, sub: prs.slice(0, 3).map(p => p.name).join(', '), to: 'history' });
+  if ([0, 1].includes(new Date().getDay())) out.push({ title: 'Your week in review is ready', sub: 'What went well and next week’s focus', to: 'review' });
+  const lp = legsPattern(S.sessions, s => s.kind === 'strength');
+  if (lp.ready) out.push({ title: 'How your legs feel at padel', sub: `Heavy in ${lp.afterLegs.heavyPct}% of sessions after a leg day, ${lp.otherwise.heavyPct}% otherwise`, to: 'history' });
+  else if (lp.rated) out.push({ title: `Legs at padel: ${lp.rated} of ${lp.needed} rated`, sub: 'Keep tapping it when you log padel', to: 'history' });
+  if (app.strength.length < SCORES_AFTER) out.push({ title: 'Getting started', sub: `${app.strength.length} of ${SCORES_AFTER} workouts until your scores and forecasts appear`, to: 'stats' });
+  return out;
+}
+function highlightCard() {
+  const h = highlights();
+  if (!h.length) return '';
+  const x = h[HL % h.length];
+  return `<section class="grp"><div class="card highlight"><button class="hl-main" data-action="go" data-to="${x.to}">${tile('trophy', 'indigo')}<span><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></span></button>
+    ${h.length > 1 ? `<button class="link hl-next" data-action="hl-next">${HL % h.length + 1} of ${h.length} ›</button>` : ''}</div></section>`;
+}
+export function headed() {
   if (app.strength.length < SCORES_AFTER) return gettingStarted();
   const { axes, before, level } = currentStats();
   const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) });
@@ -141,18 +161,18 @@ export const overview = {
   tab: 'overview',
   render() {
     const initial = (S.settings.name || '').trim()[0];
-    const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
+    const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="You: setup, data and settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
     const empty = !S.sessions.length ? `<div class="banner"><span class="tile blue">${icon('chart')}</span><span><b>Your progress fills in as you train</b><small>Finish a workout or log a match to see your calendar, scores and history here.</small></span></div>` : '';
     return `${pageHead('Progress', { right: avatar })}${empty}
-      <div style="height:${empty ? 24 : 8}px"></div>${progressPanel()}${calendar()}${goals()}${headed()}
+      <div style="height:${empty ? 24 : 8}px"></div>${monthCard()}${highlightCard()}${calendar()}${goals()}
       ${S.sessions.length ? `<section class="grp"><h2 class="grp-h">Details</h2><div class="tile-grid">${[
-        ['History', 'Every session and weekly load', 'note', 'gray', 'history'], ['Recovery', 'How ready each muscle is', 'heart', 'orange', 'recovery'],
-        ['Exercises', 'Progress per exercise', 'dumbbell', 'blue', 'history/progress'], ['Muscles', 'Sets per muscle this week', 'target', 'blue', 'history/muscles'],
-        ['Padel insights', 'Sides, partners, sore spots', 'racket', 'teal', 'history/padel'], ['Weekly review', 'Your week and next week’s focus', 'chart', 'blue', 'review'],
-        ['Body', bodySummary(), 'person', 'gray', 'body/o'], ['Your profile', 'Scores, level, milestones', 'trophy', 'green', 'stats'],
+        ['History', 'Every session and weekly load', 'note', 'gray', 'history'], ['Exercises', 'Progress per exercise', 'dumbbell', 'blue', 'history/progress'],
+        ['Muscles & recovery', 'Ready now, and sets this week', 'heart', 'orange', 'recovery'], ['Padel insights', 'Sides, partners, sore spots', 'racket', 'teal', 'history/padel'],
+        ['Weekly review', 'Your week and next week’s focus', 'chart', 'blue', 'review'], ['Your profile', 'Level, scores, where you’re headed', 'trophy', 'green', 'stats'],
       ].map(([t, sub, ic, c, to]) => `<button data-action="go" data-to="${to}">${tile(ic, c)}<b>${esc(t)}</b><small>${esc(sub)}</small></button>`).join('')}</div></section>` : ''}`;
   },
   actions: {
+    'hl-next'() { HL++; app.render({ keepScroll: true }); },
     'cal-prev'() { monthOffset--; app.render({ keepScroll: true }); },
     'cal-next'() { monthOffset = Math.min(0, monthOffset + 1); app.render({ keepScroll: true }); },
     'cal-day'(el) {

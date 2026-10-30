@@ -19,7 +19,7 @@ export async function setLocation(id) {
 }
 
 function listView() {
-  return `${navBar({ back: 'Settings', backTo: 'settings', title: 'Locations' })}<div style="height:12px"></div>
+  return `${navBar({ back: 'You', backTo: 'settings', title: 'Locations' })}<div style="height:12px"></div>
     ${group(S.locations.map(l => row({ title: esc(l.name), sub: `${l.equipment.length} items${l.id === S.activeLocation ? ' · training here' : ''}`, icon: 'target', color: l.id === S.activeLocation ? 'blue' : 'gray', to: `locations/${l.id}` })).join('')
       + row({ title: 'Add Location', icon: 'plus', color: 'green', action: 'add-location', chevron: false, cls: 'action' }),
       { footer: 'Workouts adapt to the equipment at the place you’re training. Exercises that need other equipment are still shown, just further down.' })}`;

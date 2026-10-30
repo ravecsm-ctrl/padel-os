@@ -22,7 +22,7 @@ import { saveBackup } from './ui-backup.js';
 import * as cloud from './core-cloud.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
-import { blockBanner } from './ui-goal.js';
+import { blockBanner, goalActions } from './ui-goal.js';
 import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js';
 import { matchTips } from './domain-matchday.js';
 import { recentPain, painWithProfile, painHits, areaName, loadsAreas } from './domain-pain.js';
@@ -288,7 +288,7 @@ function callCard(plan) {
     <div class="hero-top">${tileIc}<div><h2>${esc(title)}</h2><p class="t-sub">${esc(sub)}</p></div></div>
     ${S.active ? '' : feelCard()}
     ${levelLine(isoIn(1))}
-    <p class="hero-note call-why">${esc(c.why)}</p>
+    <p class="hero-note call-why">${esc(c.why)} <button class="link" data-action="go" data-to="recovery">Body map</button></p>
     ${c.bullets.length ? `<ul class="call-list">${c.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}${pain}
     ${swapped ? `<p class="hero-note swap-note">Swapped: ${esc(app.routine(sw.from).title)} moves to ${esc(weekday(sw.back))}. <button class="link" data-action="swap-undo">Undo</button></p>` : ''}
     ${S.active ? '' : main}</section>`;
@@ -438,7 +438,7 @@ export const today = {
   render() {
     const date = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
     const initial = (S.settings.name || '').trim()[0];
-    const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
+    const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="You: setup, data and settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc && S.locations.length > 1 ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
       <div class="court-stack">${hero()}</div>${headsUpSlot()}
@@ -454,6 +454,8 @@ export const today = {
   },
   actions: {
     ...weekActions,
+    ...goalActions,
+    'nav-back'() { history.length > 1 ? history.back() : app.go('today'); },
     'heads-more'() { app.sheet(`<h2 class="sheet-title">Heads-up</h2><p class="sheet-sub">Most important first.</p><div class="heads-list">${headsList()}</div><button class="btn gray" data-action="close-sheet">Close</button>`); },
     async 'pain-ok'(el) { S.painClear = { ...S.painClear, [el.dataset.a]: Date.now() }; await app.save('painClear'); app.render({ keepScroll: true }); app.toast('Good to hear. Flags for it are cleared until it hurts again.'); },
     async 'cloud-nudge-later'() { S.settings.cloudNudge = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); },
