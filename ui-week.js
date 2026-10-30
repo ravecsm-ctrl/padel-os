@@ -52,11 +52,13 @@ export function weekTargets(days) {
   const usual = DAYS.map(d => S.schedule[d]).filter(isRoutine);
   if (busy) {
     const flex = usual.find(id => !legWork(id)), list = [ANCHOR_ID, ...(flex ? [flex] : [])];
+    // Durability can stand in for an upper-body flex session that would land next to overheads.
+    const alt = flex && flex !== 'D' && isUpperHeavy(flex) && isRoutine('D') ? { from: flex, to: 'D', cost: 0.5 } : null;
     for (const d of inWeek) if (d.fixed && d.v !== 'Padel' && (isRoutine(d.v) || d.v === 'Quick')) {
       const i = list.indexOf(d.v) >= 0 ? list.indexOf(d.v) : list.findIndex(x => legWork(x) === legWork(d.v));
       if (i >= 0) list.splice(i, 1);
     }
-    return { busy, list };
+    return { busy, list, alt: list.includes(alt?.from) ? alt : null };
   }
   let list = workoutsLeft(days, isRoutine);
   if (list.includes(ANCHOR_ID) && !usual.includes(ANCHOR_ID)) {
@@ -96,8 +98,10 @@ function strip(days, { mark = null } = {}) {
     return `<button class="${kind} ${d.iso === today ? 'today' : ''} ${d.iso === mark ? 'mark' : ''} ${d.iso < today ? 'past' : ''}" data-action="wk-day" data-iso="${d.iso}" aria-label="${esc(dayName(d.iso))}: ${esc(titleOf(d.v))}"><small>${shortDay(d.iso).slice(0, 1)}</small><span>${esc(label)}</span></button>`;
   }).join('')}</div>`;
 }
-const moveLines = r => [...r.moved.map(m => `${titleOf(m.id)} ${m.from ? `moves from ${dayName(m.from)} to ${dayName(m.to)}` : `goes on ${dayName(m.to)}`}`),
-  ...r.dropped.map(id => `${titleOf(id)} doesn’t fit this week`)];
+const swapLine = r => { const at = r.days.find((d, i) => i > 0 && i < r.days.length - 1 && d.v === r.swapped.to)?.iso;
+  return `Durability${at ? ` on ${dayName(at)}` : ''} instead of ${titleOf(r.swapped.from)} this week, so your shoulders are fresh for overheads`; };
+const moveLines = r => [...(r.swapped ? [swapLine(r)] : []), ...r.moved.filter(m => !r.swapped || m.id !== r.swapped.to).map(m => `${titleOf(m.id)} ${m.from ? `moves from ${dayName(m.from)} to ${dayName(m.to)}` : `goes on ${dayName(m.to)}`}`),
+  ...r.dropped.map(id => id === r.restKept ? `${titleOf(id)} is skipped this week so you keep one full rest day` : `${titleOf(id)} doesn’t fit this week`)];
 
 // ── Plan tab: this week
 export const weekStrip = () => strip(weekWindow());
@@ -161,7 +165,7 @@ async function savePadel(p, edit) {
   const list = was.busy !== t.busy ? t.list : workoutsLeft(before, isRoutine).map(id => !t.busy || id === ANCHOR_ID || !legWork(id) ? id : null).filter(Boolean);
   setPadelDetails(p.iso, p);
   S.settings.dated = { ...(S.settings.dated || {}), [p.iso]: 'Padel' };
-  const r = withPadel(before, p.iso, padel, list, { ...OPTS, busy: t.busy });
+  const r = withPadel(before, p.iso, padel, list, { ...OPTS, busy: t.busy, alt: t.busy ? t.alt : null });
   const note = busyNote(was, t);
   if (!r || (!r.moved.length && !r.dropped.length && !note)) {
     await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true });
@@ -188,7 +192,7 @@ async function removePadel(iso) {
   S.settings.dated = { ...(S.settings.dated || {}), [iso]: 'Rest' };
   const days = before.map(d => d.iso === iso ? { ...d, v: 'Rest', padel: null, fixed: false } : d);
   const was = weekTargets(before), t = weekTargets(days), note = busyNote(was, t);
-  const r = planWeek(days, t.list, { ...OPTS, busy: t.busy });
+  const r = planWeek(days, t.list, { ...OPTS, busy: t.busy, alt: t.alt });
   await app.save('settings');
   if (!r.moved.length && !note) { app.closeSheet(); app.render({ keepScroll: true }); return app.toast(`Padel on ${dayName(iso)} removed`); }
   proposal(r, iso, `no padel on ${dayName(iso)}`, null, note);

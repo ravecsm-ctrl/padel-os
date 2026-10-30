@@ -39,7 +39,7 @@ export const chev = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><pa
 // green = done and progress, grey = everything else (red only for warnings and deleting).
 // Older colour names fold into those four so every screen follows the same rule.
 const TONE = { indigo: 'blue', purple: 'blue', pink: 'orange', yellow: 'orange' };
-export const routineLook = id => ({ A: { icon: 'legs', color: 'blue' }, B: { icon: 'dumbbell', color: 'blue' }, C: { icon: 'bolt', color: 'blue' }, S: { icon: 'legs', color: 'blue' } }[id] || { icon: 'dumbbell', color: 'blue' });
+export const routineLook = id => ({ A: { icon: 'legs', color: 'blue' }, B: { icon: 'dumbbell', color: 'blue' }, C: { icon: 'bolt', color: 'blue' }, S: { icon: 'legs', color: 'blue' }, D: { icon: 'shield', color: 'blue' } }[id] || { icon: 'dumbbell', color: 'blue' });
 export const tile = (name, color = 'blue', lg = false) => `<span class="tile ${TONE[color] || color} ${lg ? 'lg' : ''}">${icon(name)}</span>`;
 
 // Large title header (top-level tabs).

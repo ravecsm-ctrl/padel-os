@@ -44,6 +44,13 @@ const LIST = [
     why: 'Improves shoulder capacity for repeated shots.', setup: 'Elbow pinned to side at 90°, very light load.', execute: 'Rotate forearm outward without moving elbow.', avoid: 'Too much load; wrist bending; torso turning.' }),
   x('face-pull', 'Face pull', ['w', 'reps'], { equipment: 'Cable rope', pattern: 'pull', muscles: 'Rear delts · mid-back · external rotators', subs: ['band-face-pull', 'band-pull-apart'],
     why: 'Balances pressing and supports shoulder position.', setup: 'Rope at eye height; stand tall.', execute: 'Pull toward face and separate rope ends.', avoid: 'Lumbar lean; shrugging; elbows dropping.' }),
+  // ── Durability: tendon and joint work that's light on the legs (holds and slow lowering).
+  x('wall-sit', 'Wall sit', ['sec'], { equipment: 'Wall', pattern: 'squat', muscles: 'Quads · patellar tendon', subs: ['p-spanish-squat'],
+    why: 'A long hold strengthens the knee’s tendon without tiring your legs for padel.', setup: 'Back flat on a wall, feet a stride out, slide down until knees are at 60–90°.', execute: 'Hold still and breathe; push the floor away. Stop at strong effort, not pain.', avoid: 'Knee pain above mild (3/10); knees caving in; holding your breath.' }),
+  x('calf-iso-hold', 'Single-leg calf raise hold', ['sec'], { perSide: true, equipment: 'Step or floor', pattern: 'calf', muscles: 'Calf · Achilles tendon', subs: ['sl-calf-raise', 'seated-soleus-raise'],
+    why: 'Holds load the Achilles and calf, which take the most stress from padel’s quick push-offs.', setup: 'Stand on one foot, light hand on a wall for balance.', execute: 'Rise most of the way up and hold, knee straight, ankle steady.', avoid: 'Rolling onto the outside of the foot; bouncing; sharp Achilles pain.' }),
+  x('wrist-ext-eccentric', 'Slow-lowering wrist extension', ['w', 'reps'], { perSide: true, inc: 1, equipment: 'Light dumbbell', pattern: 'forearm', muscles: 'Wrist extensors · elbow tendon', subs: ['wrist-rotation'],
+    why: 'Strengthens the tendon behind tennis elbow, the most common padel overuse injury.', setup: 'Forearm on your thigh or a bench, palm down, wrist just over the edge.', execute: 'Lift the weight with help from the other hand, then lower slowly with one hand over 3–4 seconds.', avoid: 'Lifting with the working hand; heavy weights; pain above mild.' }),
   x('wrist-rotation', 'Wrist pronation / supination', ['w', 'reps'], { perSide: true, inc: 1, equipment: 'Light dumbbell', pattern: 'forearm', muscles: 'Forearm rotators',
     why: 'Racket control and forearm endurance.', setup: 'Support forearm; hold one end of a light dumbbell.', execute: 'Rotate palm down then up through controlled range.', avoid: 'Heavy load; moving elbow; fast drops.' }),
   x('farmer-carry', 'Farmer carry', ['w', 'm'], { inc: 2, loadNote: 'per hand', equipment: 'Heavy dumbbells', pattern: 'carry', muscles: 'Grip · trunk · scapular stabilizers', subs: ['suitcase-carry'],
@@ -138,10 +145,10 @@ const KIT = {
   'seated-soleus-raise': 'gym', 'romanian-deadlift': 'gym', 'leg-press': 'gym', 'cable-adduction': 'gym', 'seated-cable-row': 'gym',
   'cable-woodchop': 'gym', 'leg-curl': 'gym', 'inverted-row': 'gym',
   'chest-supported-row': 'db', 'incline-db-press': 'db', 'farmer-carry': 'db', 'goblet-squat': 'db', 'hk-db-press': 'db',
-  'sa-db-row': 'db', 'suitcase-carry': 'db',
+  'sa-db-row': 'db', 'suitcase-carry': 'db', 'wrist-ext-eccentric': 'db',
 };
 // Exercises that still work with no added load (the load column is hidden at home).
-const LOAD_OPTIONAL = new Set(['rfess', 'lateral-lunge', 'sl-rdl', 'pallof-press', 'standing-calf-raise', 'cable-er', 'wrist-rotation',
+const LOAD_OPTIONAL = new Set(['wrist-ext-eccentric', 'rfess', 'lateral-lunge', 'sl-rdl', 'pallof-press', 'standing-calf-raise', 'cable-er', 'wrist-rotation',
   'step-up-knee-drive', 'reverse-lunge', 'cossack-squat', 'kickstand-rdl', 'sl-calf-raise', 'side-lying-er']);
 // Default ranges, used when a substitute logs a different unit than the slot it fills.
 const RANGE = { 'plank-shoulder-tap': [16, 24], 'glute-bridge': [10, 15], 'bw-squat': [10, 15], 'pike-push-up': [6, 10], 'band-row': [12, 15],
@@ -176,6 +183,9 @@ const M = {
   'cable-er': [['band|cable'], 'rotator_cuff', 'rear_delts', 'pull', 'prevention', 'beginner', 'total'],
   'face-pull': [['cable'], 'rear_delts mid_back', 'rotator_cuff', 'pull', 'prevention', 'beginner', 'total'],
   'wrist-rotation': [[], 'forearms', '', 'rotation', 'prevention', 'beginner', 'per_hand'],
+  'wall-sit': [[], 'quads', 'glutes adductors', 'squat', 'prevention', 'beginner', 'bodyweight'],
+  'calf-iso-hold': [[], 'calves soleus', 'shins', 'calf-ankle', 'prevention', 'beginner', 'bodyweight'],
+  'wrist-ext-eccentric': [['dumbbells'], 'forearms', '', 'rotation', 'prevention', 'beginner', 'per_hand'],
   'farmer-carry': [['dumbbells|kettlebell'], 'forearms traps', 'abs obliques', 'carry', 'core', 'beginner', 'per_hand'],
   cmj: [[], 'quads glutes calves', 'hamstrings soleus', 'power', 'power', 'intermediate', 'bodyweight'],
   'lateral-bound': [[], 'glutes glute_med quads', 'adductors calves soleus', 'power', 'power', 'intermediate', 'bodyweight'],

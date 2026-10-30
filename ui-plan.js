@@ -126,8 +126,8 @@ function routineView(id) {
         <button class="nw-btn down" data-action="ord-move" data-r="${esc(id)}" data-i="${i}" data-to="${i + 1}" ${i === r.blocks.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(ex.name)} down">${icon('down')}</button></div>`; }).join(''),
       { header: 'Exercise order', footer: 'Saved as you go. Tap Done when you’re finished.' }) + `<button class="btn filled" data-action="ord-done" style="margin-bottom:20px">Done</button>` : ''}
     ${ORDER === id ? '' : group(r.blocks.map(blk => { const ex = getExercise(blk.ex), rx = prescribe(blk, wk);
-      if (blk.extra) return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel({ ...blk, min: rx.min, max: rx.max }))} · added by you`, action: 'extra-sheet', data: { r: id, k: String(blk.index).slice(1) } });
-      return row({ title: esc(ex.name), sub: `${rx.sets} sets × ${esc(rangeLabel({ ...blk, min: rx.min, max: rx.max }))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
+      if (blk.extra) return row({ title: esc(ex.name), sub: `${rx.sets} set${rx.sets === 1 ? "" : "s"} × ${esc(rangeLabel({ ...blk, min: rx.min, max: rx.max }))} · added by you`, action: 'extra-sheet', data: { r: id, k: String(blk.index).slice(1) } });
+      return row({ title: esc(ex.name), sub: `${rx.sets} set${rx.sets === 1 ? "" : "s"} × ${esc(rangeLabel({ ...blk, min: rx.min, max: rx.max }))}${blk.adaptedFrom ? ' · adapted to your setup' : ''}${S.overrides[id]?.[blk.index] ? ' · edited' : ''}`, action: 'edit-block', data: { r: id, i: blk.index } }); }).join(''),
       { header: 'Exercises', footer: `${r.dropped.length ? `Left out to fit ${S.profile.minutes} minutes: ${r.dropped.map(b => esc(getExercise(b.ex).name)).join(', ')}. ` : ''}Tap an exercise to change it.${r.blocks.length > 1 ? ` <button class="link" data-action="ord-start" data-r="${esc(id)}">Change order</button>` : ''}` })}
     <div class="btns">${S.active ? '<button class="btn tinted" data-action="resume">Continue Current Workout</button>' : `<button class="btn filled" data-action="start" data-routine="${id}">${icon('play')}Start Workout</button>`}
     ${edited ? `<button class="btn plain" data-action="reset-routine" data-r="${id}">Restore Original Exercises</button>` : ''}
@@ -178,7 +178,7 @@ export const plan = {
     'day-sheet'(el) {
       const d = el.dataset.day;
       app.sheet(`<h2 class="sheet-title">${DAY_NAME[d]}</h2><div style="height:12px"></div>
-        ${group([...DAY_OPTIONS.slice(0, 3), 'S', ...allRoutineIds().filter(isCustomRoutine), ...DAY_OPTIONS.slice(3)].map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
+        ${group([...DAY_OPTIONS.slice(0, 3), 'S', 'D', ...allRoutineIds().filter(isCustomRoutine), ...DAY_OPTIONS.slice(3)].map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
           { footer: S.schedule[d] === 'Padel' ? '' : 'Tip: avoid your hardest leg workout the day before an important match.' })}
         ${S.schedule[d] === 'Padel' ? group(Object.entries(MATCH_LEVELS).map(([k, label]) => row({ title: label, sub: LEVEL_HINT[k], action: 'set-level', data: { day: d, level: k }, chevron: false, right: usual(d) === k ? icon('check', 'check-mark') : '' })).join(''),
           { header: `How hard is padel on ${DAY_NAME[d]}s?`, footer: 'Hard days keep your legs fresh the day before and give them time after. Change it for one date from the calendar or Today.' }) : ''}`);

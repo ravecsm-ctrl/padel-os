@@ -45,7 +45,19 @@ function* orders(arr) {
 
 // Place `workouts` (routine ids still to do this week) on the free days. Keeps workouts where they
 // already are unless moving them is clearly better. Returns { days, moved, dropped, score }.
+// opts.alt = { from, to, cost }: also try the week with `to` in place of `from` (busy weeks: Durability for
+// Upper Body) and keep it only if it's better by more than `cost`. The result then has swapped: { from, to }.
 export function planWeek(days, workouts, opts) {
+  const alt = opts.alt;
+  if (alt && workouts.includes(alt.from)) {
+    const keep = planWeek(days, workouts, { ...opts, alt: null });
+    const swap = planWeek(days, workouts.map(id => id === alt.from ? alt.to : id), { ...opts, alt: null });
+    // A stand-in that ends up skipped for the rest day isn't worth mentioning: keep the original.
+    return swap.restKept !== alt.to && swap.score + (alt.cost ?? 0.5) < keep.score ? { ...swap, swapped: { from: alt.from, to: alt.to } } : keep;
+  }
+  return placeWeek(days, workouts, opts);
+}
+function placeWeek(days, workouts, opts) {
   const free = days.map((d, i) => i).filter(i => i > 0 && i < days.length - 1 && !days[i].fixed && !isPadel(days[i]) && !days[i].noGym);
   // Where each workout is now (opts.was adds one that sat on a day that just became padel).
   const was = new Map([...days.map((d, i) => [d.v, i]).filter(([v], i) => workouts.includes(v) && !days[i].fixed), ...Object.entries(opts.was || {})]);
@@ -70,14 +82,18 @@ export function planWeek(days, workouts, opts) {
     const at = rest.includes(orig) ? orig : rest.find(i => isPadel(best.trial[i - 1])) ?? rest[0];
     if (at != null) best.trial[at].v = 'Recovery';
   }
-  // A busy week always keeps one day with nothing at all.
+  // A busy week always keeps one day with nothing at all: a recovery day becomes rest, and if every day is
+  // taken, the session that's light on the legs is skipped this week (Strength stays).
+  let restKept = null;
   if (opts.busy && !best.trial.slice(1, -1).some(d => d.v === 'Rest')) {
     const spare = free.filter(i => best.trial[i].v === 'Recovery').concat(days.map((d, i) => i).filter(i => i > 0 && i < days.length - 1 && !days[i].fixed && days[i].noGym && best.trial[i].v === 'Recovery'));
+    const flex = free.find(i => workouts.includes(best.trial[i].v) && best.trial[i].v !== opts.anchor);
     if (spare.length) best.trial[spare[0]].v = 'Rest';
+    else if (flex != null) { restKept = best.trial[flex].v; best.dropped = [...best.dropped, restKept]; best.trial[flex].v = 'Rest'; }
   }
   const moved = workouts.filter(id => !best.dropped.includes(id)).map(id => ({ id, from: was.has(id) ? days[was.get(id)].iso : null, to: best.trial.find((d, i) => free.includes(i) && d.v === id)?.iso }))
     .filter(m => m.from !== m.to);
-  return { days: best.trial, moved, dropped: best.dropped, score: best.score };
+  return { days: best.trial, moved, dropped: best.dropped, score: best.score, restKept };
 }
 
 // Routines still to do: planned on days you can still change (today if nothing's logged yet, and later).
@@ -101,7 +117,7 @@ export function suggestPadelDays(days, padel, targets, opts, max = 3) {
   days.forEach((d, i) => {
     if (i === 0 || i === days.length - 1 || d.fixed || isPadel(d)) return;
     const t = typeof targets === 'function' ? targets(days.map(x => x.iso === d.iso ? { ...x, v: 'Padel', padel, fixed: true } : x)) : { list: targets, busy: !!opts.busy };
-    const r = withPadel(days, d.iso, padel, t.list, { ...opts, busy: t.busy });
+    const r = withPadel(days, d.iso, padel, t.list, { ...opts, busy: t.busy, alt: t.alt });
     out.push({ iso: d.iso, score: r.score + r.dropped.length * 10, moved: r.moved, dropped: r.dropped, days: r.days, busy: t.busy });
   });
   out.sort((a, b) => a.score - b.score || a.iso.localeCompare(b.iso));

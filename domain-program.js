@@ -28,6 +28,11 @@ export const ROUTINES = {
   C: { id: 'C', title: 'Power & Agility', minutes: 65, focus: 'A faster first step and more explosive movement.', blocks: [
     b('cmj', 4, 3, 3, 90, 1), b('lateral-bound', 3, 5, 5, 75, 2), b('mb-scoop-toss', 4, 5, 5, 75, 3), b('goblet-squat', 3, 10, 12, 90, 6),
     b('step-up-knee-drive', 3, 8, 10, 75, 4), b('slider-curl', 3, 8, 12, 60, 5), b('seated-soleus-raise', 3, 15, 20, 45, 7), b('band-ankle', 2, 15, 15, 30, 8) ] },
+  // Light on the legs (holds and slow lowering), so it's safe next to padel and counts as neither leg nor
+  // upper-body work for the weekly plan. Busy weeks use it when Upper Body would land before overheads.
+  D: { id: 'D', title: 'Durability', minutes: 35, lowFatigue: true, focus: 'Groin, knees, calves, shoulder and elbow: the tendons padel works hardest. Light on your legs, safe next to a match.', blocks: [
+    b('copenhagen-short', 2, 20, 30, 45, 1), b('wall-sit', 2, 30, 45, 45, 2), b('calf-iso-hold', 2, 30, 45, 45, 3),
+    b('cable-er', 2, 12, 15, 45, 4), b('wrist-ext-eccentric', 2, 12, 15, 45, 5), b('pallof-press', 2, 10, 12, 45, 6) ] },
 };
 
 // Workouts you create (e.g. from an import) sit next to the built-in A/B/C.
@@ -42,10 +47,10 @@ export const isRoutine = id => !!getRoutine(id);
 // the day after padel (and, more strongly, the day before).
 const LEG_MUSCLES = new Set(['quads', 'hamstrings', 'glutes', 'glute_med', 'adductors', 'calves', 'soleus']);
 export const legHeavyBlocks = (blocks = []) => blocks.length > 0 && blocks.filter(b => (getExercise(b.ex)?.primary || []).some(m => LEG_MUSCLES.has(m))).length / blocks.length >= 0.4;
-export const isLegHeavy = id => legHeavyBlocks(getRoutine(id)?.blocks);
+export const isLegHeavy = id => !getRoutine(id)?.lowFatigue && legHeavyBlocks(getRoutine(id)?.blocks);
 // Mostly upper body (shoulders, chest, back, arms): kept away from a session of overheads (see weekplan).
 const UPPER_MUSCLES = new Set(['chest', 'upper_chest', 'lower_chest', 'front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serratus', 'traps', 'mid_back', 'lats', 'biceps', 'triceps', 'forearms']);
-export const isUpperHeavy = id => { const b = getRoutine(id)?.blocks || []; return b.length > 0 && b.filter(x => (getExercise(x.ex)?.primary || []).some(m => UPPER_MUSCLES.has(m))).length / b.length >= 0.5; };
+export const isUpperHeavy = id => { const b = getRoutine(id)?.blocks || []; return !getRoutine(id)?.lowFatigue && b.length > 0 && b.filter(x => (getExercise(x.ex)?.primary || []).some(m => UPPER_MUSCLES.has(m))).length / b.length >= 0.5; };
 export const allRoutineIds = () => [...Object.keys(ROUTINES), ...Object.keys(CUSTOM_ROUTINES)];
 export const isCustomRoutine = id => !!CUSTOM_ROUTINES[id];
 
