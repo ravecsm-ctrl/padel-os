@@ -69,8 +69,8 @@ function legsRow() {
 function padelGroup() {
   const p = padelSummary(S.sessions);
   if (!p.sessions) return '';
-  const side = Object.entries(p.sides).sort((a, b) => b[1] - a[1])[0];
-  const sore = Object.entries(p.sore).sort((a, b) => b[1] - a[1]);
+  const side = Object.entries(p.sides).filter(([k]) => SIDES[k]).sort((a, b) => b[1] - a[1])[0];
+  const sore = Object.entries(p.sore).filter(([k]) => AREAS[k]).sort((a, b) => b[1] - a[1]);
   const rows = row({ title: 'Matches', value: String(p.matches) })
     + (p.practice ? row({ title: 'Lessons, training and ball machine', value: `${p.practice} · ${Math.round(p.practiceMin / 60 * 10) / 10} h` }) : '')
     + (p.winRate != null ? row({ title: 'Win rate', value: `${p.winRate}% <span class="t-foot">(${p.won}–${p.lost})</span>` }) : '')
@@ -127,7 +127,7 @@ function musclesView() {
     return row({ title: esc(mname(m.id)), value: `<span class="mstat ${st.key}">${m.sets ? `${fmtSets(m.sets)} · ` : ''}${st.label}</span>`, action: 'muscle-sheet', data: { m: m.id },
       sub: `<span class="mbar"><span class="zone" style="left:${lo / scale * 100}%;width:${(hi - lo) / scale * 100}%"></span><b style="width:${Math.min(100, m.sets / scale * 100)}%"></b></span>` });
   }).join('');
-  return `${navBar({ back: 'Back', backAction: 'nav-back', title: 'Muscles' })}
+  return `${navBar({ back: 'Back', backAction: 'nav-back', title: '' })}
     <h1 class="t-title" style="padding:8px 4px 2px">Muscles</h1><p class="t-sub" style="padding:0 4px 16px">Sets per muscle over the last 7 days. <button class="link" data-action="go" data-to="recovery">See recovery</button></p>
     <div class="card">${bodyMap(map)}<div class="bm-legend">Fewer sets <i></i> More sets</div></div>
     <div style="height:24px"></div>

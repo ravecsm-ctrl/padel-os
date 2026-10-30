@@ -71,7 +71,7 @@ const phaseRows = (plan, week = 0) => phaseSpans(plan).map(s => row({ title: `${
 
 function pickView() {
   const b = S.settings.block, pos = app.blockPos();
-  return `${navBar({ back: 'Plan', backTo: 'plan', title: 'Start a Goal' })}<div style="height:12px"></div>
+  return `${navBar({ back: 'Train', backTo: 'court', title: 'Start a Goal' })}<div style="height:12px"></div>
     ${group(Object.entries(GOALS).map(([id, g]) => row({ title: esc(g.label), sub: esc(g.sub), icon: id === 'tournament' ? 'trophy' : id === 'faster' ? 'bolt' : id === 'legs' ? 'legs' : id === 'shoulders' ? 'dumbbell' : id === 'injury' ? 'heart' : 'racket',
       color: id === 'injury' ? 'pink' : id === 'tournament' ? 'teal' : 'blue', action: 'goal-pick', data: { goal: id } })).join(''),
       { header: 'What are you training for?', footer: `A 4 to 8 week plan in phases. Your workouts stay the same all block, so your weights keep climbing; reps, sets and rest change with each phase.${b && pos?.state !== 'done' ? ` Starting a new goal ends ${esc(blockTitle(b))}.` : ''}` })}`;

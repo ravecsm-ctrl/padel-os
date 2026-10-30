@@ -108,9 +108,9 @@ function newView() {
 
 function routineView(id) {
   const r = app.routine(id), wk = app.position().week, look = routineLook(id);
-  if (!r) return navBar({ back: 'Plan', backTo: 'plan' });
+  if (!r) return navBar({ back: 'Train', backTo: 'court' });
   const edited = Object.keys(S.overrides[id] || {}).length;
-  return `${navBar({ back: 'Plan', backTo: 'plan', title: '' })}
+  return `${navBar({ back: 'Train', backTo: 'court', title: '' })}
     <div class="hero-top" style="padding:8px 4px 16px">${icon(look.icon) && `<span class="tile ${look.color} lg">${icon(look.icon)}</span>`}<div><h1 class="t-title">${esc(r.title)}</h1><p class="t-sub">${r.blocks.length} exercise${r.blocks.length === 1 ? "" : "s"} · about ${r.minutes} min</p></div></div>
     <p class="t-sub" style="padding:0 4px 20px">${esc(r.focus)}</p>
     ${ORDER === id ? group(r.blocks.map((blk, i) => { const ex = getExercise(blk.ex);
@@ -150,7 +150,7 @@ export const plan = {
     'nw-del'(el) { NEW.blocks.splice(+el.dataset.i, 1); app.render({ keepScroll: true }); },
     async 'nw-cancel'() {
       if (NEW?.blocks.length && !(await app.confirm('Discard this workout?', { ok: 'Discard', danger: true }))) return;
-      NEW = null; app.go('plan');
+      NEW = null; app.go('court');
     },
     async 'nw-save'() {
       if (!NEW.title.trim()) { document.querySelector('#nwName')?.focus(); return app.toast('Give it a name'); }
@@ -196,7 +196,7 @@ export const plan = {
       if (!(await app.confirm(`Delete “${esc(getRoutine(el.dataset.r).title)}”? Logged sessions stay in Progress.`, { ok: 'Delete', danger: true }))) return;
       delete S.customRoutines[el.dataset.r]; setCustomRoutines(S.customRoutines);
       for (const d of Object.keys(S.schedule)) if (S.schedule[d] === el.dataset.r) S.schedule[d] = 'Rest';
-      await app.save('customRoutines'); await app.save('schedule'); app.go('plan');
+      await app.save('customRoutines'); await app.save('schedule'); app.go('court');
     },
     'extra-sheet'(el) {
       const x = S.overrides[el.dataset.r]?._extra?.[+el.dataset.k];

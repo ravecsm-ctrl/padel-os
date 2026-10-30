@@ -341,7 +341,7 @@ function hero() {
   }
   if (tp?.noGym) {
     const day = tp.phase === 'day', sum = day ? tournamentSummary(S.sessions, S.settings.tournament) : null, played = sum?.matches || 0;
-    const sore = sum ? Object.keys(sum.sore).map(a => AREAS[a].split(' ')[0].toLowerCase()) : [];
+    const sore = sum ? Object.keys(sum.sore).filter(a => AREAS[a]).map(a => AREAS[a].split(' ')[0].toLowerCase()) : [];
     const so = played ? `<div class="tiles three" style="margin:4px 0 16px">${['Matches', 'Won–lost', 'Minutes'].map((l, i) => `<div class="tile-stat"><b class="num">${[played, `${sum.won}–${sum.lost}`, sum.minutes][i]}</b><small>${l}</small></div>`).join('')}</div>${sore.length ? `<p class="hero-note orange">Sore so far: ${esc(sore.join(', '))}. Ease off where you can.</p>` : ''}` : '';
     return `<section class="card hero"><div class="hero-top">${tile('trophy', 'teal', true)}<div><p class="t-foot">${day ? 'Today' : tp.days === 1 ? 'Tomorrow' : 'In 2 days'}</p><h2>${esc(tp.name)}</h2><p class="t-sub">${day ? 'Tournament day' : 'Rest up before you play'}</p></div></div>
       ${played ? so : `<p class="hero-note">${esc(taperText(tp))}</p>`}

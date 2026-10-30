@@ -98,7 +98,7 @@ export const builder = {
     if (name === 'b-days') B.days = value; if (name === 'b-min') B.minutes = value; if (name === 'b-level') B.level = value;
   },
   actions: {
-    'b-cancel'() { B = null; app.go('plan'); },
+    'b-cancel'() { B = null; app.go('court'); },
     'b-back'() { B.step = Math.max(1, B.step - 1); app.render(); },
     'b-next'() { B.step = 2; app.render(); },
     'b-focus'(el) {

@@ -25,7 +25,7 @@ export function bodySummary() {
 }
 
 function view() {
-  const back = S.params[0] === 'o' ? { back: 'Progress', backTo: 'overview' } : { back: 'Plan', backTo: 'plan' };
+  const back = S.params[0] === 'o' ? { back: 'Progress', backTo: 'overview' } : { back: 'You', backTo: 'settings' };
   const w = latest(S.body, 'kg'), bf = latest(S.body, 'bf'), waist = latest(S.body, 'waist');
   const ch = change(S.body, 'kg'), wt = trend(S.body, 'kg');
   const head = `${navBar({ ...back, title: '' })}<h1 class="t-large" style="padding:8px 4px 2px">Body</h1><p class="t-sub" style="padding:0 4px 18px">Weight, body fat and waist over time.</p>`;

@@ -116,7 +116,7 @@ function libraryView() {
     if (!rows) return group(row({ title: `<span class="muted">${no.length} need other equipment</span>`, action: 'lib-toggle', chevron: false }), { header: CATEGORIES[c] });
     return group(rows, { header: CATEGORIES[c], footer: !showAll && no.length ? `${no.length} more need other equipment.` : '' });
   }).join('');
-  return `${navBar({ back: 'Plan', backTo: 'plan', title: 'Exercises' })}
+  return `${navBar({ back: 'Train', backTo: 'court', title: '' })}
     <h1 class="t-large" style="padding:8px 4px 2px">Exercises</h1>
     <p class="t-sub" style="padding:0 4px 16px">${allExercises().length} exercises · training at <button class="link" data-action="loc-sheet">${esc(loc?.name || 'anywhere')}</button></p>
     <div class="lib-tools"><input class="input" id="libSearch" type="search" placeholder="Search by name or muscle" value="${esc(query)}" aria-label="Search exercises">
