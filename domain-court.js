@@ -59,7 +59,7 @@ export const COURT_ROUTINES = {
     ] },
   warmup: {
     id: 'warmup', title: 'Pre-match warm-up', kind: 'court', tag: 'Before you play', areas: [],
-    blurb: 'Raise temperature, open hips and shoulders, then wake up fast feet. Do it on court.',
+    blurb: 'Raise temperature, open hips and shoulders, then switch your legs on with a few jumps and sprints. Do it on court.',
     steps: [
       s('Easy jog + side shuffles', 60, 'Jog the length of the court and back, then shuffle side to side. Stay light.'),
       s('Leg swings, front–back', 30, 'Hold the fence. Swing one leg relaxed through a growing range.', true),
@@ -71,7 +71,8 @@ export const COURT_ROUTINES = {
       s('Wrist & forearm prep', 30, 'Circle the wrists, then gently stretch palm-up and palm-down.'),
       s('Split-step + reaction', 45, 'Small hop, land on the balls of your feet, explode to a random direction. Reset.'),
       s('Shadow strokes', 60, 'Bandeja, volley, bajada, at 50% then 80%. Move your feet into each one.'),
-      s('2 short sprints', 30, 'Net to back glass twice, decelerate under control.'),
+      s('Pogo hops + 3 jumps', 30, '10 quick, small hops on the balls of your feet, then 3 tall jumps landing softly. Rest fully after.'),
+      s('2 short sprints', 30, 'Net to back glass twice at full speed, decelerate under control.'),
     ] },
   between: {
     id: 'between', title: 'Between matches', kind: 'court', tag: 'Tournament days', areas: [],

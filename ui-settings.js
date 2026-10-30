@@ -31,6 +31,7 @@ export const settings = {
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
         + row({ title: 'Vibration', icon: 'phone', color: 'gray', right: sw('vibrate', S.settings.vibrate, 'Vibration') })
         + row({ title: 'Check-in before workouts', icon: 'heart', color: 'red', right: sw('readinessPrompt', S.settings.readinessPrompt, 'Check-in before workouts') })
+        + row({ title: 'Match-day tips', sub: 'Sleep, food and warm-up around your padel', icon: 'racket', color: 'teal', right: sw('matchTips', S.settings.matchTips !== false, 'Match-day tips') })
         + row({ title: 'Adapt workouts to recovery', sub: 'Lighter when tired, a bit more when fresh', icon: 'sliders', color: 'green', right: sw('adaptive', S.settings.adaptive !== false, 'Adapt workouts to recovery') })
         + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'During workouts' })}
       <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>

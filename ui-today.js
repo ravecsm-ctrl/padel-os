@@ -23,6 +23,7 @@ import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { blockBanner } from './ui-goal.js';
 import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js';
+import { matchTips } from './domain-matchday.js';
 import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
 
@@ -332,6 +333,21 @@ function hero() {
     <button class="btn tinted" data-action="${rec ? 'go' : 'log-activity'}" ${rec ? 'data-to="court"' : 'data-kind="mobility"'}>${rec ? 'Browse Routines' : 'Log an Activity'}</button></section>`;
 }
 
+// ── Match-day essentials: the day before padel, on the day, and after playing. "Got it" hides them for the day;
+// Settings → Match-day tips turns them off. (The padel card above already has the Warm Up button.)
+function matchTipsCard() {
+  const today = isoDate();
+  if (S.settings.matchTips === false || S.settings.tipsSeen === today) return '';
+  const playedToday = S.sessions.some(s => s.activity === 'padel' && isoDate(new Date(s.startedAt)) === today);
+  const next = [1, 2].find(i => app.planOn(isoIn(i)) === 'Padel') ?? null, padelToday = app.planOn() === 'Padel', tp = taperFor(S.settings.tournament);
+  const t = matchTips({ padelToday, padelTomorrow: next === 1, playedToday, nextPadelIn: next,
+    level: app.matchLevel(padelToday ? today : isoIn(1)) || 'normal', long: tp?.phase === 'day' || (padelToday && defaultMinutes('padel', today) >= 90) });
+  if (!t) return '';
+  return `<section class="card week-tip match-tips"><div class="hero-top" style="margin-bottom:10px">${tile(t.when === 'after' ? 'heart' : 'racket', 'teal')}<div><b>${esc(t.title)}</b></div></div>
+    <ul class="week-moves">${t.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+    <div class="btns"><button class="btn plain" data-action="tips-seen">Got it</button></div></section>`;
+}
+
 // ── One-tap check-in on Today: how you feel sets today's workout before you press Start.
 // Each answer stands for a full check-in (sleep, energy, soreness: 1–5) so the workout adapts as it did from the sheet.
 export const FEELS = {
@@ -409,7 +425,7 @@ export const today = {
     const others = allRoutineIds().filter(id => id !== todays || S.active);
     const loc = app.location();
     return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners()}${reviewBanner()}<div class="court-stack">${hero()}${rings()}</div>
+      ${banners()}${reviewBanner()}<div class="court-stack">${hero()}${rings()}</div>${matchTipsCard()}
       <div style="height:28px"></div>${weekCard()}${recoveryStrip()}${stayHealthy()}
       ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
         return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
@@ -422,6 +438,7 @@ export const today = {
   },
   actions: {
     ...weekActions,
+    'tips-seen'() { S.settings.tipsSeen = isoDate(); app.save('settings'); app.render({ keepScroll: true }); },
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     async 'swap-today'(el) {
       S.settings.swap = { date: isoDate(), from: app.planOn(), to: el.dataset.r, back: el.dataset.back };
