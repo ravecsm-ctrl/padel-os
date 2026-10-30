@@ -9,9 +9,13 @@ import { canDoWith, missingFor, equipLabel } from './domain-taxonomy.js';
 import { getExercise } from './domain-catalog.js';
 import { startForWeek, dayKey } from './domain-calendar.js';
 import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.js';
+import { MATCH_LEVELS, LEVEL_HINT, suggestLevel } from './domain-matchlevel.js';
 import { bodySummary } from './ui-body.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+const usual = d => S.settings.padelLevel?.[d] || 'normal';
+// "Padel · Hard" in the schedule; a normal day just says Padel.
+const dayLabel = d => S.schedule[d] === 'Padel' && usual(d) !== 'normal' ? `Padel · ${MATCH_LEVELS[usual(d)]}` : optLabel(S.schedule[d]);
 const optLabel = v => getRoutine(v) ? getRoutine(v).title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
 
 // ── A better week for the schedule you have: same workouts and padel days, days moved so legs aren't
@@ -20,8 +24,9 @@ function betterWeek() {
   const sched = S.schedule, gym = DAYS.filter(d => isRoutine(sched[d]));
   if (!gym.length || S.settings.weekTipOff === JSON.stringify(sched)) return null;
   const padel = DAYS.filter(d => sched[d] === 'Padel');
-  const best = bestWeek(gym.map(d => sched[d]), padel, isLegHeavy);
-  if (scheduleScore(sched, isRoutine, isLegHeavy) - best.score < 1.9) return null;
+  const levels = S.settings.padelLevel || {};
+  const best = bestWeek(gym.map(d => sched[d]), padel, isLegHeavy, levels);
+  if (scheduleScore(sched, isRoutine, isLegHeavy, levels) - best.score < 1.9) return null;
   const next = { ...sched };
   gym.forEach(d => { next[d] = 'Rest'; });
   const hadRecovery = DAYS.filter(d => sched[d] === 'Recovery').length;
@@ -30,17 +35,32 @@ function betterWeek() {
   const freed = gym.filter(d => !best.days.includes(d));
   if (DAYS.filter(d => next[d] === 'Recovery').length < hadRecovery && freed.length) next[freed[Math.floor(freed.length / 2)]] = 'Recovery';
   // Say what the new week fixes: the first problem in your week that isn't in the new one.
-  const at = (w, d, k) => w[DAYS[(DAYS.indexOf(d) + k + 7) % 7]];
+  const at = (w, d, k) => w[DAYS[(DAYS.indexOf(d) + k + 7) % 7]], lvl = (d, k) => usual(DAYS[(DAYS.indexOf(d) + k + 7) % 7]);
   const problems = w => DAYS.filter(d => isRoutine(w[d])).flatMap(d => [
-    isLegHeavy(w[d]) && at(w, d, 1) === 'Padel' && `${optLabel(w[d])} is the day before padel`,
-    isLegHeavy(w[d]) && at(w, d, -1) === 'Padel' && `${optLabel(w[d])} is the day after padel`,
+    isLegHeavy(w[d]) && at(w, d, 1) === 'Padel' && lvl(d, 1) !== 'easy' && `${optLabel(w[d])} is the day before ${lvl(d, 1) === 'hard' ? 'a hard match' : 'padel'}`,
+    isLegHeavy(w[d]) && at(w, d, -1) === 'Padel' && lvl(d, -1) !== 'easy' && `${optLabel(w[d])} is the day after ${lvl(d, -1) === 'hard' ? 'a hard match' : 'padel'}`,
     isLegHeavy(w[d]) && isLegHeavy(at(w, d, 1)) && `${optLabel(w[d])} and ${optLabel(at(w, d, 1))} are leg days in a row`,
     isRoutine(at(w, d, 1)) && `${optLabel(w[d])} and ${optLabel(at(w, d, 1))} are on back-to-back days`,
-    !isLegHeavy(w[d]) && at(w, d, 1) === 'Padel' && `${optLabel(w[d])} is the day before padel`]).filter(Boolean);
+    !isLegHeavy(w[d]) && at(w, d, 1) === 'Padel' && lvl(d, 1) !== 'easy' && `${optLabel(w[d])} is the day before padel`]).filter(Boolean);
   const fixed = problems(next);
   const why = problems(sched).find(p => !fixed.includes(p)) || 'Your workouts can be spread out better around padel';
   const moves = gym.map(d => [d, best.days[best.ids.indexOf(sched[d])]]).filter(([a, b]) => b && a !== b).map(([a, b]) => `${optLabel(sched[a])}: ${DAY_NAME[a]} → ${DAY_NAME[b]}`);
   return moves.length ? { next, why, moves } : null;
+}
+// Your last three matches on a weekday all went one way that isn't the setting: suggest it (never changed by itself).
+function levelTip() {
+  for (const d of DAYS) {
+    if (S.schedule[d] !== 'Padel') continue;
+    const sug = suggestLevel(S.sessions, d, usual(d));
+    if (sug && S.settings.levelTipOff?.[d] !== sug) return { d, sug };
+  }
+  return null;
+}
+function levelTipCard() {
+  const t = levelTip();
+  if (!t) return '';
+  return `<section class="card week-tip"><div class="hero-top" style="margin-bottom:10px"><span class="tile teal">${icon('racket')}</span><div><b>Your ${DAY_NAME[t.d]} matches</b><p class="t-sub">Your last three were ${MATCH_LEVELS[t.sug].toLowerCase()}. ${DAY_NAME[t.d]} is set to ${MATCH_LEVELS[usual(t.d)].toLowerCase()}.</p></div></div>
+    <div class="btns"><button class="btn filled" data-action="set-level" data-day="${t.d}" data-level="${t.sug}" data-tip="1">Set ${DAY_NAME[t.d]} to ${MATCH_LEVELS[t.sug]}</button><button class="btn plain" data-action="level-tip-off" data-day="${t.d}" data-level="${t.sug}">Not now</button></div></section>`;
 }
 function betterWeekCard() {
   const b = betterWeek();
@@ -60,8 +80,8 @@ function overview() {
       <div class="court-days">${DAYS.map(d => { const v = S.schedule[d], kind = isRoutine(v) ? 'gym' : v === 'Padel' ? 'padel' : v === 'Recovery' ? 'rec' : 'rest';
         return `<button class="${kind} ${d === today ? 'today' : ''}" data-action="day-sheet" data-day="${d}" aria-label="${DAY_NAME[d]}: ${esc(optLabel(v))}"><small>${d[0]}</small><span>${kind === 'gym' ? icon(routineLook(v).icon) : kind === 'padel' ? icon('racket') : kind === 'rec' ? icon('heart') : ''}</span></button>`; }).join('')}</div></div>
     <p class="grp-f" style="margin:8px 4px 24px">Each cycle is 4 weeks and moves forward on its own every Monday. Tap a day to change it.</p>
-    ${betterWeekCard()}
-    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(optLabel(S.schedule[d])), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
+    ${betterWeekCard()}${levelTipCard()}
+    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { header: 'Schedule' })}
     ${group(row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' }), { header: 'Body' })}
     ${group(row({ title: 'New Workout', sub: 'Pick the exercises yourself', icon: 'plus', color: 'green', action: 'new-workout' })
       + row({ title: 'Build a program', sub: 'Choose a focus; get workouts that fit you', icon: 'sliders', color: 'blue', to: 'builder' }), { header: 'New' })}
@@ -149,8 +169,18 @@ export const plan = {
       const d = el.dataset.day;
       app.sheet(`<h2 class="sheet-title">${DAY_NAME[d]}</h2><div style="height:12px"></div>
         ${group([...DAY_OPTIONS.slice(0, 3), ...allRoutineIds().filter(isCustomRoutine), ...DAY_OPTIONS.slice(3)].map(v => row({ title: esc(optLabel(v)), action: 'set-day', data: { day: d, v }, chevron: false, right: S.schedule[d] === v ? icon('check', 'check-mark') : '' })).join(''),
-          { footer: 'Tip: avoid your hardest leg workout the day before an important match.' })}`);
+          { footer: S.schedule[d] === 'Padel' ? '' : 'Tip: avoid your hardest leg workout the day before an important match.' })}
+        ${S.schedule[d] === 'Padel' ? group(Object.entries(MATCH_LEVELS).map(([k, label]) => row({ title: label, sub: LEVEL_HINT[k], action: 'set-level', data: { day: d, level: k }, chevron: false, right: usual(d) === k ? icon('check', 'check-mark') : '' })).join(''),
+          { header: `How hard is padel on ${DAY_NAME[d]}s?`, footer: 'Hard days keep your legs fresh the day before and give them time after. Change it for one date from the calendar or Today.' }) : ''}`);
     },
+    async 'set-level'(el) {
+      const d = el.dataset.day, lv = el.dataset.level, map = { ...(S.settings.padelLevel || {}) };
+      if (lv === 'normal') delete map[d]; else map[d] = lv;
+      S.settings.padelLevel = map; await app.save('settings');
+      if (el.dataset.tip) { app.render({ keepScroll: true }); return app.toast(`${DAY_NAME[d]}: ${MATCH_LEVELS[lv].toLowerCase()} padel`); }
+      plan.actions['day-sheet']({ dataset: { day: d } }); app.render({ keepScroll: true });
+    },
+    async 'level-tip-off'(el) { S.settings.levelTipOff = { ...(S.settings.levelTipOff || {}), [el.dataset.day]: el.dataset.level }; await app.save('settings'); app.render({ keepScroll: true }); },
     async 'week-better'() {
       const b = betterWeek(); if (!b) return;
       const old = { ...S.schedule };

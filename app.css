@@ -675,3 +675,8 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .setup-steps li { margin-bottom: 10px; }
 .setup-steps .link { font-size: inherit; white-space: nowrap; }
 a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.call-chip.prep { background: #9FE1CB; color: #04342C; }
+.court-stack .match-line { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--court-ink-2); }
+.court-stack .match-line .ic, .court-stack .match-line svg { width: 16px; height: 16px; }
+.court-stack .match-line b { color: var(--court-ink); }
+.court-stack .match-line .link { color: var(--ball); margin-left: 2px; }

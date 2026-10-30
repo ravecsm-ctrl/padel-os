@@ -21,7 +21,7 @@ export function exerciseFatigue(ex, rec) {
   return { level: worst, muscle: who };
 }
 
-// ctx: { rec, sore:[muscles], readiness:{label}, padelTomorrow, loadRatio, deload, level, history, unit }
+// ctx: { rec, sore:[muscles], readiness:{label}, padelTomorrow, hardSoon, loadRatio, deload, level, history, unit }
 export function adaptEntry(entry, ctx) {
   const ex = getExercise(entry.exId);
   if (!ex || entry.skipped) return null;
@@ -37,6 +37,15 @@ export function adaptEntry(entry, ctx) {
   if (sore) return down(`You said your ${name(sore)} feel sore`);
   if (fat >= TIRED_FROM) return down(`${MUSCLES[muscle]} still tired from your last session`, { lighter: fat >= 0.8 ? 0.9 : 0.95 });
   if (ctx.padelTomorrow && (ex.primary || []).some(m => LEGS.includes(m)) && sets > 2) return down('Padel tomorrow: saving your legs');
+  // Hard match in two days: legs at Solid effort, no weight jump.
+  if (ctx.hardSoon && (ex.primary || []).some(m => LEGS.includes(m))) {
+    if (entry.suggestion?.kind === 'up') {
+      const last = performances(ctx.history || [], ex.id, 1)[0];
+      const lastTop = last ? Math.max(0, ...doneSets(last.entry).map(s => s.w || 0)) : 0;
+      return { dir: 'hold', reason: 'Hard match in 2 days, so same weight as last time', sets, w: lastTop || w, muscle: ex.primary.find(m => LEGS.includes(m)) };
+    }
+    return { dir: 'ease', reason: 'Hard match in 2 days: aim for Solid, not Hard', sets, w, muscle: ex.primary.find(m => LEGS.includes(m)) };
+  }
   // Big week: trim the main work, keep injury-prevention and power work as is.
   if (ctx.loadRatio > 1.5 && sets > 2 && ex.category !== 'prevention' && ex.movement !== 'power') return down('Big training week: one set fewer');
   // Still recovering (not tired): keep the work, take the edge off. Jumps lose a set (tired legs and landings

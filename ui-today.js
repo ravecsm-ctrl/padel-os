@@ -12,6 +12,7 @@ import { sessionEffortChips, mname } from './ui-words.js';
 import { recoveryCard, currentRecovery } from './ui-recovery.js';
 import { adaptWorkout, revertAdaptation, exerciseFatigue, RECOVERING_FROM } from './domain-adaptive.js';
 import { dayCall, recoveryDaysRecently, TOO_MANY_RECOVERY_DAYS } from './domain-daycall.js';
+import { MATCH_LEVELS, LEVEL_HINT, levelOn, harderThanPlanned } from './domain-matchlevel.js';
 import { calibrate, colorFor } from './domain-recovery.js';
 import { phaseFor, DAYS } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
@@ -45,6 +46,8 @@ export function banners({ resumeOnly = false } = {}) {
     const res = sum?.matches ? `${plural(sum.matches, 'match')}${sum.won + sum.lost ? `, ${sum.won}–${sum.lost}` : ''}. ` : '';
     out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'teal')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`;
   }
+  const hm = hardMatchOffer();
+  if (hm) out += `<div class="banner warn">${tile('racket', 'orange')}<span><b>That match was harder than planned</b><small>Move ${esc(app.routine(hm.routine).title)} from ${esc(weekday(hm.from))} to ${esc(weekday(hm.to))}, so your legs get more time?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="hard-move" data-r="${esc(hm.routine)}" data-from="${hm.from}" data-to="${hm.to}" data-id="${esc(hm.match.id)}" style="font-size:15px;white-space:nowrap">Move it</button><button class="link" data-action="hard-keep" data-id="${esc(hm.match.id)}" style="font-size:13px">Keep</button></span></div>`;
   // Recovery days keep coming: the plan is too much for how much padel you play.
   const recent = recoveryDaysRecently(S.settings.recoveryDays);
   if (recent >= TOO_MANY_RECOVERY_DAYS && Date.now() - (S.settings.recWarnSnooze || 0) > 30 * 86400000)
@@ -102,7 +105,7 @@ function buildWorkout(routineId, { readiness = null, light = false, sore = [] } 
   const w = createWorkout({ routineId, week, history: app.strength, overrides: S.overrides, unit: S.settings.unit, readiness, light, profile: app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile });
   const rec = currentRecovery();
   if (S.settings.adaptive !== false) {
-    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: app.planOn(isoIn(1)) === 'Padel', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
+    adaptWorkout(w, { rec, sore, readiness: readiness ? readinessScore(readiness) : null, padelTomorrow: !!app.matchLevel(isoIn(1)) && app.matchLevel(isoIn(1)) !== 'easy', hardSoon: app.matchLevel(isoIn(2)) === 'hard', loadRatio: loadTrend(weeklySeries(S.sessions, 5)).ratio || 0,
       deload: phaseFor(week).loadMult < 1, level: S.profile.level, history: app.strength, unit: S.settings.unit, afterPadel: afterPadel() });
   }
   return { w, rec };
@@ -142,21 +145,64 @@ function swapOffer(routineId) {
 
 // A later free day this week for a workout you rest from today: not the day before padel, and for legs
 // not the day after one if there's a choice. Tomorrow only as a last resort (you're resting for a reason).
-function moveDay(routineId) {
+// from: days from today of the workout being moved (0 = today).
+function moveDay(routineId, from = 0) {
   let fallback = null;
-  for (let i = 1; i < 7; i++) {
+  const beforeMatch = iso => !!app.matchLevel(iso) && app.matchLevel(iso) !== 'easy';
+  for (let i = from + 1; i < 7; i++) {
     const iso = isoIn(i);
     if (parseISO(iso).getDay() === 1) break;
     const v = app.planOn(iso);
-    if ((v !== 'Rest' && v !== 'Recovery') || S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso) || app.planOn(isoIn(i + 1)) === 'Padel') continue;
-    if (i === 1 || (isLegHeavy(routineId) && app.planOn(isoIn(i - 1)) === 'Padel')) { fallback ??= iso; continue; }
+    if ((v !== 'Rest' && v !== 'Recovery') || S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso) || beforeMatch(isoIn(i + 1))) continue;
+    if (i === from + 1 || (isLegHeavy(routineId) && app.planOn(isoIn(i - 1)) === 'Padel' && app.matchLevel(isoIn(i - 1)) !== 'easy')) { fallback ??= iso; continue; }
     return iso;
   }
   return fallback;
 }
 
+// Hard match tomorrow and legs planned today: swap in a non-leg workout from later this week, or move
+// the leg day to a free one. { to, back } for a swap, { move } for a move, or null.
+function prepOffer(routineId) {
+  if (S.active || S.settings.adaptive === false || !isLegHeavy(routineId) || app.matchLevel(isoIn(1)) !== 'hard' || S.settings.swap?.date === isoDate()) return null;
+  for (let i = 2; i < 7; i++) {
+    const iso = isoIn(i);
+    if (parseISO(iso).getDay() === 1) break;
+    const alt = app.planOn(iso);
+    if (!isRoutine(alt) || isLegHeavy(alt) || S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso)) continue;
+    if (!(app.matchLevel(isoIn(i + 1)) && app.matchLevel(isoIn(i + 1)) !== 'easy')) return { to: alt, back: iso };
+  }
+  const move = moveDay(routineId);
+  return move && move !== isoIn(1) ? { move } : null;
+}
+
+// ── Expected match level for one date: a small picker (the weekday's usual level is set in Plan).
+export function levelSheet(iso) {
+  const cur = levelOn(iso, S.settings), d = parseISO(iso);
+  app.sheet(`<h2 class="sheet-title">How hard will padel be?</h2><p class="sheet-sub">${esc(d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}. Only this date changes.</p>
+    ${group(Object.entries(MATCH_LEVELS).map(([k, label]) => row({ title: label, sub: LEVEL_HINT[k], action: 'match-level', data: { iso, level: k }, chevron: false, right: cur === k ? icon('check', 'check-mark') : '' })).join(''))}
+    <button class="btn gray" data-action="close-sheet">Cancel</button>`);
+}
+const levelLine = iso => { const lv = app.matchLevel(iso); return lv ? `<p class="hero-note match-line">${icon('racket')}Padel ${iso === isoIn(1) ? 'tomorrow' : 'today'} · <b>${MATCH_LEVELS[lv]}</b> <button class="link" data-action="level-sheet" data-iso="${iso}">Change</button></p>` : ''; };
+
+// A match logged as hard when it wasn't planned that way: offer to push the next leg day (within two days) back.
+function hardMatchOffer() {
+  if (S.settings.adaptive === false) return null;
+  const sw = S.settings.swap;
+  if (sw && (sw.date >= isoDate() || (sw.back && sw.back >= isoDate()))) return null;   // one move at a time
+  const m = S.sessions.filter(s => s.activity === 'padel' && Date.now() - s.startedAt < 36 * 3600000 && S.settings.hardSeen !== s.id)
+    .find(s => harderThanPlanned(s, levelOn(isoDate(new Date(s.startedAt)), S.settings)));
+  if (!m) return null;
+  for (let i = 1; i <= 2; i++) {
+    const iso = isoIn(i), r = app.planOn(iso);
+    if (!isRoutine(r) || !isLegHeavy(r)) continue;
+    const to = moveDay(r, i);
+    return to ? { match: m, routine: r, from: iso, to } : null;
+  }
+  return null;
+}
+
 // ── Today's call: Full, Easier, Reshaped or Recovery day, with the reason and what changes (see daycall.js).
-const CALL = { full: ['bolt', 'Full workout'], easier: ['sliders', 'Easier today'], reshaped: ['swap', 'Reshaped'], recovery: ['heart', 'Recovery day'] };
+const CALL = { full: ['bolt', 'Full workout'], easier: ['sliders', 'Easier today'], reshaped: ['swap', 'Reshaped'], prep: ['racket', 'Match prep'], recovery: ['heart', 'Recovery day'] };
 // The body area a workout mostly works: Legs, Core or Upper body.
 const routineRegion = id => { const n = {}; for (const b of app.routine(id).blocks) for (const m of getExercise(b.ex)?.primary || []) n[regionOf(m)] = (n[regionOf(m)] || 0) + 1;
   return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Upper body'; };
@@ -165,9 +211,9 @@ function todayCall(plan) {
   const said = todayFeel(), feel = said?.feel || null, r = feel ? FEELS[feel].r : null, tp = taperFor(S.settings.tournament);
   const light = !!(tp?.lighter || tp?.noGym) || (r ? readinessScore(r).label === 'Low' : false);
   const { w, rec } = buildWorkout(plan, { readiness: r, light });
-  const swap = swapOffer(plan);
+  const swap = swapOffer(plan), prep = prepOffer(plan);
   const call = S.settings.adaptive === false ? { level: light ? 'easier' : 'full', tiredShare: 0 }
-    : dayCall({ fatigue: w.exercises.map(e => exerciseFatigue(getExercise(e.exId), rec).level), changes: w.adapt?.changes || [], feel, light, swap, afterTournament: tp?.phase === 'recover' });
+    : dayCall({ fatigue: w.exercises.map(e => exerciseFatigue(getExercise(e.exId), rec).level), changes: w.adapt?.changes || [], feel, light, swap, prep, afterTournament: tp?.phase === 'recover' });
   const r0 = app.routine(plan), pv = adjustPreview(plan);
   let why = '', bullets = [], extra = {};
   if (call.level === 'full') {
@@ -178,6 +224,10 @@ function todayCall(plan) {
   } else if (call.level === 'easier') {
     why = pv?.head && pv.head !== 'Fully recovered' ? `${pv.head}.` : feel === 'tired' ? 'You said you’re tired.' : feel === 'sore' ? 'You said you’re sore.' : tp?.lighter ? (tp.phase === 'recover' ? 'Just after your tournament.' : 'Tournament week.') : 'A lighter day today.';
     bullets = [...(light ? ['One set fewer on each exercise, easier effort'] : []), ...(pv?.parts || []).map(cap)];
+  } else if (call.level === 'prep') {
+    why = 'Hard match tomorrow, so your legs stay fresh today.';
+    if (prep.to) { const alt = app.routine(prep.to); bullets = [`${alt.title} today`, `${r0.title} moves to ${weekday(prep.back)}`]; extra = { to: prep.to, back: prep.back, alt }; }
+    else { bullets = [`${r0.title} moves to ${weekday(prep.move)}`, 'Some easy mobility today if you like']; extra = { move: prep.move }; }
   } else if (call.level === 'reshaped') {
     const alt = app.routine(swap.to);
     const mine = routineRegion(plan), theirs = routineRegion(swap.to);
@@ -200,15 +250,18 @@ function callCard(plan) {
   const r = app.routine(plan), look = routineLook(plan), c = todayCall(plan), [ic, label] = CALL[c.level];
   const pain = (() => { const h = recoveringHint(plan); return h.startsWith('Gentler') ? `<p class="hero-note orange">${esc(h)}</p>` : ''; })();
   const sw = S.settings.swap, swapped = sw?.date === isoDate() && sw.to === plan;
-  const title = c.level === 'recovery' ? 'Mobility and stretching' : c.level === 'reshaped' ? c.alt.title : r.title;
-  const sub = c.level === 'recovery' ? `Instead of ${r.title}` : c.level === 'reshaped' ? `Swapped in from ${weekday(c.back)}` : `${plural(r.blocks.length, 'exercise')} · about ${r.minutes} min`;
-  const tileIc = c.level === 'recovery' ? tile('heart', 'pink', true) : c.level === 'reshaped' ? tile(routineLook(c.to).icon, routineLook(c.to).color, true) : tile(look.icon, look.color, true);
+  const swapIn = c.level === 'reshaped' || (c.level === 'prep' && c.to);
+  const title = c.level === 'recovery' ? 'Mobility and stretching' : swapIn ? c.alt.title : c.level === 'prep' ? 'Rest before your match' : r.title;
+  const sub = c.level === 'recovery' || (c.level === 'prep' && !c.to) ? `Instead of ${r.title}` : swapIn ? `Swapped in from ${weekday(c.back)}` : `${plural(r.blocks.length, 'exercise')} · about ${r.minutes} min`;
+  const tileIc = c.level === 'recovery' ? tile('heart', 'pink', true) : swapIn ? tile(routineLook(c.to).icon, routineLook(c.to).color, true) : c.level === 'prep' ? tile('racket', 'teal', true) : tile(look.icon, look.color, true);
   const main = c.level === 'recovery' ? `<button class="btn filled" data-action="recovery-day" data-back="${c.back || ''}">${icon('play')}Start Mobility</button><button class="link call-alt" data-action="start" data-routine="${plan}">Train anyway, made easier</button>`
-    : c.level === 'reshaped' ? `<button class="btn filled" data-action="reshape-start" data-r="${esc(c.to)}" data-back="${c.back}">${icon('play')}Start ${esc(c.alt.title)}</button><button class="link call-alt" data-action="start" data-routine="${plan}">Keep ${esc(r.title)}, made easier</button>`
+    : swapIn ? `<button class="btn filled" data-action="reshape-start" data-r="${esc(c.to)}" data-back="${c.back}">${icon('play')}Start ${esc(c.alt.title)}</button><button class="link call-alt" data-action="start" data-routine="${plan}">Keep ${esc(r.title)}, made easier</button>`
+    : c.level === 'prep' ? `<button class="btn filled" data-action="prep-move" data-back="${c.move}">Move ${esc(r.title)} to ${esc(weekday(c.move))}</button><button class="link call-alt" data-action="start" data-routine="${plan}">Train anyway, made easier</button>`
     : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>${c.level === 'easier' && S.settings.adaptive !== false ? `<button class="link call-alt" data-action="start-full" data-routine="${plan}">Use the full plan</button>` : ''}`;
   return `<section class="card hero"><span class="call-chip ${c.level}">${icon(ic)}${label}</span>
     <div class="hero-top">${tileIc}<div><h2>${esc(title)}</h2><p class="t-sub">${esc(sub)}</p></div></div>
     ${S.active ? '' : feelCard()}
+    ${levelLine(isoIn(1))}
     <p class="hero-note call-why">${esc(c.why)}</p>
     ${c.bullets.length ? `<ul class="call-list">${c.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}${pain}
     ${swapped ? `<p class="hero-note swap-note">Swapped: ${esc(app.routine(sw.from).title)} moves to ${esc(weekday(sw.back))}. <button class="link" data-action="swap-undo">Undo</button></p>` : ''}
@@ -249,10 +302,18 @@ function hero() {
   if (isRoutine(plan)) return callCard(plan);
   if (plan === 'Padel') {
     return `<section class="card hero"><div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">Warm up, play, then log it</p></div></div>
+      ${levelLine(isoDate())}
       <div class="btns"><button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button>
       <button class="btn tinted" data-action="log-activity" data-kind="padel">Log Match</button></div></section>`;
   }
   const rec = plan === 'Recovery', sw = S.settings.swap;
+  if (plan === 'Rest' && sw?.date === isoDate() && isRoutine(sw.from)) {
+    return `<section class="card hero"><span class="call-chip prep">${icon('racket')}Match prep</span>
+      <div class="hero-top">${tile('racket', 'teal', true)}<div><h2>Rest before your match</h2><p class="t-sub">Legs fresh for tomorrow</p></div></div>
+      ${levelLine(isoIn(1))}
+      <p class="hero-note swap-note">${esc(app.routine(sw.from).title)} ${sw.back ? `moves to ${esc(weekday(sw.back))}` : 'is skipped this week'}. <button class="link" data-action="swap-undo">Undo</button></p>
+      <button class="btn tinted" data-action="go" data-to="court/mobility">${icon('play')}Daily Mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</button></section>`;
+  }
   if (rec && sw?.date === isoDate() && isRoutine(sw.from)) {
     return `<section class="card hero"><span class="call-chip recovery">${icon('heart')}Recovery day</span>
       <div class="hero-top">${tile('heart', 'pink', true)}<div><h2>Mobility and stretching</h2><p class="t-sub">Daily mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</p></div></div>
@@ -362,6 +423,25 @@ export const today = {
       if (S.settings.swap?.to === 'Recovery') S.settings.recoveryDays = (S.settings.recoveryDays || []).filter(d => d !== S.settings.swap.date);
       delete S.settings.swap; await app.save('settings'); app.render({ keepScroll: true }); app.toast('Back to your usual plan');
     },
+    async 'prep-move'(el) {
+      S.settings.swap = { date: isoDate(), from: app.planOn(), to: 'Rest', back: el.dataset.back || null };
+      await app.save('settings'); app.render({ keepScroll: true }); app.toast(`${app.routine(S.settings.swap.from).title} moved to ${weekday(el.dataset.back)}`);
+    },
+    'level-sheet'(el) { levelSheet(el.dataset.iso); },
+    async 'match-level'(el) {
+      const { iso, level } = el.dataset, map = { ...(S.settings.matchLevel || {}) };
+      for (const k of Object.keys(map)) if (k < isoDate()) delete map[k];          // old dates don't matter any more
+      const usual = S.settings.padelLevel?.[DAYS[(parseISO(iso).getDay() + 6) % 7]] || 'normal';
+      if (level === usual) delete map[iso]; else map[iso] = level;
+      S.settings.matchLevel = map; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true });
+      app.toast(`${weekday(iso)}: ${MATCH_LEVELS[level].toLowerCase()} padel`);
+    },
+    async 'hard-move'(el) {
+      S.settings.swap = { date: el.dataset.from, from: el.dataset.r, to: 'Rest', back: el.dataset.to };
+      S.settings.hardSeen = el.dataset.id; await app.save('settings'); app.render({ keepScroll: true });
+      app.toast(`${app.routine(el.dataset.r).title} moved to ${weekday(el.dataset.to)}`, async () => { delete S.settings.swap; await app.save('settings'); app.render({ keepScroll: true }); });
+    },
+    async 'hard-keep'(el) { S.settings.hardSeen = el.dataset.id; await app.save('settings'); app.render({ keepScroll: true }); },
     async 'reshape-start'(el) {
       S.settings.swap = { date: isoDate(), from: app.planOn(), to: el.dataset.r, back: el.dataset.back };
       await app.save('settings'); startFlow(el.dataset.r);

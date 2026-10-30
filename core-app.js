@@ -4,6 +4,7 @@ import * as db from './core-db.js';
 import { DEFAULT_SCHEDULE, resolveRoutine, DAYS } from './domain-program.js';
 import { DEFAULT_PROFILE } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition, parseISO } from './domain-calendar.js';
+import { levelOn } from './domain-matchlevel.js';
 
 export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, adaptive: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
@@ -49,6 +50,8 @@ export const app = {
     const sw = S.settings.swap, plan = S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
     return sw && iso === sw.date ? sw.to : sw && iso === sw.back ? sw.from : plan;
   },
+  // How hard padel is expected to be on a date ('easy' | 'normal' | 'hard'); null if it isn't a padel day.
+  matchLevel(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? levelOn(iso, S.settings) : null; },
   routine: id => resolveRoutine(id, S.overrides, app.location() ? { ...S.profile, owned: app.location().equipment } : S.profile),
 
   async save(key) { try { await db.setMeta(key, S[key]); } catch { S.storageOk = false; app.toast('Could not save — storage unavailable'); } },

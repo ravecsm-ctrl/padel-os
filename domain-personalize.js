@@ -3,6 +3,7 @@
 import { getExercise, EXERCISES, PATTERN_FALLBACK, targetField } from './domain-catalog.js';
 import { canDoWith } from './domain-taxonomy.js';
 import { DAYS } from './domain-program.js';
+import { NEXT_TO } from './domain-matchlevel.js';
 
 export const DEFAULT_PROFILE = {
   onboarded: false, goal: 'perform', level: 'intermediate', equipment: 'gym', minutes: 70,
@@ -98,19 +99,21 @@ export function adaptBlocks(blocks, profile = DEFAULT_PROFILE, overridden = new 
 // The weekly plan. Gym days never go on padel days; where they can, they also stay off the day before
 // a match (you'd play on tired legs) and leg-heavy workouts stay off the day after one (legs still recovering).
 // Every choice of days and order is scored and the lowest wins; ties keep the earliest days and the given order.
-const SCORE = { legsBefore: 4, otherBefore: 1, legsAfter: 2, backToBack: 1.5, legsTwoDays: 2, uneven: 0.3 };
+// Next to a padel day, the cost depends on how hard it is (matchlevel.NEXT_TO); these are the rest.
+const SCORE = { backToBack: 1.5, legsTwoDays: 2, uneven: 0.3 };
 const defaultLegs = id => id === 'A' || id === 'C';
 const choose = (arr, k) => k === 0 ? [[]] : arr.flatMap((x, i) => choose(arr.slice(i + 1), k - 1).map(r => [x, ...r]));
 const orders = a => a.length <= 1 ? [a] : a.flatMap((x, i) => orders([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r]));
 
 // Penalty for gym workouts on these day indexes (0 = Monday), given the padel days.
-function weekPenalty(dayIdx, ids, padelDays, legs) {
-  const padel = i => padelDays.includes(DAYS[(i + 7) % 7]);
+// levels: how hard each padel weekday usually is ({ Sat: 'hard' }); unset days are normal.
+function weekPenalty(dayIdx, ids, padelDays, legs, levels = {}) {
+  const padel = i => padelDays.includes(DAYS[(i + 7) % 7]), cost = i => NEXT_TO[levels[DAYS[(i + 7) % 7]]] || NEXT_TO.normal;
   let sc = 0;
   dayIdx.forEach((i, k) => {
     const heavy = legs(ids[k]);
-    if (padel(i + 1)) sc += heavy ? SCORE.legsBefore : SCORE.otherBefore;
-    if (padel(i - 1) && heavy) sc += SCORE.legsAfter;
+    if (padel(i + 1)) sc += heavy ? cost(i + 1).before : cost(i + 1).other;
+    if (padel(i - 1) && heavy) sc += cost(i - 1).after;
   });
   if (dayIdx.length > 1) {
     const gaps = dayIdx.map((x, k) => ((dayIdx[(k + 1) % dayIdx.length] - x + 7) % 7) || 7);
@@ -122,21 +125,21 @@ function weekPenalty(dayIdx, ids, padelDays, legs) {
 }
 
 // Best days and order for these workouts: { days: ['Mon', ...], ids: [...], score }.
-export function bestWeek(ids, padelDays = [], legs = defaultLegs) {
+export function bestWeek(ids, padelDays = [], legs = defaultLegs, levels = {}) {
   const free = DAYS.map((_, i) => i).filter(i => !padelDays.includes(DAYS[i]));
   const n = Math.min(ids.length, free.length);
   let best = null;
   for (const set of choose(free, n)) for (const order of orders(ids.slice(0, n))) {
-    const score = weekPenalty(set, order, padelDays, legs);
+    const score = weekPenalty(set, order, padelDays, legs, levels);
     if (!best || score < best.score - 1e-9) best = { days: set.map(i => DAYS[i]), ids: order, score };
   }
   return best || { days: [], ids: [], score: 0 };
 }
 
 // How a schedule you already have scores, on the same scale.
-export function scheduleScore(sched, isGym, legs = defaultLegs) {
+export function scheduleScore(sched, isGym, legs = defaultLegs, levels = {}) {
   const padelDays = DAYS.filter(d => sched[d] === 'Padel'), gym = DAYS.filter(d => isGym(sched[d]));
-  return weekPenalty(gym.map(d => DAYS.indexOf(d)), gym.map(d => sched[d]), padelDays, legs);
+  return weekPenalty(gym.map(d => DAYS.indexOf(d)), gym.map(d => sched[d]), padelDays, legs, levels);
 }
 
 export function generateSchedule(days, padelDays = [], ids = null, legs = defaultLegs) {

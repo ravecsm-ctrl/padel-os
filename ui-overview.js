@@ -15,6 +15,7 @@ import { exercisePicker } from './ui-picker.js';
 import { currentStats, radar } from './ui-stats.js';
 import { activitySheet, pastWorkoutSheet } from './ui-today.js';
 import { bodySummary } from './ui-body.js';
+import { MATCH_LEVELS, LEVEL_HINT } from './domain-matchlevel.js';
 
 let monthOffset = 0;
 const MONTH = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -155,7 +156,9 @@ export const overview = {
       const iso = el.dataset.iso, list = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === iso);
       const d = new Date(iso + 'T12:00'), plan = app.planOn(iso), future = iso > isoDate();
       const title = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-      app.sheet(`<h2 class="sheet-title">${esc(title)}</h2><p class="sheet-sub">${isRoutine(plan) ? `Planned: ${esc(getRoutine(plan).title)}` : plan === 'Padel' ? 'Planned: padel' : 'No workout planned'}</p>
+      const lv = plan === 'Padel' && iso >= isoDate() ? app.matchLevel(iso) : null;
+      app.sheet(`<h2 class="sheet-title">${esc(title)}</h2><p class="sheet-sub">${isRoutine(plan) ? `Planned: ${esc(getRoutine(plan).title)}` : plan === 'Padel' ? `Planned: padel${lv ? ` · ${MATCH_LEVELS[lv].toLowerCase()}` : ''}` : 'No workout planned'}</p>
+        ${lv ? group(Object.entries(MATCH_LEVELS).map(([k, label]) => row({ title: label, sub: LEVEL_HINT[k], action: 'match-level', data: { iso, level: k }, chevron: false, right: lv === k ? icon('check', 'check-mark') : '' })).join(''), { header: 'How hard will it be?' }) : ''}
         ${list.length ? group(list.map(s => row({ title: esc(s.title), sub: `${s.durationMin || '—'} min`, to: `history/session/${s.id}` })).join('')) : `<p class="t-sub" style="text-align:center;margin:8px 0 18px">${future ? 'Coming up.' : 'Nothing logged.'}</p>`}
         ${future ? '' : `<div class="btns">${iso < isoDate() ? `<button class="btn tinted" data-action="cal-past" data-iso="${iso}">Log a Past Workout</button>` : ''}<button class="btn ${iso < isoDate() ? 'gray' : 'tinted'}" data-action="cal-log" data-iso="${iso}">Log Padel or Activity</button></div>`}`);
     },
