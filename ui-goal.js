@@ -185,7 +185,8 @@ export function blockBanner(tournamentShown) {
   const b = S.settings.block, pos = app.blockPos();
   if (!pos) return '';
   if (pos.state === 'done') return pos.endedDays < 14 ? `<button class="banner" data-action="go" data-to="plan">${tile('trophy', 'teal')}<span><b>${esc(blockTitle(b))} finished</b><small>Pick what’s next on Plan.</small></span>${chev}</button>` : '';
-  if (pos.state !== 'active' || (b.goal === 'tournament' && tournamentShown)) return '';
+  // The phase itself sits on Today's card; a heads-up only when it changes (or pain holds you back).
+  if (pos.state !== 'active' || (b.goal === 'tournament' && tournamentShown) || (!pos.newPhase && !pos.held)) return '';
   const why = pos.held ? `Staying in ${pos.phase.name} while your ${AREAS[b.area].toLowerCase()} settles.` : `${pos.newPhase ? 'New phase. ' : ''}${pos.phase.note}`;
   return `<button class="banner" data-action="go" data-to="plan">${tile(b.goal === 'tournament' ? 'trophy' : 'target', 'teal')}<span><b>${esc(goalLabel(b))} · week ${pos.week} of ${pos.weeks} · ${esc(pos.phase.name)}</b><small>${esc(why)}</small></span>${chev}</button>`;
 }

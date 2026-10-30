@@ -7,6 +7,7 @@ import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-anal
 import { createWorkout, createActivity, workoutStats, applySupersets, createQuickWorkout } from './domain-workout.js';
 import { COURT_ROUTINES, routineMinutes } from './domain-court.js';
 import { prehabFor, PADEL_TYPES, PADEL_FOCUS, hasFocus, LEGS_FELT } from './domain-padel.js';
+import { AREA_ROUTINE } from './domain-court.js';
 import { AREAS } from './domain-personalize.js';
 import { sessionEffortChips, mname } from './ui-words.js';
 import { recoveryCard, currentRecovery } from './ui-recovery.js';
@@ -24,53 +25,72 @@ import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { blockBanner } from './ui-goal.js';
 import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js';
 import { matchTips } from './domain-matchday.js';
-import { recentPain, painWithProfile, painHits, areaName } from './domain-pain.js';
+import { recentPain, painWithProfile, painHits, areaName, loadsAreas } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : /(ch|sh|s|x)$/.test(w) ? 'es' : 's'}`;
 
-export function banners({ resumeOnly = false } = {}) {
-  let out = '';
-  if (S.active) {
-    const st = workoutStats(S.active);
-    out += `<button class="banner" data-action="resume">${tile('play', 'blue')}<span><b>Continue your workout</b><small>${esc(S.active.title)} · ${st.sets} of ${st.planned} sets done</small></span>${chev}</button>`;
-  }
-  if (resumeOnly) return out;
-  if (!S.profile.onboarded) out += `<button class="banner" data-action="go" data-to="welcome">${tile('sliders', 'blue')}<span><b>Personalise your plan</b><small>Takes 30 seconds. Your history is kept.</small></span>${chev}</button>`;
+// ── Heads-up: Today shows at most one alert, the most important first; the rest wait behind "+N more".
+// Ranks: 0 setup · 1 pain · 2 your data · 3 today's training · 4 matches · 5 planning · 6 suggestions.
+export function headsUps() {
+  const items = [], add = (rank, html) => { if (html) items.push({ rank, html }); };
+  if (!S.profile.onboarded) add(0, `<button class="banner" data-action="go" data-to="welcome">${tile('sliders', 'blue')}<span><b>Personalise your plan</b><small>Takes 30 seconds. Your history is kept.</small></span>${chev}</button>`);
   // During a goal block the weeks follow the block, so no "restart at week 1" offer.
   const br = app.position().block ? null : breakInfo(S.sessions, app.position().week, { acknowledged: S.settings.breakAck || 0 });
-  if (br) out += `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`;
-  out += weekAskCard();
+  if (br) add(3, `<div class="banner">${tile('today', 'blue')}<span><b>Welcome back</b><small>${br.days} days since your last workout, and your plan is on week ${app.position().week}. Restart at week 1 to build back up?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="cycle-restart" style="font-size:15px">Restart</button><button class="link" data-action="cycle-keep" data-ts="${br.lastTs}" style="font-size:13px">Keep week ${app.position().week}</button></span></div>`);
+  add(5, weekAskCard());
   const tr = loadTrend(weeklySeries(S.sessions, 5));
-  if (tr.ratio != null && tr.ratio > 1.5) out += `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`;
+  if (tr.ratio != null && tr.ratio > 1.5) add(3, `<div class="banner warn">${tile('flame', 'orange')}<span><b>Big week</b><small>You’ve trained about ${tr.ratio}× more than usual. Consider an easier day.</small></span></div>`);
   const tp = taperFor(S.settings.tournament);
   if (tp && !tp.noGym) {
     const sum = tp.phase === 'recover' ? tournamentSummary(S.sessions, S.settings.tournament) : null;
     const res = sum?.matches ? `${plural(sum.matches, 'match')}${sum.won + sum.lost ? `, ${sum.won}–${sum.lost}` : ''}. ` : '';
-    out += `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'teal')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`;
+    add(4, `<button class="banner" data-action="go" data-to="overview">${tile('trophy', 'teal')}<span><b>${esc(tp.phase === 'recover' ? `After ${tp.name}` : tp.phase === 'taper' ? 'Tournament week' : `${tp.name} coming up`)}</b><small>${esc(res + taperText(tp))}</small></span>${chev}</button>`);
   }
-  out += blockBanner(!!(tp && !tp.noGym));
+  add(5, blockBanner(!!(tp && !tp.noGym)));
   const hm = hardMatchOffer();
-  if (hm) out += `<div class="banner warn">${tile('racket', 'orange')}<span><b>That match was harder than planned</b><small>Move ${esc(app.routine(hm.routine).title)} from ${esc(weekday(hm.from))} to ${esc(weekday(hm.to))}, so your legs get more time?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="hard-move" data-r="${esc(hm.routine)}" data-from="${hm.from}" data-to="${hm.to}" data-id="${esc(hm.match.id)}" style="font-size:15px;white-space:nowrap">Move it</button><button class="link" data-action="hard-keep" data-id="${esc(hm.match.id)}" style="font-size:13px">Keep</button></span></div>`;
+  if (hm) add(3, `<div class="banner warn">${tile('racket', 'orange')}<span><b>That match was harder than planned</b><small>Move ${esc(app.routine(hm.routine).title)} from ${esc(weekday(hm.from))} to ${esc(weekday(hm.to))}, so your legs get more time?</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="hard-move" data-r="${esc(hm.routine)}" data-from="${hm.from}" data-to="${hm.to}" data-id="${esc(hm.match.id)}" style="font-size:15px;white-space:nowrap">Move it</button><button class="link" data-action="hard-keep" data-id="${esc(hm.match.id)}" style="font-size:13px">Keep</button></span></div>`);
   // Recovery days keep coming: the plan is too much for how much padel you play.
   const recent = recoveryDaysRecently(S.settings.recoveryDays);
   if (recent >= TOO_MANY_RECOVERY_DAYS && Date.now() - (S.settings.recWarnSnooze || 0) > 30 * 86400000)
-    out += `<div class="banner warn">${tile('heart', 'orange')}<span><b>${recent} recovery days in 2 weeks</b><small>Your gym plan may be too heavy for how much padel you play. Try one fewer gym day, or shorter workouts.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="go" data-to="welcome" style="font-size:15px;white-space:nowrap">Change plan</button><button class="link" data-action="rec-warn-later" style="font-size:13px">Later</button></span></div>`;
+    add(3, `<div class="banner warn">${tile('heart', 'orange')}<span><b>${recent} recovery days in 2 weeks</b><small>Your gym plan may be too heavy for how much padel you play. Try one fewer gym day, or shorter workouts.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="go" data-to="welcome" style="font-size:15px;white-space:nowrap">Change plan</button><button class="link" data-action="rec-warn-later" style="font-size:13px">Later</button></span></div>`);
   // Everything lives on this phone, so nudge a backup from the first saved session, then weekly.
   // With the online copy working, no backup nudge; if it stops, say so (a broken key is the one thing to fix).
   const cs = cloud.status();
-  if (cs.on && ['key', 'access'].includes(cs.error)) out += `<button class="banner warn" data-action="go" data-to="settings">${tile('shield', 'orange')}<span><b>Online copy stopped</b><small>${cs.error === 'key' ? 'Your GitHub key no longer works. Add a new one in Settings.' : 'The key can’t reach your repository any more. Check it in Settings.'}</small></span>${chev}</button>`;
+  if (cs.on && ['key', 'access'].includes(cs.error)) add(2, `<button class="banner warn" data-action="go" data-to="settings">${tile('shield', 'orange')}<span><b>Online copy stopped</b><small>${cs.error === 'key' ? 'Your GitHub key no longer works. Add a new one in Settings.' : 'The key can’t reach your repository any more. Check it in Settings.'}</small></span>${chev}</button>`);
   const cloudOk = cs.on && cs.lastOk && Date.now() - cs.lastOk < 7 * 86400000;
   if (S.sessions.length && !cloudOk) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
     const snoozed = Date.now() - (S.settings.backupSnooze || 0) < 7 * 86400000;
     // A slim strip, not a card: it matters, but it shouldn't compete with today's workout.
-    if ((days == null || days >= 7) && !snoozed) out += `<div class="strip">${icon('download')}<span>${cs.on ? `Online copy hasn’t saved for ${cs.lastOk ? Math.floor((Date.now() - cs.lastOk) / 86400000) : 'several'} days.` : days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`;
+    if ((days == null || days >= 7) && !snoozed && cs.on) add(2, `<div class="strip">${icon('download')}<span>${cs.on ? `Online copy hasn’t saved for ${cs.lastOk ? Math.floor((Date.now() - cs.lastOk) / 86400000) : 'several'} days.` : days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`);
   }
-  return out;
+  // Not connected at all: your training is only on this phone (a reset or a full phone can lose it).
+  if (!cs.on && S.sessions.length && Date.now() - (S.settings.cloudNudge || 0) > 7 * 86400000)
+    add(2, `<div class="banner warn">${tile('shield', 'orange')}<span><b>Your training is only on this phone</b><small>${db.persistent ? '' : 'This phone may clear it to free up space. '}Set up the online copy (about 3 minutes) so nothing gets lost.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="go" data-to="settings" style="font-size:15px;white-space:nowrap">Set Up</button><button class="link" data-action="cloud-nudge-later" style="font-size:13px">Later</button></span></div>`);
+  // Pain you logged after a workout: the most important thing to know before training.
+  const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear });
+  for (const [a] of Object.entries(recentPain(S.sessions, { cleared: S.painClear })).filter(([, v]) => v.from === 'workout').slice(0, 1)) {
+    const r = COURT_ROUTINES[AREA_ROUTINE[a]], plan = app.planOn();
+    // First when today's training loads that area (a workout that uses it, or padel); otherwise a quieter reminder.
+    const loads = plan === 'Padel' || (isRoutine(plan) && app.routine(plan).blocks.some(blk => loadsAreas(getExercise(blk.ex)).includes(a)));
+    add(loads ? 1 : 6, `<div class="banner warn">${tile('heart', 'orange')}<span><b>${esc(areaName(a))}: pain logged recently</b><small>Exercises that load it are marked in your workout${r ? `; ${esc(r.title)} (${routineMinutes(r)} min) can help` : ''}. Not medical advice: stop if it gets worse.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right">${r ? `<button class="link" data-action="go" data-to="court/${AREA_ROUTINE[a]}" style="font-size:15px">Routine</button>` : ''}<button class="link" data-action="pain-ok" data-a="${a}" style="font-size:13px;white-space:nowrap">Feels fine</button></span></div>`);
+  }
+  add(4, matchTipsCard());
+  add(5, reviewBanner());
+  // One injury-prevention routine for an area that keeps coming up (pain is handled above).
+  const sug = pre.ids.map(id => COURT_ROUTINES[id]).find(r => r && !r.areas.some(x => pre.hurt[x]));
+  if (sug) add(6, `<button class="banner" data-action="go" data-to="court/${sug.id}">${tile('heart', 'pink')}<span><b>${esc(sug.title)} · ${routineMinutes(sug)} min</b><small>${pre.flagged[sug.areas[0]] >= 2 ? `You flagged your ${esc(areaName(sug.areas[0]).toLowerCase())} ${pre.flagged[sug.areas[0]]}× recently.` : 'For an area from your setup.'}</small></span>${chev}</button>`);
+  return items.sort((x, y) => x.rank - y.rank);
 }
+function headsUpSlot() {
+  const h = headsUps();
+  if (!h.length) return '';
+  return `<div class="heads">${h[0].html}${h.length > 1 ? `<button class="link heads-more" data-action="heads-more">+${h.length - 1} more</button>` : ''}</div>`;
+}
+const headsList = () => headsUps().map(x => x.html).join('');
 
 // After you log soreness or pain: say what the app will do about it, so you know it listened.
 // Workout pain counts straight away; padel soreness once it comes back (see recentPain).
@@ -264,7 +284,7 @@ function callCard(plan) {
     : swapIn ? `<button class="btn filled" data-action="reshape-start" data-r="${esc(c.to)}" data-back="${c.back}">${icon('play')}Start ${esc(c.alt.title)}</button><button class="link call-alt" data-action="start" data-routine="${plan}">Keep ${esc(r.title)}, made easier</button>`
     : c.level === 'prep' ? `<button class="btn filled" data-action="prep-move" data-back="${c.move}">Move ${esc(r.title)} to ${esc(weekday(c.move))}</button><button class="link call-alt" data-action="start" data-routine="${plan}">Train anyway, made easier</button>`
     : `<button class="btn filled" data-action="start" data-routine="${plan}">${icon('play')}Start Workout</button>${c.level === 'easier' && S.settings.adaptive !== false ? `<button class="link call-alt" data-action="start-full" data-routine="${plan}">Use the full plan</button>` : ''}`;
-  return `<section class="card hero"><span class="call-chip ${c.level}">${icon(ic)}${label}</span>
+  return `<section class="card hero"><span class="call-chip ${c.level}">${icon(ic)}${label}</span>${cardContext()}
     <div class="hero-top">${tileIc}<div><h2>${esc(title)}</h2><p class="t-sub">${esc(sub)}</p></div></div>
     ${S.active ? '' : feelCard()}
     ${levelLine(isoIn(1))}
@@ -283,8 +303,31 @@ function nextPlanned() {
 
 // Today's planned padel in words: "Ball machine · Overheads. Warm up, play, then log it".
 const padelToday = () => { const p = app.padelOn(); return p && p.type !== 'match' ? `${PADEL_TYPES[p.type]}${p.focus && p.focus !== 'mixed' ? ` · ${PADEL_FOCUS[p.focus]}` : ''}. Warm up, then log it` : 'Warm up, play, then log it'; };
+// The card's top line: where you are in a goal block, and whether padel makes this a busy week.
+function cardContext() {
+  const b = app.position().block, busy = weekTargets(weekWindow()).busy;
+  const parts = [b && `Week ${b.week} of ${b.weeks} · ${b.phase.name}`, busy && 'Busy padel week'].filter(Boolean);
+  return parts.length ? `<p class="t-foot card-context">${esc(parts.join(' · '))}</p>` : '';
+}
+// Two quick buttons under the card, never repeating what the card already offers: on a padel day the card has
+// Warm Up and Log, on a rest or recovery day it has Mobility.
+function quickRow() {
+  const plan = app.planOn(), done = S.sessions.some(s => isoDate(new Date(s.startedAt)) === isoDate());
+  const gym = isRoutine(plan) && !done && !S.active;
+  const log = `<button class="btn tinted" data-action="log-activity" data-kind="padel">${icon('plus')}Log ${gym || plan === 'Padel' ? 'Padel' : 'Activity'}</button>`;
+  const mob = `<button class="btn tinted" data-action="go" data-to="court/mobility">Mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</button>`;
+  const other = `<button class="btn tinted" data-action="other-train">Train Something Else</button>`;
+  const pair = plan === 'Padel' && !done ? [mob, other] : gym || S.active ? [log, mob] : [log, other];
+  return `<div class="quick-row">${pair.join('')}</div>${gym ? '<p style="text-align:center;margin:-4px 0 20px"><button class="link" data-action="other-train">Train something else</button></p>' : ''}`;
+}
 function hero() {
   const plan = app.planOn();
+  // A workout under way is always the one thing to do.
+  if (S.active) {
+    const st = workoutStats(S.active);
+    return `<section class="card hero"><div class="hero-top">${tile('play', 'blue', true)}<div><p class="t-foot">In progress</p><h2>${esc(S.active.title)}</h2><p class="t-sub">${st.sets} of ${st.planned} sets done</p></div></div>
+      <button class="btn filled" data-action="resume">${icon('play')}Continue Workout</button></section>`;
+  }
   const doneToday = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === isoDate());
   const tp = taperFor(S.settings.tournament);
   // On tournament day the tournament card stays up after each match (that's when you need it most).
@@ -309,7 +352,7 @@ function hero() {
   }
   if (isRoutine(plan)) return callCard(plan);
   if (plan === 'Padel') {
-    return `<section class="card hero"><div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">${esc(padelToday())}</p></div></div>
+    return `<section class="card hero">${cardContext()}<div class="hero-top">${tile('racket', 'teal', true)}<div><p class="t-foot">Today</p><h2>Padel day</h2><p class="t-sub">${esc(padelToday())}</p></div></div>
       ${levelLine(isoDate())}
       <div class="btns"><button class="btn filled" data-action="go" data-to="court/warmup">${icon('play')}Warm Up · ${routineMinutes(COURT_ROUTINES.warmup)} min</button>
       <button class="btn tinted" data-action="log-activity" data-kind="padel">Log ${app.padelOn()?.type === 'match' ? 'Match' : 'Padel'}</button></div></section>`;
@@ -328,9 +371,14 @@ function hero() {
       <p class="hero-note swap-note">${esc(app.routine(sw.from).title)} ${sw.back ? `moves to ${esc(weekday(sw.back))}` : 'is skipped this week; your plan continues Monday'}. <button class="link" data-action="swap-undo">Undo</button></p>
       <button class="btn filled" data-action="go" data-to="court/mobility">${icon('play')}Start Mobility</button></section>`;
   }
-  return `<section class="card hero"><div class="hero-top">${tile(rec ? 'heart' : 'snow', rec ? 'pink' : 'gray', true)}<div><p class="t-foot">Today</p><h2>${rec ? 'Recovery day' : 'Rest day'}</h2><p class="t-sub">${rec ? 'Light movement only' : 'Take it easy'}</p></div></div>
-    <p class="hero-note">${rec ? 'A walk, some mobility or an injury-prevention routine is perfect today.' : 'Full rest helps you come back stronger.'}</p>
-    <button class="btn tinted" data-action="${rec ? 'go' : 'log-activity'}" ${rec ? 'data-to="court"' : 'data-kind="mobility"'}>${rec ? 'Browse Routines' : 'Log an Activity'}</button></section>`;
+  // Rest and recovery days: how your body is recovering leads (on training days it's the reason line instead).
+  const recent = S.sessions.some(s => Date.now() - s.startedAt < 8 * 86400000);
+  const rcv = currentRecovery(), parts = [['Legs', LEGS], ['Upper body', UPPER], ['Core', CORE]].map(([l, ms]) => ({ l, p: readyPct(rcv, ms) }));
+  const low = parts.reduce((x, y) => y.p < x.p ? y : x);
+  const head = !recent ? (rec ? 'Recovery day' : 'Rest day') : low.p >= 90 ? 'Fully recovered' : `${low.l} ${low.p}% recovered`;
+  return `<section class="card hero">${cardContext()}<div class="hero-top">${tile(rec ? 'heart' : 'snow', rec ? 'pink' : 'gray', true)}<div><p class="t-foot">${recent ? (rec ? 'Recovery day' : 'Rest day') : 'Today'}</p><h2>${esc(head)}</h2><p class="t-sub">${recent ? esc(parts.map(x => `${x.l} ${x.p}%`).join(' · ')) : rec ? 'Light movement only' : 'Take it easy'}</p></div></div>
+    <p class="hero-note">${rec ? 'A walk, some mobility or an injury-prevention routine is perfect today.' : 'Full rest helps you come back stronger.'}${recent ? ` <button class="link" data-action="go" data-to="recovery">See your body map</button>` : ''}</p>
+    <button class="btn filled" data-action="go" data-to="court/mobility">${icon('play')}Mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</button></section>`;
 }
 
 // ── Match-day essentials: the day before padel, on the day, and after playing. "Got it" hides them for the day;
@@ -365,33 +413,11 @@ function feelCard() {
   return `<div class="feel"><p class="feel-q">How do you feel today?</p><div class="feel-row">${Object.entries(FEELS).map(([k, f]) => `<button class="feel-btn" data-action="feel" data-feel="${k}">${f.label}</button>`).join('')}</div></div>`;
 }
 
-// ── The court panel's rings: how ready you are for today, this week's workouts, your streak.
+// Body regions for the recovery summary on rest days.
 const UPPER = ['front_delts', 'side_delts', 'rear_delts', 'rotator_cuff', 'serratus', 'upper_chest', 'chest', 'lower_chest', 'traps', 'mid_back', 'lats', 'biceps', 'triceps', 'forearms'];
 const CORE = ['abs', 'obliques', 'lower_back', 'hip_flexors'];
 const LEGS = ['glutes', 'glute_med', 'adductors', 'quads', 'hamstrings', 'calves', 'soleus', 'shins'];
 const readyPct = (rec, ms) => ms.length ? Math.round(100 * (1 - ms.reduce((n, m) => n + (rec[m]?.level || 0), 0) / ms.length)) : 100;
-function rings() {
-  if (!S.sessions.length) return '';
-  const rec = currentRecovery(), plan = app.planOn();
-  const muscles = isRoutine(plan) ? [...new Set(app.routine(plan).blocks.flatMap(b => getExercise(b.ex)?.primary || []))] : [...UPPER, ...CORE, ...LEGS];
-  const feel = isRoutine(plan) ? todayFeel()?.feel : null;
-  const ready = Math.round(readyPct(rec, muscles) * (feel === 'tired' ? 0.75 : feel === 'sore' ? 0.85 : 1)), planned = Object.values(S.schedule).filter(isRoutine).length;
-  const done = app.strength.filter(s => s.startedAt >= mondayOf().getTime()).length, streak = weekStreak(S.sessions);
-  const readyColor = ready >= 75 ? 'var(--ball)' : ready >= 50 ? '#FFD60A' : '#FF9F0A';
-  return `<button class="court-rings" data-action="go" data-to="recovery" aria-label="Ready ${ready}%, ${done} of ${planned} workouts this week, ${streak} week streak">
-    ${ringStat(ready / 100, readyColor, `${ready}%`, '', isRoutine(plan) ? 'Ready for today' : 'Ready')}
-    ${ringStat(planned ? done / planned : 0, '#64D2FF', `${done}/${planned || done}`, '', 'This week')}
-    ${ringStat(Math.min(1, streak / 8), '#FFFFFF', String(streak), streak === 1 ? 'week' : 'weeks', 'Streak')}</button>`;
-}
-
-// Recovery at a glance: three bars instead of the full body map (one tap opens it).
-function recoveryStrip() {
-  if (!S.sessions.some(s => Date.now() - s.startedAt < 8 * 86400000)) return '';
-  const rec = currentRecovery(), part = (label, ms) => { const p = readyPct(rec, ms); return `<div class="rs-part"><span>${label}</span><i><b style="width:${p}%;background:${colorFor(1 - p / 100)}"></b></i><em>${p}%</em></div>`; };
-  return `<section class="grp"><h2 class="grp-h big">Recovery</h2><button class="card rec-strip" data-action="go" data-to="recovery">
-    ${part('Upper body', UPPER)}${part('Core', CORE)}${part('Legs', LEGS)}<p class="t-foot">Tap for the body map and each muscle ${chev}</p></button></section>`;
-}
-
 function weekCard() {
   const days = trainingDays(S.sessions), today = isoDate();
   // This week's plan (dated changes and busy weeks included), not the usual week.
@@ -408,36 +434,39 @@ function weekCard() {
   <div class="week-key"><span><i style="background:var(--blue)"></i>Gym</span><span><i style="background:var(--teal)"></i>Padel</span><span><i class="ring"></i>Planned</span></div></div></section>`;
 }
 
-function stayHealthy() {
-  const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear });
-  if (!pre.ids.length) return '';
-  return group(pre.ids.map(id => { const r = COURT_ROUTINES[id]; const n = pre.flagged[r.areas[0]];
-    return row({ title: esc(r.title), sub: `${routineMinutes(r)} min · ${r.areas.some(a => pre.hurt[a]) ? 'you reported pain here recently' : n >= 2 ? `you flagged this ${n}× recently` : 'from your profile'}`, icon: 'heart', color: 'pink', to: `court/${id}` }); }).join(''),
-  { header: 'Stay healthy', big: true });
-}
-
 export const today = {
   render() {
     const date = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
     const initial = (S.settings.name || '').trim()[0];
     const avatar = `<button class="avatar" data-action="go" data-to="settings" aria-label="Settings">${initial ? esc(initial.toUpperCase()) : icon('person')}</button>`;
-    const todays = app.planOn();
-    const others = allRoutineIds().filter(id => id !== todays || S.active);
     const loc = app.location();
-    return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
-      ${banners()}${reviewBanner()}<div class="court-stack">${hero()}${rings()}</div>${matchTipsCard()}
-      <div style="height:28px"></div>${weekCard()}${recoveryStrip()}${stayHealthy()}
-      ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
-        return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: S.active ? 'resume' : 'start', data: { routine: id } }); }).join('')
-        + row({ title: 'Quick workout', sub: 'No plan: add exercises as you go', icon: 'bolt', color: 'indigo', action: 'quick-start' })
-        + row({ title: 'Log a match or activity', icon: 'racket', color: 'teal', action: 'log-activity' })
-        + row({ title: 'Warm up before playing', sub: `${routineMinutes(COURT_ROUTINES.warmup)} min, guided`, icon: 'flame', color: 'orange', to: 'court/warmup' }),
-        { header: 'More', big: true })}
+    return `${pageHead('Today', { eyebrow: date, right: avatar, sub: loc && S.locations.length > 1 ? `Training at <button class="link" data-action="loc-sheet">${esc(loc.name)} ▾</button>` : '' })}
+      <div class="court-stack">${hero()}</div>${headsUpSlot()}
+      ${quickRow()}
+      ${weekCard()}
       ${S.sessions.length ? (cloud.status().on && cloud.status().lastOk ? `<p class="t-foot" style="text-align:center;margin:8px 0 4px">Copied online ${esc(relDay(cloud.status().lastOk).toLowerCase())}</p>`
         : `<p class="t-foot" style="text-align:center;margin:8px 0 4px">${S.lastBackup ? `Last backup ${esc(relDay(S.lastBackup).toLowerCase())}` : 'Not backed up yet'} · <button class="link" data-action="quick-backup" style="font-size:inherit">Back up now</button></p>`) : ''}`;
   },
+  // The "+N more" sheet stays in step with Today: an action there redraws it (and closes it when nothing's left).
+  mounted() {
+    const box = document.querySelector('#sheet[open] .heads-list');
+    if (box) { const html = headsList(); if (html) box.innerHTML = html; else app.closeSheet(); }
+  },
   actions: {
     ...weekActions,
+    'heads-more'() { app.sheet(`<h2 class="sheet-title">Heads-up</h2><p class="sheet-sub">Most important first.</p><div class="heads-list">${headsList()}</div><button class="btn gray" data-action="close-sheet">Close</button>`); },
+    async 'pain-ok'(el) { S.painClear = { ...S.painClear, [el.dataset.a]: Date.now() }; await app.save('painClear'); app.render({ keepScroll: true }); app.toast('Good to hear. Flags for it are cleared until it hurts again.'); },
+    async 'cloud-nudge-later'() { S.settings.cloudNudge = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); },
+    // Everything that isn't today's plan: your other workouts, a quick workout, warm-up and routines.
+    'other-train'() {
+      const todays = app.planOn(), others = allRoutineIds().filter(id => id !== todays);
+      app.sheet(`<h2 class="sheet-title">Train something else</h2><div style="height:12px"></div>
+        ${group(others.map(id => { const r = app.routine(id), look = routineLook(id), last = lastDone(id);
+          return row({ title: esc(r.title), sub: `About ${r.minutes} min · ${last ? `last done ${esc(relDay(last.startedAt).toLowerCase())}` : 'not done yet'}`, icon: look.icon, color: look.color, action: 'start', data: { routine: id } }); }).join('')
+          + row({ title: 'Quick workout', sub: 'No plan: add exercises as you go', icon: 'bolt', color: 'indigo', action: 'quick-start' }))}
+        ${group(row({ title: 'Warm up before playing', sub: `${routineMinutes(COURT_ROUTINES.warmup)} min, guided`, icon: 'flame', color: 'orange', to: 'court/warmup' })
+          + row({ title: 'Mobility and injury prevention', sub: 'All routines', icon: 'heart', color: 'pink', to: 'court' }))}`);
+    },
     'tips-seen'() { S.settings.tipsSeen = isoDate(); app.save('settings'); app.render({ keepScroll: true }); },
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     async 'swap-today'(el) {

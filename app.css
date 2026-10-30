@@ -608,6 +608,14 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .cycle b { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); }
 .cycle .past b { background: rgba(255, 255, 255, .45); }
 .cycle .on b { background: var(--ball); }
+/* Today: one heads-up, then quick actions */
+.heads { display: grid; margin-top: 16px; }
+.heads > .banner, .heads > .strip, .heads > .card { margin-bottom: 0; }
+.heads-more { justify-self: end; font-size: 13px; margin: 6px 4px 0; }
+.heads-list > * { margin-bottom: 12px; }
+.quick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 12px; }
+.quick-row .btn { min-height: 44px; font-size: 15px; }
+.card-context { margin: 0 0 8px; opacity: .85; }
 /* This week: one cell per day with what's on */
 .wk-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 10px 8px 12px; background: var(--court-2); }
 .wk-strip button { display: grid; justify-items: center; gap: 4px; color: var(--court-ink); min-width: 0; }
