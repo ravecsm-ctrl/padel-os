@@ -61,7 +61,8 @@ export const app = {
   },
   async reloadSessions() { S.sessions = await db.allSessions(); },
 
-  go(route) { location.hash = '#/' + route; },
+  // Same address (e.g. first-run setup shown while the address still says Today): no hashchange fires, so redraw here.
+  go(route) { const h = '#/' + route; if (location.hash === h) { parseHash(); app.closeSheet(); app.render(); } else location.hash = h; },
   render({ keepScroll = false } = {}) {
     const y = scrollY;
     const v = app.view();
