@@ -9,7 +9,7 @@ import { DAYS, isRoutine, legHeavyBlocks, isLegHeavy, setCustomRoutines } from '
 import { bestWeek, AREAS } from './domain-personalize.js';
 import { isoDate, mondayOf, parseISO, daysBetween } from './domain-calendar.js';
 import { lands } from './domain-adaptive.js';
-import { usualKinds } from './ui-week.js';
+import { usualKinds, followUsualWeek } from './ui-week.js';
 
 const fmtDay = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const weeksLabel = (a, b) => a === b ? `Week ${a}` : `Weeks ${a}–${b}`;
@@ -194,7 +194,7 @@ export function blockBanner(tournamentShown) {
 export async function startPendingBlock() {
   const b = S.settings.block;
   if (!b?.pending || app.blockPos()?.state === 'upcoming') return false;
-  if (app.blockPos()?.state === 'active') { S.schedule = b.pending; await app.save('schedule'); }
+  if (app.blockPos()?.state === 'active') { S.schedule = b.pending; await app.save('schedule'); followUsualWeek(); }
   delete b.pending;
   await app.save('settings');
   return true;
@@ -205,7 +205,7 @@ async function endBlock(revert) {
   const b = S.settings.block, pos = app.blockPos();
   if (revert && b?.prev?.schedule) {
     S.schedule = Object.fromEntries(DAYS.map(d => { const v = b.prev.schedule[d]; return [d, ['Padel', 'Recovery', 'Rest'].includes(v) || isRoutine(v) ? v : 'Rest']; }));
-    await app.save('schedule');
+    await app.save('schedule'); followUsualWeek();
   }
   S.settings.programStart = pos?.state === 'done' ? pos.nextStart : isoDate(mondayOf());
   delete S.settings.block;

@@ -12,7 +12,8 @@ import { EQUIPMENT, AREAS, bestWeek, scheduleScore } from './domain-personalize.
 import { MATCH_LEVELS, LEVEL_HINT, suggestLevel } from './domain-matchlevel.js';
 import { bodySummary } from './ui-body.js';
 import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
-import { thisWeekSection, weekPick, weekStrip, usualKinds } from './ui-week.js';
+import { thisWeekSection, weekPick, weekStrip, usualKinds, followUsualWeek } from './ui-week.js';
+import { PADEL_TYPES } from './domain-padel.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const usual = d => S.settings.padelLevel?.[d] || 'normal';
@@ -194,11 +195,21 @@ export const plan = {
     async 'week-better'() {
       const b = betterWeek(); if (!b) return;
       const old = { ...S.schedule };
-      S.schedule = b.next; await app.save('schedule'); app.render({ keepScroll: true });
+      S.schedule = b.next; await app.save('schedule'); followUsualWeek(); await app.save('settings'); app.render({ keepScroll: true });
       app.toast('Week updated', async () => { S.schedule = old; await app.save('schedule'); app.render({ keepScroll: true }); });
     },
     async 'week-tip-off'() { S.settings.weekTipOff = JSON.stringify(S.schedule); await app.save('settings'); app.render({ keepScroll: true }); },
-    async 'set-day'(el) { S.schedule[el.dataset.day] = el.dataset.v; await app.save('schedule'); app.closeSheet(); app.render({ keepScroll: true }); },
+    // Changing a usual weekday changes this week's (and later) matching days too. Padel booked for this
+    // week's date stays unless you say so: you're asked.
+    async 'set-day'(el) {
+      const d = el.dataset.day, v = el.dataset.v;
+      S.schedule[d] = v; await app.save('schedule');
+      const kept = followUsualWeek(d); await app.save('settings');
+      app.closeSheet(); app.render({ keepScroll: true });
+      const iso = kept[0];
+      if (iso && v !== 'Padel') app.sheet(`<h2 class="sheet-title">This ${DAY_NAME[d]} still has padel</h2><p class="sheet-sub">Your usual ${DAY_NAME[d]} is now ${esc(optLabel(v).toLowerCase())}, but you added padel for this date (${esc(PADEL_TYPES[app.padelOn(iso)?.type] || 'Match')}). Remove it too?</p>
+        <div class="btns"><button class="btn destructive" data-action="wk-remove" data-iso="${iso}">Remove This ${DAY_NAME[d]}’s Padel</button><button class="btn plain" data-action="close-sheet">Keep It</button></div>`);
+    },
     'how-sheet'() {
       app.sheet(`<h2 class="sheet-title">How your plan adapts</h2><div style="height:12px"></div>
         ${group(row({ title: 'Getting stronger', sub: 'Each exercise has a target range, like 8–10 reps. When you reach the top on every set, the app suggests a little more weight next time.' })

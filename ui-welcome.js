@@ -10,7 +10,7 @@ import { GOALS as BLOCK_GOALS } from './domain-block.js';
 import { PADEL_TYPES, PADEL_FOCUS, hasFocus } from './domain-padel.js';
 import { MATCH_LEVELS } from './domain-matchlevel.js';
 import { openGoal } from './ui-goal.js';
-import { usualKinds } from './ui-week.js';
+import { usualKinds, followUsualWeek } from './ui-week.js';
 import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 
 let step = 0;
@@ -141,7 +141,7 @@ export const welcome = {
       S.settings.padelLevel = { ...(S.settings.padelLevel || {}), ...levels(answers) };
       S.settings.padelUsual = usualOf(answers);
       await app.save('settings');
-      if (replace) { S.schedule = schedFor(answers); await app.save('schedule'); }
+      if (replace) { S.schedule = schedFor(answers); await app.save('schedule'); followUsualWeek(); await app.save('settings'); }
       S.form = {};
       // A goal you picked (or changed): its setup screen shows the weeks before it starts.
       if (answers.goalBlock !== 'none' && (firstTime || goalChanged)) { openGoal(answers.goalBlock); return app.toast('Your plan is ready. Now check your goal’s weeks.'); }

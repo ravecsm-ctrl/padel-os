@@ -71,11 +71,30 @@ export function weekTargets(days) {
 const busyNote = (from, to) => to.busy && !from.busy ? 'Busy padel week: 2 gym sessions, Strength and one that’s light on the legs, and a full rest day.'
   : from.busy && !to.busy ? 'Not a busy padel week any more: your usual workouts are back.' : '';
 
-// Save a planned week: every day you can still change gets its own entry.
-async function applyWeek(days, padelIso = null) {
+// Dates and the usual week: a date keeps its own entry only where it differs from your usual weekday, so a
+// later change to the usual week still reaches it. Padel you booked for a date always keeps its entry.
+const usualOn = iso => S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
+export const isBooked = iso => S.settings.dated?.[iso] === 'Padel' && !!S.settings.padelPlan?.[iso];
+function setDated(iso, v) {
   S.settings.dated = { ...(S.settings.dated || {}) };
-  days.forEach((d, i) => { if (i > 0 && i < days.length - 1 && (!d.fixed || d.iso === padelIso)) S.settings.dated[d.iso] = d.v; });
+  if (v === usualOn(iso) && !(v === 'Padel' && S.settings.padelPlan?.[iso])) delete S.settings.dated[iso];
+  else S.settings.dated[iso] = v;
+}
+// Save a planned week: only the days you can still change, and only where they differ from the usual week.
+async function applyWeek(days, padelIso = null) {
+  days.forEach((d, i) => { if (i > 0 && i < days.length - 1 && (!d.fixed || d.iso === padelIso)) setDated(d.iso, d.v); });
   await app.save('settings');
+}
+// Your usual week changed (one weekday, or all of it): dates from today on follow it again, except padel
+// you booked for a date. Returns this week's booked dates on that weekday, so you can be asked about them.
+export function followUsualWeek(weekday = null) {
+  const today = isoDate(), dated = S.settings.dated || {}, end = isoAdd(monIso(today), 6), kept = [];
+  for (const iso of Object.keys(dated)) {
+    if (iso < today || (weekday && DAYS[(parseISO(iso).getDay() + 6) % 7] !== weekday)) continue;
+    if (isBooked(iso)) { if (iso <= end && !S.sessions.some(s => isoDate(new Date(s.startedAt)) === iso)) kept.push(iso); continue; }
+    delete dated[iso];
+  }
+  return kept;
 }
 function setPadelDetails(iso, p) {
   S.settings.padelPlan = { ...(S.settings.padelPlan || {}), [iso]: { type: p.type, ...(hasFocus(p.type) ? { focus: p.focus } : {}) } };
@@ -88,6 +107,8 @@ export function pruneDated(now = isoDate()) {
     const m = S.settings[k];
     if (m) for (const iso of Object.keys(m)) if (iso < cut) delete m[iso];
   }
+  // Entries that only repeat the usual week (saved by older versions) would hide later changes to it.
+  for (const [iso, v] of Object.entries(S.settings.dated || {})) if (v === usualOn(iso) && !isBooked(iso)) delete S.settings.dated[iso];
 }
 
 function strip(days, { mark = null } = {}) {
@@ -134,10 +155,10 @@ export function weekAskCard() {
 export function addPadelSheet(iso = null, type = null) {
   const today = isoDate(), cur = iso && app.planOn(iso) === 'Padel' ? app.padelOn(iso) : null;
   const last = S.sessions.find(s => s.activity === 'padel' && s.padel?.type)?.padel;
-  S.form = { wkIso: iso || today, wkType: type || cur?.type || last?.type || 'match', wkFocus: cur?.focus || last?.focus || 'mixed', wkLevel: iso && cur ? app.matchLevel(iso) : 'normal', wkEdit: !!cur };
+  S.form = { wkIso: iso || '', wkType: type || cur?.type || last?.type || 'match', wkFocus: cur?.focus || last?.focus || 'mixed', wkLevel: iso && cur ? app.matchLevel(iso) : 'normal', wkEdit: !!cur };
   const f = () => S.form;
   const days = Array.from({ length: 7 }, (_, k) => isoAdd(today, k));
-  const draw = () => `<h2 class="sheet-title">${f().wkEdit ? 'Change padel' : 'Add padel'}</h2><p class="sheet-sub">${esc(fmtDay(f().wkIso))}</p>
+  const draw = () => `<h2 class="sheet-title">${f().wkEdit ? 'Change padel' : 'Add padel'}</h2><p class="sheet-sub">${f().wkIso ? esc(fmtDay(f().wkIso)) : 'Pick the day it’s booked for.'}</p>
     ${f().wkEdit ? '' : `<label class="field-l">Day</label>${chips('wkIso', days, f().wkIso, d => d === today ? 'Today' : shortDay(d))}
     <input class="input" id="wkDate" type="date" min="${today}" max="${isoAdd(today, MAX_AHEAD)}" value="${esc(f().wkIso)}" aria-label="Date" style="margin-top:8px">`}
     <label class="field-l">Type</label>${chips('wkType', Object.keys(PADEL_TYPES), f().wkType, k => PADEL_TYPES[k])}
@@ -156,7 +177,8 @@ export function addPadelSheet(iso = null, type = null) {
 let PROPOSAL = null;
 async function savePadel(p, edit) {
   const today = isoDate();
-  if (!p.iso || p.iso < today || p.iso > isoAdd(today, MAX_AHEAD)) return app.toast('Pick a day from today on');
+  if (!p.iso) return app.toast('Pick the day first');
+  if (p.iso < today || p.iso > isoAdd(today, MAX_AHEAD)) return app.toast('Pick a day from today on');
   const before = weekWindow(p.iso), padel = { type: p.type, focus: p.focus, level: p.level };
   const at = before.find(d => d.iso === p.iso);
   if (at?.fixed && at.v !== 'Padel') return app.toast('You’ve already trained that day');
@@ -189,7 +211,7 @@ async function removePadel(iso) {
   const before = weekWindow(iso);
   delete S.settings.padelPlan?.[iso];
   if (S.settings.matchLevel) delete S.settings.matchLevel[iso];
-  S.settings.dated = { ...(S.settings.dated || {}), [iso]: 'Rest' };
+  setDated(iso, 'Rest');
   const days = before.map(d => d.iso === iso ? { ...d, v: 'Rest', padel: null, fixed: false } : d);
   const was = weekTargets(before), t = weekTargets(days), note = busyNote(was, t);
   const r = planWeek(days, t.list, { ...OPTS, busy: t.busy, alt: t.alt });
@@ -201,9 +223,11 @@ async function removePadel(iso) {
 function daySheet(iso) {
   const today = isoDate(), d = weekWindow(iso).find(x => x.iso === iso), wd = DAYS[(parseISO(iso).getDay() + 6) % 7];
   const done = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === iso);
+  // Where the day comes from: booked for this date, re-planned for this week, or your usual weekday.
+  const from = done.length ? '' : isBooked(iso) ? 'Added for this date' : S.settings.dated?.[iso] != null ? 'Planned for this week' : `From your usual ${dayName(iso)}`;
   const body = d.v === 'Padel'
-    ? group(row({ title: esc(padelLabel(d.padel)), sub: esc(MATCH_LEVELS[d.padel?.level || 'normal']), icon: 'racket', color: 'teal', chevron: false }))
-    : group(row({ title: esc(titleOf(d.v)), sub: done.length ? 'Done' : iso < today ? 'Not logged' : 'Planned', icon: isRoutine(d.v) ? 'dumbbell' : d.v === 'Recovery' ? 'heart' : 'snow', color: isRoutine(d.v) ? 'blue' : 'gray', chevron: false }));
+    ? group(row({ title: esc(padelLabel(d.padel)), sub: esc([MATCH_LEVELS[d.padel?.level || 'normal'], from].filter(Boolean).join(' · ')), icon: 'racket', color: 'teal', chevron: false }))
+    : group(row({ title: esc(titleOf(d.v)), sub: done.length ? 'Done' : iso < today ? 'Not logged' : from, icon: isRoutine(d.v) ? 'dumbbell' : d.v === 'Recovery' ? 'heart' : 'snow', color: isRoutine(d.v) ? 'blue' : 'gray', chevron: false }));
   const can = iso >= today && !done.length;
   app.sheet(`<h2 class="sheet-title">${esc(fmtDay(iso))}</h2><div style="height:12px"></div>${body}
     <div class="btns">${can && d.v === 'Padel' ? `<button class="btn tinted" data-action="week-add" data-iso="${iso}">Change Padel</button><button class="btn destructive" data-action="wk-remove" data-iso="${iso}">Remove Padel</button>` : ''}
@@ -211,6 +235,7 @@ function daySheet(iso) {
     <button class="btn plain" data-action="day-sheet-usual" data-day="${wd}">Change Your Usual ${esc(dayName(iso))}</button></div>`);
 }
 
+export const removeBooking = iso => removePadel(iso);
 export const weekActions = {
   'week-add'(el) { addPadelSheet(el.dataset.iso || null, el.dataset.type || null); },
   'week-ask-off'() { S.settings.weekAsked = monIso(isoDate()); app.save('settings'); app.render({ keepScroll: true }); },

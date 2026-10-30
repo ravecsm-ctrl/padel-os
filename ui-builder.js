@@ -1,6 +1,6 @@
 // Program builder screens: focus → setup → preview & edit → save.
 import { app, S } from './core-app.js';
-import { usualKinds } from './ui-week.js';
+import { usualKinds, followUsualWeek } from './ui-week.js';
 import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
 import { FOCUS, buildProgram, alternativesFor, prescriptionFor, rankExercises } from './domain-builder.js';
 import { estimateMinutes, generateSchedule, LEVELS } from './domain-personalize.js';
@@ -80,7 +80,7 @@ async function save() {
   });
   setCustomRoutines(S.customRoutines);
   await app.save('customRoutines');
-  if (B.schedule) { S.schedule = generateSchedule(ids.length, S.profile.padelDays || [], ids, isLegHeavy, S.profile.trainDays, S.settings.padelLevel || {}, usualKinds()); await app.save('schedule'); }
+  if (B.schedule) { S.schedule = generateSchedule(ids.length, S.profile.padelDays || [], ids, isLegHeavy, S.profile.trainDays, S.settings.padelLevel || {}, usualKinds()); await app.save('schedule'); followUsualWeek(); await app.save('settings'); }
   const count = ids.length; B = null;
   app.go('plan');
   app.toast(`Program saved · ${count} workout${count > 1 ? 's' : ''}${count && S.schedule ? ' on your schedule' : ''}`);
