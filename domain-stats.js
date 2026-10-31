@@ -5,6 +5,7 @@ import { getExercise } from './domain-catalog.js';
 import { doneSets, e1rm } from './domain-progression.js';
 import { mondayOf, isoDate } from './domain-calendar.js';
 import { COURT_ROUTINES } from './domain-court.js';
+import { challengeXp, anyTierCleared } from './domain-challenges.js';
 
 const isRoutineLog = s => s.kind === 'activity' && !!s.routine;
 const isPrehab = s => isRoutineLog(s) && COURT_ROUTINES[s.routine]?.kind === 'prehab';
@@ -99,7 +100,7 @@ export function pentagon(sessions, { plannedPerWeek = 3, now = Date.now() } = {}
 }
 
 // ── XP for good habits (never raw volume) ───────────────────────────────────────
-export function xpEvents(sessions, { plannedIds = [] } = {}) {
+export function xpEvents(sessions, { plannedIds = [], shotStarts = {} } = {}) {
   const out = [], sorted = [...sessions].sort((a, b) => a.startedAt - b.startedAt);
   const weeks = new Map(), lightDays = new Set();
   for (const s of sorted) {
@@ -119,6 +120,8 @@ export function xpEvents(sessions, { plannedIds = [] } = {}) {
     }
   }
   for (const [wk, n] of weeks) if (n >= 2) out.push({ ts: new Date(wk + 'T23:00').getTime() + 6 * DAY, xp: 50, label: 'Active week (2+ sessions)' });
+  // Padel shot challenges add a little, capped each week so drills can't out-level the gym.
+  out.push(...challengeXp(sessions, shotStarts));
   return out.sort((a, b) => b.ts - a.ts);
 }
 
@@ -147,5 +150,6 @@ export function achievements(sessions) {
     { key: 'pr', label: 'First personal record', done: prs >= 1, progress: `${Math.min(1, prs)}/1` },
     { key: 'prehab', label: '5 prevention routines', done: routines >= 5, progress: `${Math.min(5, routines)}/5` },
     { key: 'matches', label: '10 matches logged', done: matches >= 10, progress: `${Math.min(10, matches)}/10` },
+    { key: 'shotTier', label: 'First padel shot tier cleared', done: anyTierCleared(sessions), progress: `${anyTierCleared(sessions) ? 1 : 0}/1` },
   ];
 }

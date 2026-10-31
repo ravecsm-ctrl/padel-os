@@ -15,7 +15,7 @@ const powerInPlan = () => Object.values(S.schedule).filter(isRoutine).some(id =>
 const markPlan = axes => axes.map(a => a.key === 'power' && a.score === 0 && !powerInPlan() ? { ...a, notInPlan: true } : a);
 export const currentStats = () => {
   const now = Date.now();
-  return { axes: markPlan(pentagon(S.sessions, { plannedPerWeek: planned(), now })), before: pentagon(S.sessions, { plannedPerWeek: planned(), now: now - 28 * DAY }), level: levelFor(xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) }).reduce((n, e) => n + e.xp, 0)) };
+  return { axes: markPlan(pentagon(S.sessions, { plannedPerWeek: planned(), now })), before: pentagon(S.sessions, { plannedPerWeek: planned(), now: now - 28 * DAY }), level: levelFor(xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} }).reduce((n, e) => n + e.xp, 0)) };
 };
 
 // Original radar chart: five axes, rings at 25/50/75/100, now vs 4 weeks ago.
@@ -58,7 +58,7 @@ export const stats = {
   tab: 'overview',
   render() {
     const { axes, before, level } = currentStats();
-    const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) }).slice(0, 8);
+    const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} }).slice(0, 8);
     const badges = achievements(S.sessions);
     return `${navBar({ back: 'Progress', backTo: 'overview', title: 'Your Profile' })}
       <div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>

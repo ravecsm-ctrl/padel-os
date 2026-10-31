@@ -27,6 +27,7 @@ import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js'
 import { matchTips } from './domain-matchday.js';
 import { recentPain, painWithProfile, painHits, areaName, loadsAreas } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
+import { challengeForm, challengeSection, bindChallenge, afterSave, focusForShot } from './ui-challenges.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -620,11 +621,13 @@ const lastPadelType = (iso = isoDate()) => {
   const p = S.settings.padelPlan?.[iso]; if (p) return { ptype: p.type, focus: p.focus || 'mixed' };
   const l = S.sessions.find(s => s.activity === 'padel' && s.padel?.type); return { ptype: l?.padel.type || 'match', focus: l?.padel.focus || 'mixed' };
 };
-export function activitySheet(kind = 'padel', existing = null, date = null) {
+// shot: open on that shot's challenge (from the Train tab), as a training session.
+export function activitySheet(kind = 'padel', existing = null, date = null, shot = null) {
   const pd = existing?.padel || {};
   S.form = existing ? { activity: existing.activity, duration: existing.durationMin, rpe: existing.rpe, date: isoDate(new Date(existing.startedAt)), notes: existing.notes,
     ptype: pd.type || 'match', focus: pd.focus || 'mixed', legs: pd.legs || '', result: pd.result || 'none', score: pd.score || '', partner: pd.partner || '', side: pd.side || '', sore: [...(pd.sore || [])] }
     : { activity: kind, duration: defaultMinutes(kind, date || isoDate()), rpe: 7, date: date || isoDate(), notes: '', ...lastPadelType(date || isoDate()), legs: '', result: 'none', score: '', partner: '', side: '', sore: [] };
+  Object.assign(S.form, challengeForm(existing, shot), shot ? { ptype: hasFocus(S.form.ptype) ? S.form.ptype : 'training', focus: focusForShot(shot) } : {});
   const f = () => S.form;
   const draw = () => {
     const padel = f().activity === 'padel', match = padel && ['match', 'americano'].includes(f().ptype);
@@ -632,6 +635,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
     <div style="height:8px"></div>${seg('activity', ACTIVITIES, f().activity)}
     ${padel ? `<label class="field-l">Type</label>${chips('ptype', Object.keys(PADEL_TYPES), f().ptype, k => PADEL_TYPES[k])}` : ''}
     ${padel && hasFocus(f().ptype) ? `<label class="field-l">What did you work on?</label>${chips('focus', Object.keys(PADEL_FOCUS), f().focus, k => PADEL_FOCUS[k])}` : ''}
+    ${padel && hasFocus(f().ptype) ? challengeSection(f(), existing) : ''}
     ${match ? `<label class="field-l">Result</label>${seg('result', [['won', 'Won'], ['lost', 'Lost'], ['none', 'Skip']], f().result)}
       <div class="grid2"><input class="input" id="scoreIn" placeholder="Score (optional)" value="${esc(f().score)}" aria-label="Score"><input class="input" id="partnerIn" placeholder="Partner (optional)" value="${esc(f().partner)}" aria-label="Partner"></div>` : ''}
     ${padel && f().ptype !== 'machine' ? `<label class="field-l">Side you played</label>${seg('side', [['drive', 'Right'], ['reves', 'Left'], ['both', 'Both']], f().side)}` : ''}
@@ -648,6 +652,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
     const bind = (id, key, ev = 'oninput') => { const el = body.querySelector(id); if (el) el[ev] = e => { f()[key] = e.target.value; }; };
     body.querySelector('#durIn').oninput = e => { f().duration = +e.target.value; };
     bind('#dateIn', 'date', 'onchange'); bind('#notesIn', 'notes'); bind('#scoreIn', 'score'); bind('#partnerIn', 'partner');
+    bindChallenge(body, f(), existing, () => app.sheet(draw(), mount));
     body.querySelectorAll('[data-sore]').forEach(b => b.onclick = () => { const k = b.dataset.sore; f().sore = f().sore.includes(k) ? f().sore.filter(x => x !== k) : [...f().sore, k]; app.sheet(draw(), mount); });
     body.querySelector('#saveAct').onclick = async () => {
       const dur = +f().duration;
@@ -657,14 +662,16 @@ export function activitySheet(kind = 'padel', existing = null, date = null) {
       if (isoDate(d) === isoDate(now)) d.setTime(Math.max(parseISO(isoDate(now)).getTime(), now.getTime() - dur * 60000));
       else d.setHours(12);
       const t = S.settings.tournament, event = t?.date && t.date === isoDate(d) ? t.name || 'Tournament' : existing?.padel?.event;
-      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(LEGS_FELT[f().legs] ? { legs: f().legs } : {}), ...(event ? { event } : {}) } : undefined;
+      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(LEGS_FELT[f().legs] ? { legs: f().legs } : {}), ...(event ? { event } : {}), ...(hasFocus(f().ptype) && f().drills.length ? { drills: f().drills } : {}) } : undefined;
       const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];
       const base = existing ? { ...existing, activity: f().activity, durationMin: dur, rpe: +f().rpe, notes: f().notes, startedAt: d.getTime(), endedAt: d.getTime() + dur * 60000 }
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });
       const rec = { ...base, title: titleFor(), padel };
+      const shots = afterSave(padel?.drills, existing);
+      if (padel?.drills) await app.save('settings');
       await db.putSession(rec); await app.reloadSessions(); app.closeSheet();
       const note = existing ? '' : soreNote(padel?.sore);
-      app.toast(`${existing ? 'Saved' : `${rec.title} saved`}${note ? `. ${note}` : ''}`);
+      app.toast(`${existing ? 'Saved' : `${rec.title} saved`}${note ? `. ${note}` : ''}${shots ? `. ${shots}` : ''}`);
       app.render({ keepScroll: true });
     };
   };

@@ -142,7 +142,7 @@ function highlightCard() {
 export function headed() {
   if (app.strength.length < SCORES_AFTER) return gettingStarted();
   const { axes, before, level } = currentStats();
-  const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine) });
+  const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} });
   const eta = levelEta(xp, level), proj = liftProjections(app.strength), wi = whatIf(app.strength, xp, level, proj);
   const unit = S.settings.unit, by = ts => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   const val = (p, v) => p.metric.load ? fmtNum(toDisplay(v, unit)) : fmtNum(v);
