@@ -93,5 +93,14 @@ export function challengeXp(sessions, starts = {}) {
   return out;
 }
 
+// The padel pentagon: one point per shot, in SHOT_IDS order. A shot with no results scores 0 and is marked not started.
+// now: the moment to score at (4 weeks ago for the comparison shape); later results don't count.
+export const SHORT = { overhead: 'Bandeja / Víbora', smash: 'Smash', fhv: 'FH volley', bhv: 'BH volley', lob: 'Lob' };
+export function padelPentagon(sessions, starts = {}, now = Date.now()) {
+  const upTo = sessions.filter(s => s.startedAt <= now);
+  return SHOT_IDS.map(id => { const st = shotState(upTo, id, { start: starts[id]?.start || 1, now });
+    return { key: id, label: SHORT[id], score: st.started ? st.score : 0, started: st.started, faded: st.faded, level: st.level, next: st.next, best: st.best }; });
+}
+
 // For milestones: has any result cleared its tier?
 export const anyTierCleared = sessions => sessions.some(s => (s.padel?.drills || []).some(r => TIERS[r.tier] && passes(r)));

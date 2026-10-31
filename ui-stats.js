@@ -1,11 +1,13 @@
 // Progress pentagon, level and badges. Private: nothing here leaves the device.
 import { app, S } from './core-app.js';
-import { esc, icon, navBar, group, row } from './ui-kit.js';
+import { esc, icon, navBar, group, row, seg } from './ui-kit.js';
 import { pentagon, xpEvents, levelFor, achievements } from './domain-stats.js';
 import { isRoutine } from './domain-program.js';
 import { getExercise } from './domain-catalog.js';
 import { relDay } from './domain-calendar.js';
 import { headed } from './ui-overview.js';
+import { padelPentagon, SHOTS, TIERS } from './domain-challenges.js';
+import { challengeActions } from './ui-challenges.js';
 
 const DAY = 86400000;
 const planned = () => Math.max(1, Object.values(S.schedule).filter(isRoutine).length);
@@ -29,7 +31,7 @@ export function radar(axes, before = null, { size = 300, labels = true } = {}) {
   const cur = `<polygon points="${poly(axes.map(a => Math.max(3, a.score)))}" class="rd-cur"/>` + axes.map((a, i) => { const [x, y] = pt(i, Math.max(3, a.score)); return `<circle cx="${x}" cy="${y}" r="3.5" class="rd-dot"/>`; }).join('');
   const lab = labels ? axes.map((a, i) => {
     const [x, y] = pt(i, 122), anchor = Math.abs(x - cx) < 8 ? 'middle' : x > cx ? 'start' : 'end';
-    return `<text x="${x}" y="${y - 6}" text-anchor="${anchor}" class="rd-label">${esc(a.label)}</text><text x="${x}" y="${y + 18}" text-anchor="${anchor}" class="rd-score">${a.notInPlan ? '—' : a.score}</text>`;
+    return `<text x="${x}" y="${y - 6}" text-anchor="${anchor}" class="rd-label">${esc(a.label)}</text><text x="${x}" y="${y + 18}" text-anchor="${anchor}" class="rd-score">${a.notInPlan || a.dash ? '—' : a.score}</text>`;
   }).join('') : '';
   return `<svg class="radar" viewBox="-104 -26 508 360" width="${size}" role="img" aria-label="Progress pentagon: ${esc(axes.map(a => `${a.label} ${a.score}`).join(', '))}">${rings}${spokes}${prev}${cur}${lab}</svg>`;
 }
@@ -54,23 +56,42 @@ function axisSheet(key) {
     ${group(row({ title: esc(a.tip) }), { header: 'How to raise it' })}`);
 }
 
+// Which pentagon Your Profile shows: your gym scores or your padel shots.
+let VIEW = 'gym';
+const legend = `<div class="bm-legend"><span><i style="width:14px;height:3px;background:var(--blue);display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></i>Now</span><span><i style="width:14px;height:0;border-top:2px dashed var(--label-3);display:inline-block;margin-right:4px;vertical-align:middle"></i>4 weeks ago</span></div>`;
+const diffTag = d => d ? ` <span class="t-foot ${d > 0 ? 'green' : 'red'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>` : '';
+
+// The padel pentagon: one point per shot from its challenge tiers (fed balls and drills).
+function padelView() {
+  const now = Date.now(), starts = S.settings.shots || {}, axes = padelPentagon(S.sessions, starts, now).map(a => ({ ...a, dash: !a.started })), before = padelPentagon(S.sessions, starts, now - 28 * DAY);
+  const none = axes.every(a => !a.started);
+  return `<div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>${none ? '<p class="t-foot" style="text-align:center;margin:4px 0 0">No shot results yet. Add one when you log a lesson, training or ball-machine session.</p>' : legend}</div>
+      <div style="height:24px"></div>
+      ${group(axes.map(a => { const d = a.started ? a.score - (before.find(b => b.key === a.key)?.score || 0) : 0, t = a.next ? TIERS[a.next] : null;
+        const sub = !a.started ? 'Not started' : `${a.level}${a.faded ? ' · not practised for 8 weeks' : t ? ` · next: ${t.goal(a.key)}` : ' · every tier cleared'}`;
+        return row({ title: esc(SHOTS[a.key]), sub: esc(sub), value: a.started ? `${a.score}${diffTag(d)}` : '—', action: 'shot-sheet', data: { id: a.key } }); }).join(''),
+        { header: 'Shots', footer: 'Out of 100 from your challenge tiers: each tier cleared is a third, and your best result toward the next tier fills in between. They compare you with your own results, not with other people.' })}`;
+}
+
 export const stats = {
   tab: 'overview',
+  onPick(name, v) { if (name === 'profileView') { VIEW = v; app.render({ keepScroll: true }); } },
   render() {
     const { axes, before, level } = currentStats();
     const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} }).slice(0, 8);
     const badges = achievements(S.sessions);
-    return `${navBar({ back: 'Progress', backTo: 'overview', title: 'Your Profile' })}
-      <div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>
-        <div class="bm-legend"><span><i style="width:14px;height:3px;background:var(--blue);display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></i>Now</span><span><i style="width:14px;height:0;border-top:2px dashed var(--label-3);display:inline-block;margin-right:4px;vertical-align:middle"></i>4 weeks ago</span></div></div>
+    const gym = `<div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>${legend}</div>
       <div style="height:24px"></div>
-      ${group(axes.map(a => { const d = a.score - (before.find(b => b.key === a.key)?.score || 0); return row({ title: esc(a.label), sub: a.notInPlan ? 'Not in your plan yet: none of your scheduled workouts has jumps or throws. Add Power & Agility to a day in Plan if you want it.' : esc(a.parts.map(p => p.detail).join(' · ')), value: a.notInPlan ? '—' : `${a.score}${d ? ` <span class="t-foot ${d > 0 ? 'green' : 'red'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>` : ''}`, action: 'axis-sheet', data: { k: a.key } }); }).join(''),
-        { header: 'Scores', footer: 'Out of 100. They compare you with your own training over the last 4 weeks, not with other people.' })}
+      ${group(axes.map(a => { const d = a.score - (before.find(b => b.key === a.key)?.score || 0); return row({ title: esc(a.label), sub: a.notInPlan ? 'Not in your plan yet: none of your scheduled workouts has jumps or throws. Add Power & Agility to a day in Plan if you want it.' : esc(a.parts.map(p => p.detail).join(' · ')), value: a.notInPlan ? '—' : `${a.score}${diffTag(d)}`, action: 'axis-sheet', data: { k: a.key } }); }).join(''),
+        { header: 'Scores', footer: 'Out of 100. They compare you with your own training over the last 4 weeks, not with other people.' })}`;
+    return `${navBar({ back: 'Progress', backTo: 'overview', title: 'Your Profile' })}
+      <div style="margin-top:12px">${seg('profileView', [['gym', 'Gym'], ['padel', 'Padel']], VIEW)}</div>
+      ${VIEW === 'padel' ? padelView() : gym}
       <section class="grp"><h2 class="grp-h">Level</h2><div class="card">${levelBar(level)}</div><p class="grp-f">Points come from showing up and training well: finishing workouts, hitting your targets, records, prevention routines, logged matches and active weeks. Extra sets don’t earn more, so there’s no reward for overdoing it.</p></section>
       ${group(badges.map(b => row({ title: esc(b.label), value: b.done ? '' : b.progress, right: b.done ? icon('check', 'check-mark') : '', icon: b.done ? 'trophy' : 'target', color: b.done ? 'orange' : 'gray' })).join(''), { header: 'Milestones' })}
       ${xp.length ? group(xp.map(e => row({ title: esc(e.label), sub: esc(relDay(e.ts)), value: `+${e.xp}` })).join(''), { header: 'Recent points' }) : ''}
       <p class="fine">Private to this device.</p>
       ${headed()}`;
   },
-  actions: { 'axis-sheet'(el) { axisSheet(el.dataset.k); } },
+  actions: { 'axis-sheet'(el) { axisSheet(el.dataset.k); }, ...challengeActions },
 };

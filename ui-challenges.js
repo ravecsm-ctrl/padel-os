@@ -2,6 +2,7 @@
 // The rules are in domain/challenges.js; see PADEL-CHALLENGES.md.
 import { app, S } from './core-app.js';
 import { esc, group, row, chips, seg } from './ui-kit.js';
+import { activitySheet } from './ui-today.js';
 import { SHOTS, SHOT_IDS, VARIANTS, LEVELS, TIERS, TOP_TIER, shotResults, shotState, allShots, tierFor, firstResultNote, overheadBalls, resultText, passes, OVERHEAD_NOTE_FROM } from './domain-challenges.js';
 
 const starts = () => S.settings.shots || {};
@@ -99,3 +100,10 @@ export function shotSheet(id) {
 
 // History: a session's results.
 export const drillsGroup = drills => drills?.length ? group(drills.map(r => row({ title: `${esc(SHOTS[r.shot] || r.shot)}${r.variant ? ` · ${esc(VARIANTS[r.variant])}` : ''}`, sub: `${esc(LEVELS[r.tier] || '')} try`, value: `${esc(resultText(r))}${passes(r) ? ' ✓' : ''}` })).join(''), { header: 'Shot challenges' }) : '';
+
+// The shot sheet's buttons, for any view that opens it (Train tab, Your Profile).
+export const challengeActions = {
+  'shot-sheet'(el) { shotSheet(el.dataset.id); },
+  'shot-log'(el) { app.closeSheet(); activitySheet('padel', null, null, el.dataset.id); },
+  async 'shot-focus'(el) { S.settings.focusShot = el.dataset.id; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Focus shot set'); },
+};

@@ -11,8 +11,7 @@ import { blockHero } from './ui-goal.js';
 import { prehabFor } from './domain-padel.js';
 import { createActivity } from './domain-workout.js';
 import { AREAS } from './domain-personalize.js';
-import { challengesCard, shotSheet } from './ui-challenges.js';
-import { activitySheet } from './ui-today.js';
+import { challengesCard, challengeActions } from './ui-challenges.js';
 
 // Player state uses absolute timestamps so it stays correct if the phone throttles timers.
 let P = null;
@@ -127,9 +126,7 @@ export const court = {
   mounted() { if (P && P.i >= 0 && !P.done) { keepAwake(); loop(); } },
   actions: {
     'routines-sheet'(el) { routinesSheet(el.dataset.kind); },
-    'shot-sheet'(el) { shotSheet(el.dataset.id); },
-    'shot-log'(el) { app.closeSheet(); activitySheet('padel', null, null, el.dataset.id); },
-    async 'shot-focus'(el) { S.settings.focusShot = el.dataset.id; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Focus shot set'); },
+    ...challengeActions,
     'cp-start'() { P.startedAt = Date.now(); startStep(0); beep(true); app.render(); },
     'cp-pause'() { if (P.paused != null) { P.endAt = Date.now() + P.paused * 1000; P.paused = null; } else P.paused = remaining(); app.render({ keepScroll: true }); },
     'cp-next'() { if (P.i >= P.steps.length - 1) P.done = true; else startStep(P.i + 1); app.render({ keepScroll: true }); },
