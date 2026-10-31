@@ -11,6 +11,7 @@ import { MATCH_LEVELS, loggedLevel } from './domain-matchlevel.js';
 import { planWeek, withPadel, suggestPadelDays, workoutsLeft } from './domain-weekplan.js';
 import { padelProfile } from './domain-recovery.js';
 import { busyWeek, ANCHOR_ID } from './domain-busy.js';
+import { bestWeek, scheduleScore } from './domain-personalize.js';
 
 const OPTS = { legs: id => id === ANCHOR_ID || isLegHeavy(id), upper: isUpperHeavy, anchor: ANCHOR_ID };
 // Your usual padel weekdays as load factors, for planning the usual week (personalize.bestWeek).
@@ -180,14 +181,54 @@ async function commitDay(iso, v) {
 }
 // Your usual weekday changes, and this week's (and later) matching days follow; padel you booked for this
 // week's date stays unless you say so (you're asked).
+// A usual weekday becoming padel: re-plan the usual week so the workout that was there gets another day, and
+// show it before anything changes. Rest or recovery turning into padel only asks when the week clearly improves.
+const WEEKDAY = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+let USUAL = null;
+export function usualWithPadel(sched, d) {
+  const before = { ...sched, [d]: 'Padel' }, was = sched[d], gym = DAYS.filter(x => isRoutine(before[x]));
+  const ids = [...gym.map(x => before[x]), ...(isRoutine(was) ? [was] : [])];
+  if (!ids.length) return { next: before, changed: [], skipped: [], worth: false };
+  const padelDays = DAYS.filter(x => before[x] === 'Padel'), levels = S.settings.padelLevel || {}, kinds = usualKinds();
+  let best = bestWeek(ids, padelDays, isLegHeavy, levels, S.profile.trainDays, kinds);
+  // Not enough training days in your setup: use any free day rather than lose a workout.
+  if (best.ids.length < ids.length) best = bestWeek(ids, padelDays, isLegHeavy, levels, null, kinds);
+  const next = { ...before }; gym.forEach(x => { next[x] = 'Rest'; });
+  best.days.forEach((x, i) => { next[x] = best.ids[i]; });
+  if (DAYS.some(x => before[x] === 'Recovery') && !DAYS.some(x => next[x] === 'Recovery')) { const free = DAYS.filter(x => next[x] === 'Rest'); if (free.length) next[free[Math.floor(free.length / 2)]] = 'Recovery'; }
+  const skipped = [...ids]; best.ids.forEach(id => skipped.splice(skipped.indexOf(id), 1));
+  const changed = DAYS.filter(x => x !== d && next[x] !== sched[x]);
+  // A workout lost its day: always worth showing. Otherwise only when the week is clearly better (as A Better Week).
+  const worth = isRoutine(was) || scheduleScore(before, isRoutine, isLegHeavy, levels, kinds) - best.score >= 1.9;
+  return { next, changed, skipped, worth: worth && (changed.length > 0 || skipped.length > 0) };
+}
+function usualPadelSheet(d) {
+  const sched = { ...S.schedule }, was = sched[d], r = usualWithPadel(sched, d);
+  if (!r.worth) return null;
+  USUAL = { d, next: r.next, plain: { ...sched, [d]: 'Padel' } };
+  app.sheet(`<h2 class="sheet-title">Every ${WEEKDAY[d]}: padel</h2><p class="sheet-sub">${isRoutine(was) ? `${esc(titleOf(was))} needs a new day. Here’s your usual week with it moved.` : 'Your workouts fit better around it like this.'}</p>
+    ${group(DAYS.map(x => row({ title: WEEKDAY[x], sub: x === d || r.changed.includes(x) ? '<span class="orange">Changed</span>' : '', value: esc(titleOf(r.next[x])), chevron: false })).join(''))}
+    ${r.skipped.length ? `<p class="hero-note">${esc(r.skipped.map(titleOf).join(' and '))} doesn’t fit around your padel, so it’s left out.</p>` : ''}
+    <div class="btns"><button class="btn filled" data-action="usual-use">Use This Week</button><button class="btn plain" data-action="usual-plain">${isRoutine(was) ? `Just Make ${WEEKDAY[d]} Padel` : 'Keep Workouts Where They Are'}</button></div>
+    ${isRoutine(was) ? `<p class="t-foot" style="text-align:center">With “Just make ${WEEKDAY[d]} padel”, ${esc(titleOf(was))} leaves your usual week.</p>` : ''}`);
+  return true;
+}
+async function applyUsual(next, weekday = null) {
+  const old = { ...S.schedule };
+  S.schedule = next; await app.save('schedule'); followUsualWeek(weekday); await app.save('settings');
+  USUAL = null; app.closeSheet(); app.render({ keepScroll: true });
+  app.toast('Usual week updated', async () => { S.schedule = old; await app.save('schedule'); app.render({ keepScroll: true }); });
+}
+
 export async function setUsualDay(d, v) {
+  if (v === 'Padel' && S.schedule[d] !== 'Padel' && usualPadelSheet(d)) return;
   S.schedule[d] = v; await app.save('schedule');
   const kept = followUsualWeek(d); await app.save('settings');
   app.closeSheet(); app.render({ keepScroll: true });
   const iso = kept[0], name = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }[d];
   if (iso && v !== 'Padel') app.sheet(`<h2 class="sheet-title">This ${name} still has padel</h2><p class="sheet-sub">Your usual ${name} is now ${esc(titleOf(v).toLowerCase())}, but you added padel for this date (${esc(PADEL_TYPES[app.padelOn(iso)?.type] || 'Match')}). Remove it too?</p>
     <div class="btns"><button class="btn destructive" data-action="wk-remove" data-iso="${iso}">Remove This ${name}’s Padel</button><button class="btn plain" data-action="close-sheet">Keep It</button></div>`);
-  else app.toast(`Every ${name}: ${titleOf(v)}`);
+  else app.toast(`Every ${name}: ${titleOf(v)}${v === 'Padel' ? '. Your workouts already fit around it.' : ''}`);
 }
 
 // One sheet for a day: what it is, and whether a change is for this week only or every week.
@@ -337,6 +378,8 @@ export const weekActions = {
   'week-ask-off'() { S.settings.weekAsked = monIso(isoDate()); app.save('settings'); app.render({ keepScroll: true }); },
   'wk-day'(el) { daySheet(el.dataset.iso); },
   'wk-remove'(el) { removePadel(el.dataset.iso); },
+  async 'usual-use'() { if (USUAL) await applyUsual(USUAL.next); },
+  async 'usual-plain'() { if (USUAL) await applyUsual(USUAL.plain, USUAL.d); },
   async 'wk-use'() { if (!PROPOSAL) return app.closeSheet(); await applyWeek(PROPOSAL.days, PROPOSAL.mark); if (PROPOSAL.keep) await PROPOSAL.keep(); PROPOSAL = null; app.closeSheet(); app.render({ keepScroll: true }); app.toast('Week updated'); },
   async 'wk-keep'() {
     // Padel stays; a workout that was on that day is skipped this week.

@@ -62,8 +62,9 @@ function placeWeek(days, workouts, opts) {
   // Where each workout is now (opts.was adds one that sat on a day that just became padel).
   const was = new Map([...days.map((d, i) => [d.v, i]).filter(([v], i) => workouts.includes(v) && !days[i].fixed), ...Object.entries(opts.was || {})]);
   const n = Math.min(workouts.length, free.length);
-  // Days you can't train keep what they have (a Recovery day stays), unless it's a workout to re-place.
-  const base = days.map(d => !d.fixed && !isPadel(d) && (!d.noGym || workouts.includes(d.v)) ? { ...d, v: 'Rest' } : d);
+  // Free days start empty; on days you can't train only a Recovery day stays. A workout there that isn't in the
+  // list (e.g. one a busy week drops) is cleared too, so the week shows only the workouts it says it has.
+  const base = days.map(d => !d.fixed && !isPadel(d) && !(d.noGym && d.v === 'Recovery') ? { ...d, v: 'Rest' } : d);
   let best = null;
   const keep = [...choose(workouts.map((_, i) => i), n)];
   for (const pick of keep) for (const slots of choose(free, n)) for (const order of orders(pick)) {
