@@ -25,6 +25,7 @@ import { painWithProfile, painHits, gentlerFor, areaName, painAreasOf } from './
 import { soreNote } from './ui-today.js';
 import { AREAS } from './domain-personalize.js';
 import { barFor, barWeight, platesPerSide, warmupSets, BARS } from './domain-plates.js';
+import { recordLog } from './ui-habits.js';
 
 const W = () => S.active;
 const cur = () => W().exercises[W().index];
@@ -550,6 +551,7 @@ export const workout = {
       }
       const goalsBefore = (S.settings.liftGoals || []).filter(g => liftProgress(g, app.strength).done).map(g => g.exId);
       try { await db.putSession(session); } catch { return app.toast('Couldn’t save. Export a backup in Settings.'); }
+      recordLog(session.startedAt);
       S.active = null; await app.saveActive(true); timer.stop(); wakeLock?.release?.();
       await app.reloadSessions();
       app.go(`history/session/${session.id}`);

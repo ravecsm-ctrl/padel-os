@@ -730,6 +730,11 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 .court-stack .call-why { margin-bottom: 8px; color: var(--court-ink); }
 .call-list { margin: 0 0 16px; padding-left: 20px; color: var(--court-ink-2); font-size: 15px; line-height: 21px; }
 .court-stack .call-alt { display: block; margin: 12px auto 0; color: var(--ball); font-size: 15px; }
+/* The reasons behind today's call, one tap away. */
+.call-more { margin: 0 0 14px; }
+.call-more summary { cursor: pointer; color: var(--ball); font-size: 15px; list-style: none; }
+.call-more summary::-webkit-details-marker { display: none; }
+.call-more[open] summary { margin-bottom: 8px; }
 /* Online copy setup */
 .setup-steps { margin: 0 0 16px; padding-left: 22px; font-size: 15px; line-height: 21px; color: var(--label); }
 .setup-steps li { margin-bottom: 10px; }

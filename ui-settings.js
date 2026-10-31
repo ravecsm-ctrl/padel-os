@@ -10,6 +10,7 @@ import { cloudRows, cloudActions } from './ui-cloudui.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
 import { bodySummary } from './ui-body.js';
+import { ADJUST, ADJUST_HINT, adjustOf, tuned, habitSummary } from './domain-habits.js';
 
 let persist = '…';
 const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
@@ -28,6 +29,8 @@ export const settings = {
         + row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' })
         + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' })
         + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Your plan' })}
+      <section class="grp"><h2 class="grp-h">How much the app changes your day</h2>${seg('adjust', Object.entries(ADJUST), adjustOf(S.settings))}<p class="grp-f">${esc(ADJUST_HINT[adjustOf(S.settings)])}${adjustOf(S.settings) === 'balanced' && (tuned(S.settings.signals).easier || tuned(S.settings.signals).reshaped) ? ` You’ve trained through ${tuned(S.settings.signals).easier ? 'Easier' : 'Reshaped'} days a few times lately, so the app suggests them less.` : ''}</p></section>
+      ${(() => { const h = habitSummary(S.settings.signals); return h.logged || h.overrides || h.catchups ? group(row({ title: 'Advice you overrode', value: String(h.overrides) }) + row({ title: 'Logged the day you did it', value: h.sameDay == null ? '—' : `${h.sameDay}%` }) + row({ title: 'Catch-ups', value: String(h.catchups) }), { header: 'Your last 4 weeks', footer: 'Private to this device. The app uses these to adjust less where you keep overruling it.' }) : ''; })()}
       ${group(row({ title: 'Start rest timer automatically', icon: 'clock', color: 'orange', right: sw('autoRest', S.settings.autoRest, 'Start rest timer automatically') })
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
         + row({ title: 'Vibration', icon: 'phone', color: 'gray', right: sw('vibrate', S.settings.vibrate, 'Vibration') })
@@ -61,6 +64,7 @@ export const settings = {
   async onPick(name, value) {
     if (name === 'unit') { S.settings.unit = value; await app.save('settings'); }
     if (name === 'appearance') { S.settings.appearance = value; applyTheme(); await app.save('settings'); }
+    if (name === 'adjust') { S.settings.adjust = value; await app.save('settings'); app.render({ keepScroll: true }); }
   },
   actions: {
     ...cloudActions,
