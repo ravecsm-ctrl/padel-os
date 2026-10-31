@@ -12,6 +12,7 @@ import { planWeek, withPadel, suggestPadelDays, workoutsLeft } from './domain-we
 import { padelProfile } from './domain-recovery.js';
 import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 import { bestWeek, scheduleScore } from './domain-personalize.js';
+import { flip, rise, reduced } from './ui-motion.js';
 
 const OPTS = { legs: id => id === ANCHOR_ID || isLegHeavy(id), upper: isUpperHeavy, anchor: ANCHOR_ID };
 // Your usual padel weekdays as load factors, for planning the usual week (personalize.bestWeek).
@@ -114,11 +115,14 @@ export function pruneDated(now = isoDate()) {
 }
 
 function strip(days, { mark = null } = {}) {
-  const today = isoDate();
+  const today = isoDate(), seen = {};
+  // Each workout or padel pill has a key (data-k), so a re-planned week can show it moving to its new day.
+  const key = d => d.v === 'Padel' ? `p-${d.iso}` : isRoutine(d.v) ? `w-${d.v}-${(seen[d.v] = (seen[d.v] ?? -1) + 1)}` : '';
   return `<div class="wk-strip">${days.slice(1, 8).map(d => {
+    const k = key(d);
     const kind = d.v === 'Padel' ? 'padel' : isRoutine(d.v) || d.v === 'Quick' ? 'gym' : d.v === 'Recovery' ? 'rec' : 'rest';
     const label = d.v === 'Padel' ? (d.padel?.type === 'machine' ? 'Machine' : PADEL_TYPES[d.padel?.type] || 'Padel') : isRoutine(d.v) ? app.routine(d.v).title.split(/[ &]/)[0] : d.v === 'Quick' ? 'Gym' : d.v === 'Recovery' ? 'Rec' : '–';
-    return `<button class="${kind} ${d.iso === today ? 'today' : ''} ${d.iso === mark ? 'mark' : ''} ${d.iso < today ? 'past' : ''}" data-action="wk-day" data-iso="${d.iso}" aria-label="${esc(dayName(d.iso))}: ${esc(titleOf(d.v))}"><small>${shortDay(d.iso).slice(0, 1)}</small><span class="${label.length > 8 ? 'xs' : label.length > 6 ? 's' : ''}">${esc(label)}</span></button>`;
+    return `<button class="${kind} ${d.iso === today ? 'today' : ''} ${d.iso === mark ? 'mark' : ''} ${d.iso < today ? 'past' : ''}" data-action="wk-day" data-iso="${d.iso}" aria-label="${esc(dayName(d.iso))}: ${esc(titleOf(d.v))}"><small>${shortDay(d.iso).slice(0, 1)}</small><span class="${label.length > 8 ? 'xs' : label.length > 6 ? 's' : ''}"${k ? ` data-k="${k}"` : ''}>${esc(label)}</span></button>`;
   }).join('')}</div>`;
 }
 const swapLine = r => { const at = r.days.find((d, i) => i > 0 && i < r.days.length - 1 && d.v === r.swapped.to)?.iso;
@@ -211,6 +215,8 @@ function usualPadelSheet(d) {
     ${r.skipped.length ? `<p class="hero-note">${esc(r.skipped.map(titleOf).join(' and '))} doesn’t fit around your padel, so it’s left out.</p>` : ''}
     <div class="btns"><button class="btn filled" data-action="usual-use">Use This Week</button><button class="btn plain" data-action="usual-plain">${isRoutine(was) ? `Just Make ${WEEKDAY[d]} Padel` : 'Keep Workouts Where They Are'}</button></div>
     ${isRoutine(was) ? `<p class="t-foot" style="text-align:center">With “Just make ${WEEKDAY[d]} padel”, ${esc(titleOf(was))} leaves your usual week.</p>` : ''}`);
+  // The days that change arrive one after another, so you can follow what moved.
+  rise([...document.querySelectorAll('#sheetBody .row')].filter(el => el.querySelector('.row-sub .orange')).map(el => el.querySelector('.row-value')), { delay: 200, stagger: 90 });
   return true;
 }
 async function applyUsual(next, weekday = null) {
@@ -314,18 +320,28 @@ async function savePadel(p, edit) {
     return app.toast(`${edit ? 'Saved' : `${padelLabel(p)} on ${dayName(p.iso)} added`}. Your workouts already fit.`);
   }
   await app.save('settings');
-  proposal(r, p.iso, `${padelLabel(p)} on ${dayName(p.iso)}`, isRoutine(at?.v) ? at.v : null, note);
+  proposal(r, p.iso, `${padelLabel(p)} on ${dayName(p.iso)}`, isRoutine(at?.v) ? at.v : null, note, null, before);
 }
 
 // A re-planned week to accept or not.
 // lost: the workout that was on the new padel day (skipped this week if you keep the rest as it is).
 // keep: what "Keep Workouts Where They Are" does (a day you changed still changes; only the others stay put).
-function proposal(r, mark, what, lost = null, note = '', keep = null) {
-  PROPOSAL = { days: r.days, mark, lost, keep };
+// before: the week as it was (default: as it stands now). The sheet opens on it, then the workouts move to their
+// new days, so you see what changed rather than only the result.
+function proposal(r, mark, what, lost = null, note = '', keep = null, before = null) {
+  const prop = PROPOSAL = { days: r.days, mark, lost, keep }, was = before || weekWindow(mark), animate = !reduced();
   app.sheet(`<h2 class="sheet-title">Your week with ${esc(what)}</h2><p class="sheet-sub">${esc(note || 'Workouts placed around your padel.')}</p>
-    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px">${strip(r.days, { mark })}</div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px">${strip(animate ? was : r.days, { mark: animate ? null : mark })}</div>
     <ul class="week-moves">${moveLines(r).map(l => `<li>${esc(l)}</li>`).join('')}</ul>
     <div class="btns"><button class="btn filled" data-action="wk-use">Use This Week</button><button class="btn plain" data-action="wk-keep">Keep Workouts Where They Are</button></div>`);
+  if (!animate) return;
+  rise(document.querySelectorAll('#sheetBody .week-moves li'), { delay: 750 });
+  setTimeout(() => {
+    const box = document.querySelector('#sheet[open] #sheetBody .wk-strip');
+    if (!box || PROPOSAL !== prop) return;
+    const t = document.createElement('template'); t.innerHTML = strip(r.days, { mark });
+    flip(box, () => { box.innerHTML = t.content.firstElementChild.innerHTML; });
+  }, 250);
 }
 
 async function removePadel(iso) {
@@ -338,7 +354,7 @@ async function removePadel(iso) {
   const r = planWeek(days, t.list, { ...OPTS, busy: t.busy, alt: t.alt });
   await app.save('settings');
   if (!r.moved.length && !note) { app.closeSheet(); app.render({ keepScroll: true }); return app.toast(`Padel on ${dayName(iso)} removed`); }
-  proposal(r, iso, `no padel on ${dayName(iso)}`, null, note);
+  proposal(r, iso, `no padel on ${dayName(iso)}`, null, note, null, before);
 }
 
 function daySheet(iso) {

@@ -8,6 +8,7 @@ import { relDay } from './domain-calendar.js';
 import { headed } from './ui-overview.js';
 import { padelPentagon, SHOTS, TIERS } from './domain-challenges.js';
 import { challengeActions } from './ui-challenges.js';
+import { tween, lerp, scoresChanged } from './ui-motion.js';
 
 const DAY = 86400000;
 const planned = () => Math.max(1, Object.values(S.schedule).filter(isRoutine).length);
@@ -21,9 +22,10 @@ export const currentStats = () => {
 };
 
 // Original radar chart: five axes, rings at 25/50/75/100, now vs 4 weeks ago.
+const radarPt = (i, v, n) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = 96 * v / 100; return [150 + r * Math.cos(a), 150 + r * Math.sin(a)]; };
 export function radar(axes, before = null, { size = 300, labels = true } = {}) {
-  const cx = 150, cy = 150, R = 96, n = axes.length;
-  const pt = (i, v) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = R * v / 100; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  const cx = 150, cy = 150, n = axes.length;
+  const pt = (i, v) => radarPt(i, v, n);
   const poly = vals => vals.map((v, i) => pt(i, v).map(x => x.toFixed(1)).join(',')).join(' ');
   const rings = [25, 50, 75, 100].map(v => `<polygon points="${poly(axes.map(() => v))}" class="rd-ring"/>`).join('');
   const spokes = axes.map((_, i) => { const [x, y] = pt(i, 100); return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="rd-ring"/>`; }).join('');
@@ -75,8 +77,27 @@ function padelView() {
         { header: 'Shots', footer: 'Out of 100 from your challenge tiers: each tier cleared is a third, and your best result toward the next tier fills in between. They compare you with your own results, not with other people.' })}`;
 }
 
+// Your pentagon grows from the scores you last saw to today's, and the numbers count, but only when something
+// changed since then (the first visit just draws it). Seen scores are remembered per view.
+function growPentagon() {
+  const view = VIEW, now = Date.now();
+  const axes = view === 'padel' ? padelPentagon(S.sessions, S.settings.shots || {}, now).map(a => ({ key: a.key, score: a.started ? a.score : 0, dash: !a.started })) : currentStats().axes.map(a => ({ key: a.key, score: a.score, dash: !!a.notInPlan }));
+  const cur = Object.fromEntries(axes.map(a => [a.key, a.score])), seen = S.settings.seen?.[view];
+  const svg = document.querySelector('#app .radar');
+  if (svg && scoresChanged(seen, cur)) {
+    const poly = svg.querySelector('.rd-cur'), dots = svg.querySelectorAll('.rd-dot'), nums = svg.querySelectorAll('.rd-score'), n = axes.length;
+    tween(700, t => {
+      const vals = axes.map(a => lerp(seen[a.key] ?? 0, a.score, t));
+      poly?.setAttribute('points', vals.map((v, i) => radarPt(i, Math.max(3, v), n).map(x => x.toFixed(1)).join(',')).join(' '));
+      vals.forEach((v, i) => { const [x, y] = radarPt(i, Math.max(3, v), n); dots[i]?.setAttribute('cx', x); dots[i]?.setAttribute('cy', y); if (nums[i] && !axes[i].dash) nums[i].textContent = Math.round(v); });
+    });
+  }
+  if (!seen || scoresChanged(seen, cur)) { S.settings.seen = { ...(S.settings.seen || {}), [view]: cur }; app.save('settings'); }
+}
+
 export const stats = {
   tab: 'overview',
+  mounted() { growPentagon(); },
   onPick(name, v) { if (name === 'profileView') { VIEW = v; app.render({ keepScroll: true }); } },
   render() {
     const { axes, before, level } = currentStats();

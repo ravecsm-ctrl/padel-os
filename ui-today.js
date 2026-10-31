@@ -30,6 +30,7 @@ import { applyPainHolds } from './ui-workout.js';
 import { challengeForm, challengeSection, bindChallenge, afterSave, focusForShot, onChallengePick } from './ui-challenges.js';
 import { catchupBanner, welcomeBanner, habitActions, recordSignal, recordLog } from './ui-habits.js';
 import { shapeCall, adjustOf, tuned, isComeback } from './domain-habits.js';
+import { stamp, rise, reduced, MS, EASE } from './ui-motion.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -455,6 +456,33 @@ function weekCard() {
   <div class="week-key"><span><i style="background:var(--blue)"></i>Gym</span><span><i style="background:var(--teal)"></i>Padel</span><span><i class="ring"></i>Planned</span></div></div></section>`;
 }
 
+// ── Today's card reacting to a check-in or swap: the old workout slides out, the new one slides in and the
+// chip stamps on, so you see your answer change the plan. rememberCard() runs before the action re-renders.
+let PREV_CARD = null;
+function rememberCard() {
+  const h = document.querySelector('.court-stack .hero');
+  PREV_CARD = h ? { title: h.querySelector('h2')?.textContent, chip: h.querySelector('.call-chip')?.textContent, top: h.querySelector('.hero-top')?.outerHTML, feel: !!h.querySelector('.feel') } : null;
+}
+function morphCard() {
+  const prev = PREV_CARD; PREV_CARD = null;
+  const h = document.querySelector('.court-stack .hero');
+  if (!prev || !h || reduced()) return;
+  const top = h.querySelector('.hero-top'), chip = h.querySelector('.call-chip'), title = h.querySelector('h2')?.textContent;
+  const moved = top && prev.top && prev.title !== title, chipNew = chip && prev.chip !== chip.textContent;
+  if (moved) {
+    if (getComputedStyle(h).position === 'static') h.style.position = 'relative';
+    const t = document.createElement('template'); t.innerHTML = prev.top; const g = t.content.firstElementChild;
+    Object.assign(g.style, { position: 'absolute', left: `${top.offsetLeft}px`, top: `${top.offsetTop}px`, width: `${top.offsetWidth}px`, margin: 0, pointerEvents: 'none' });
+    h.appendChild(g);
+    g.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-40px)' }], { duration: MS.med, easing: EASE }).onfinish = () => g.remove();
+    top.animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'none' }], { duration: MS.med, easing: EASE, delay: 80, fill: 'backwards' });
+    h.animate([{ transform: 'none' }, { transform: 'translateY(-2px)' }, { transform: 'none' }], { duration: 500, easing: EASE });
+  }
+  if (chipNew) stamp(chip);
+  if (moved || chipNew) rise(h.querySelectorAll(':scope > .call-why, :scope > .call-more'), { delay: 150 });
+  if (prev.feel && h.querySelector('.feel-said')) rise([h.querySelector('.feel-said')]);
+}
+
 export const today = {
   render() {
     const date = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -470,6 +498,7 @@ export const today = {
   },
   // The "+N more" sheet stays in step with Today: an action there redraws it (and closes it when nothing's left).
   mounted() {
+    morphCard();
     const box = document.querySelector('#sheet[open] .heads-list');
     if (box) { const html = headsList(); if (html) box.innerHTML = html; else app.closeSheet(); }
   },
@@ -494,15 +523,18 @@ export const today = {
     'tips-seen'() { S.settings.tipsSeen = isoDate(); app.save('settings'); app.render({ keepScroll: true }); },
     'past-start'(el) { startPast(el.dataset.id, el.dataset.iso); },
     async 'swap-today'(el) {
+      rememberCard();
       S.settings.swap = { date: isoDate(), from: app.planOn(), to: el.dataset.r, back: el.dataset.back };
       await app.save('settings'); app.render({ keepScroll: true });
       app.toast(`Swapped for this week: ${app.routine(S.settings.swap.from).title} on ${weekday(el.dataset.back)}`);
     },
     async 'swap-undo'() {
+      rememberCard();
       if (S.settings.swap?.to === 'Recovery') S.settings.recoveryDays = (S.settings.recoveryDays || []).filter(d => d !== S.settings.swap.date);
       delete S.settings.swap; await app.save('settings'); app.render({ keepScroll: true }); app.toast('Back to your usual plan');
     },
     async 'prep-move'(el) {
+      rememberCard();
       S.settings.swap = { date: isoDate(), from: app.planOn(), to: 'Rest', back: el.dataset.back || null };
       await app.save('settings'); app.render({ keepScroll: true }); app.toast(`${app.routine(S.settings.swap.from).title} moved to ${weekday(el.dataset.back)}`);
     },
@@ -535,8 +567,8 @@ export const today = {
     // A quiet day (Light, or a call you keep overruling) still offers the easier version, one tap away.
     'start-easier'(el) { if (S.active) return app.go('workout'); beginWorkout(el.dataset.routine, null, true); },
     async 'rec-warn-later'() { S.settings.recWarnSnooze = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); },
-    async feel(el) { S.settings.checkin = { date: isoDate(), feel: el.dataset.feel }; await app.save('settings'); app.render({ keepScroll: true }); },
-    async 'feel-clear'() { delete S.settings.checkin; await app.save('settings'); app.render({ keepScroll: true }); },
+    async feel(el) { rememberCard(); S.settings.checkin = { date: isoDate(), feel: el.dataset.feel }; await app.save('settings'); app.render({ keepScroll: true }); },
+    async 'feel-clear'() { rememberCard(); delete S.settings.checkin; await app.save('settings'); app.render({ keepScroll: true }); },
     'quick-backup'() { saveBackup(); },
     async 'backup-later'() { S.settings.backupSnooze = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); app.toast('Reminder again in a week. Back up any time in Settings.'); },
     async 'quick-start'() {
