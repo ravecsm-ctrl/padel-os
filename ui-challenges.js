@@ -11,17 +11,18 @@ export const focusShot = () => SHOTS[S.settings.focusShot] ? S.settings.focusSho
 export const focusForShot = id => ['overhead', 'smash'].includes(id) ? 'overheads' : 'groundstrokes';
 const dots = n => `${'●'.repeat(n)}${'○'.repeat(TOP_TIER - n)}`;
 
-// The tier a shot's first result sets as its start: what you chose in the log, else the lowest tier in this session.
+// A shot with no results elsewhere starts fresh: its first result in this log sets the start (a saved start only
+// counts while the shot has results, so deleting them lets you choose again).
+const freshShot = (shot, others, drills) => !shotResults(others, shot).length && !drills.some(r => r.shot === shot);
 function startFor(shot, others, drills, chosen) {
-  if (starts()[shot]?.start) return starts()[shot].start;
-  if (shotResults(others, shot).length) return 1;
+  if (shotResults(others, shot).length) return starts()[shot]?.start || 1;
   const here = drills.filter(r => r.shot === shot).map(r => r.tier);
   return here.length ? Math.min(...here) : +chosen || 1;
 }
 // The tier the next result for the picked shot aims at, counting results already added in this log.
 function formTier(f, others) {
   const shot = f.cshot, start = startFor(shot, others, f.drills, f.cstart);
-  const fresh = !shotResults(others, shot).length && !f.drills.some(r => r.shot === shot) && !starts()[shot]?.start;
+  const fresh = freshShot(shot, others, f.drills);
   if (fresh) return start;
   return tierFor([...others, { id: '_form', startedAt: Date.now(), padel: { drills: f.drills } }], shot, { ...starts(), [shot]: { start } });
 }
@@ -34,7 +35,7 @@ export function challengeForm(existing, shot = null) {
 // The section shown in the padel log for lessons, training and ball-machine sessions.
 export function challengeSection(f, existing) {
   const others = S.sessions.filter(s => s.id !== existing?.id), tier = formTier(f, others), t = TIERS[tier];
-  const fresh = !shotResults(others, f.cshot).length && !f.drills.some(r => r.shot === f.cshot) && !starts()[f.cshot]?.start;
+  const fresh = freshShot(f.cshot, others, f.drills);
   const added = f.drills.length ? group(f.drills.map((r, i) => row({ title: `${esc(SHOTS[r.shot])}${r.variant ? ` · ${esc(VARIANTS[r.variant])}` : ''}`, sub: `${esc(LEVELS[r.tier])} try · ${esc(resultText(r))}${passes(r) ? ' · cleared' : ''}`,
     right: `<button class="link" data-drill-rm="${i}" style="margin-left:auto">Remove</button>`, chevron: false })).join('')) : '';
   return `<label class="field-l">Shot challenges (optional)</label>${added}
@@ -45,6 +46,9 @@ export function challengeSection(f, existing) {
     <div class="grid2" style="margin-top:8px"><input class="input" id="cVal" type="number" inputmode="numeric" min="0" max="${t.kind === 'streak' ? 300 : t.of}" placeholder="${t.kind === 'streak' ? 'Best run in a row' : `Made out of ${t.of}`}" value="${esc(f.cval)}" aria-label="${t.kind === 'streak' ? 'Best run in a row' : `Made out of ${t.of}`}">
     <button type="button" class="btn tinted" id="cAdd" style="margin:0">Add Result</button></div>`;
 }
+
+// Picking another shot starts its entry clean (the start tier and number belong to the shot you had picked).
+export function onChallengePick(f, name) { if (name === 'cshot') { f.cstart = 1; f.cval = ''; } }
 
 export function bindChallenge(body, f, existing, redraw) {
   const v = body.querySelector('#cVal'); if (!v) return;
@@ -67,11 +71,12 @@ export function afterSave(drills, existing) {
   if (!drills?.length) return '';
   const others = S.sessions.filter(s => s.id !== existing?.id), notes = [];
   for (const shot of new Set(drills.map(r => r.shot))) {
-    if (!starts()[shot]?.start && !shotResults(others, shot).length) {
-      const start = Math.min(...drills.filter(r => r.shot === shot).map(r => r.tier));
-      if (start > 1) S.settings.shots = { ...starts(), [shot]: { start } };
+    // Before: as it stood with this session's old results (if editing), so an unchanged edit announces nothing.
+    const before = shotState(S.sessions, shot, { start: starts()[shot]?.start || 1 }).cleared;
+    if (!shotResults(others, shot).length) {
+      const start = Math.min(...drills.filter(r => r.shot === shot).map(r => r.tier)), { [shot]: _, ...rest } = starts();
+      S.settings.shots = start > 1 ? { ...rest, [shot]: { start } } : rest;
     }
-    const before = shotState(others, shot, { start: starts()[shot]?.start || 1 }).cleared;
     const after = shotState([...others, { id: '_new', startedAt: Date.now(), padel: { drills } }], shot, { start: starts()[shot]?.start || 1 }).cleared;
     if (after > before) notes.push(`${SHOTS[shot]}: ${LEVELS[after]}`);
   }

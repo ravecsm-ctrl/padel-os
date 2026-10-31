@@ -67,9 +67,11 @@ function padelView() {
   const none = axes.every(a => !a.started);
   return `<div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>${none ? '<p class="t-foot" style="text-align:center;margin:4px 0 0">No shot results yet. Add one when you log a lesson, training or ball-machine session.</p>' : legend}</div>
       <div style="height:24px"></div>
-      ${group(axes.map(a => { const d = a.started ? a.score - (before.find(b => b.key === a.key)?.score || 0) : 0, t = a.next ? TIERS[a.next] : null;
+      ${group(axes.map(a => { const was = before.find(b => b.key === a.key), t = a.next ? TIERS[a.next] : null;
+        // A shot started in the last 4 weeks shows "new": its score includes the starting tier you chose, so a ▲ would overstate it.
+        const change = !a.started ? '' : was?.started ? diffTag(a.score - was.score) : ' <span class="t-foot green">new</span>';
         const sub = !a.started ? 'Not started' : `${a.level}${a.faded ? ' · not practised for 8 weeks' : t ? ` · next: ${t.goal(a.key)}` : ' · every tier cleared'}`;
-        return row({ title: esc(SHOTS[a.key]), sub: esc(sub), value: a.started ? `${a.score}${diffTag(d)}` : '—', action: 'shot-sheet', data: { id: a.key } }); }).join(''),
+        return row({ title: esc(SHOTS[a.key]), sub: esc(sub), value: a.started ? `${a.score}${change}` : '—', action: 'shot-sheet', data: { id: a.key } }); }).join(''),
         { header: 'Shots', footer: 'Out of 100 from your challenge tiers: each tier cleared is a third, and your best result toward the next tier fills in between. They compare you with your own results, not with other people.' })}`;
 }
 

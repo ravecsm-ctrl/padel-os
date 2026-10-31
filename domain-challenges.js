@@ -36,16 +36,17 @@ export function shotResults(sessions, shot) {
   return out.sort((a, b) => a.ts - b.ts);
 }
 
-// Where a shot stands. start: the tier you chose to begin at (tiers below it count as cleared).
+// Where a shot stands. start: the tier you chose to begin at; tiers below it count as cleared once the shot has a
+// result (with none, e.g. after deleting them, the shot starts over and a new first result sets the start again).
 // Returns { cleared, level, next, progress, best, started, lastAt, faded, score, clears: [{ tier, ts }] }.
 export function shotState(sessions, shot, { start = 1, now = Date.now() } = {}) {
   const res = shotResults(sessions, shot);
-  let cleared = Math.max(0, Math.min(TOP_TIER, (start || 1) - 1)), since = -Infinity;
+  let cleared = res.length ? Math.max(0, Math.min(TOP_TIER, (start || 1) - 1)) : 0;
   const clears = [];
-  for (const r of res) if (passes(r) && r.tier > cleared) { for (let t = cleared + 1; t <= r.tier; t++) clears.push({ tier: t, ts: r.ts }); cleared = r.tier; since = r.ts; }
+  for (const r of res) if (passes(r) && r.tier > cleared) { for (let t = cleared + 1; t <= r.tier; t++) clears.push({ tier: t, ts: r.ts }); cleared = r.tier; }
   const next = cleared < TOP_TIER ? cleared + 1 : null;
-  // Progress toward the next tier: your best result at it since the last clear.
-  const tries = next ? res.filter(r => r.tier === next && r.ts >= since) : [];
+  // Progress toward the next tier: your best result at it, whatever date it was logged for.
+  const tries = next ? res.filter(r => r.tier === next) : [];
   const best = tries.reduce((b, r) => (!b || ratio(r) > ratio(b) ? r : b), null);
   const progress = best ? Math.min(0.99, ratio(best)) : 0;
   const lastAt = res.length ? res[res.length - 1].ts : null;

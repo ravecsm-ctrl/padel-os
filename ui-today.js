@@ -27,7 +27,7 @@ import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js'
 import { matchTips } from './domain-matchday.js';
 import { recentPain, painWithProfile, painHits, areaName, loadsAreas } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
-import { challengeForm, challengeSection, bindChallenge, afterSave, focusForShot } from './ui-challenges.js';
+import { challengeForm, challengeSection, bindChallenge, afterSave, focusForShot, onChallengePick } from './ui-challenges.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -635,7 +635,7 @@ export function activitySheet(kind = 'padel', existing = null, date = null, shot
     <div style="height:8px"></div>${seg('activity', ACTIVITIES, f().activity)}
     ${padel ? `<label class="field-l">Type</label>${chips('ptype', Object.keys(PADEL_TYPES), f().ptype, k => PADEL_TYPES[k])}` : ''}
     ${padel && hasFocus(f().ptype) ? `<label class="field-l">What did you work on?</label>${chips('focus', Object.keys(PADEL_FOCUS), f().focus, k => PADEL_FOCUS[k])}` : ''}
-    ${padel && hasFocus(f().ptype) ? challengeSection(f(), existing) : ''}
+    ${padel && (hasFocus(f().ptype) || f().drills.length) ? challengeSection(f(), existing) : ''}
     ${match ? `<label class="field-l">Result</label>${seg('result', [['won', 'Won'], ['lost', 'Lost'], ['none', 'Skip']], f().result)}
       <div class="grid2"><input class="input" id="scoreIn" placeholder="Score (optional)" value="${esc(f().score)}" aria-label="Score"><input class="input" id="partnerIn" placeholder="Partner (optional)" value="${esc(f().partner)}" aria-label="Partner"></div>` : ''}
     ${padel && f().ptype !== 'machine' ? `<label class="field-l">Side you played</label>${seg('side', [['drive', 'Right'], ['reves', 'Left'], ['both', 'Both']], f().side)}` : ''}
@@ -657,12 +657,14 @@ export function activitySheet(kind = 'padel', existing = null, date = null, shot
     body.querySelector('#saveAct').onclick = async () => {
       const dur = +f().duration;
       if (!(dur > 0)) return app.toast('Add how many minutes');
+      // Shot results only live on padel: saving as another activity removes them, so ask first.
+      if (f().activity !== 'padel' && f().drills.length && !(await app.confirm(`Save as ${esc(ACTIVITIES.find(a => a[0] === f().activity)[1].toLowerCase())}? Its ${f().drills.length} shot result${f().drills.length > 1 ? 's' : ''} will be removed.`, { ok: 'Save and Remove', danger: true }))) return;
       const d = parseISO(f().date || isoDate()), now = new Date();
       // Logged today = you just finished: it ended now and started `dur` minutes ago (not before midnight).
       if (isoDate(d) === isoDate(now)) d.setTime(Math.max(parseISO(isoDate(now)).getTime(), now.getTime() - dur * 60000));
       else d.setHours(12);
       const t = S.settings.tournament, event = t?.date && t.date === isoDate(d) ? t.name || 'Tournament' : existing?.padel?.event;
-      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(LEGS_FELT[f().legs] ? { legs: f().legs } : {}), ...(event ? { event } : {}), ...(hasFocus(f().ptype) && f().drills.length ? { drills: f().drills } : {}) } : undefined;
+      const padel = f().activity === 'padel' ? { type: f().ptype, ...(hasFocus(f().ptype) ? { focus: f().focus } : {}), result: ['match', 'americano'].includes(f().ptype) ? f().result : 'none', score: f().score.trim(), partner: f().partner.trim(), side: f().ptype === 'machine' ? '' : f().side, sore: f().sore, ...(LEGS_FELT[f().legs] ? { legs: f().legs } : {}), ...(event ? { event } : {}), ...(f().drills.length ? { drills: f().drills } : {}) } : undefined;
       const titleFor = () => padel ? (padel.type === 'match' ? 'Padel match' : `Padel ${PADEL_TYPES[padel.type].toLowerCase()}`) : ACTIVITIES.find(a => a[0] === f().activity)[1];
       const base = existing ? { ...existing, activity: f().activity, durationMin: dur, rpe: +f().rpe, notes: f().notes, startedAt: d.getTime(), endedAt: d.getTime() + dur * 60000 }
         : createActivity({ activity: f().activity, startedAt: d.getTime(), durationMin: dur, rpe: +f().rpe, notes: f().notes });
@@ -675,6 +677,6 @@ export function activitySheet(kind = 'padel', existing = null, date = null, shot
       app.render({ keepScroll: true });
     };
   };
-  app.onPick = () => app.sheet(draw(), mount);
+  app.onPick = name => { onChallengePick(f(), name); app.sheet(draw(), mount); };
   app.sheet(draw(), mount);
 }
