@@ -745,3 +745,6 @@ a.btn { display: flex; align-items: center; justify-content: center; text-decora
 .court-stack .match-line .ic, .court-stack .match-line svg { width: 16px; height: 16px; }
 .court-stack .match-line b { color: var(--court-ink); }
 .court-stack .match-line .link { color: var(--ball); margin-left: 2px; }
+/* Spotlight with Reduce Motion on: a still lime outline instead of movement (motion.js). */
+.spot-still { outline: 3px solid var(--ball); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

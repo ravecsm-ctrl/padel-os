@@ -11,7 +11,7 @@ import { blockHero } from './ui-goal.js';
 import { prehabFor } from './domain-padel.js';
 import { createActivity } from './domain-workout.js';
 import { AREAS } from './domain-personalize.js';
-import { challengesCard, challengeActions } from './ui-challenges.js';
+import { challengesCard, challengeActions, spotClearedTier } from './ui-challenges.js';
 
 // Player state uses absolute timestamps so it stays correct if the phone throttles timers.
 let P = null;
@@ -123,7 +123,7 @@ function playerView(r) {
 
 export const court = {
   render() { const r = COURT_ROUTINES[S.params[0]]; return r ? playerView(r) : listView(); },
-  mounted() { if (P && P.i >= 0 && !P.done) { keepAwake(); loop(); } },
+  mounted() { if (P && P.i >= 0 && !P.done) { keepAwake(); loop(); } else if (!S.params[0]) spotClearedTier(); },
   actions: {
     'routines-sheet'(el) { routinesSheet(el.dataset.kind); },
     ...challengeActions,

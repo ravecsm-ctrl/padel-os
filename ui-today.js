@@ -30,7 +30,7 @@ import { applyPainHolds } from './ui-workout.js';
 import { challengeForm, challengeSection, bindChallenge, afterSave, focusForShot, onChallengePick } from './ui-challenges.js';
 import { catchupBanner, welcomeBanner, habitActions, recordSignal, recordLog } from './ui-habits.js';
 import { shapeCall, adjustOf, tuned, isComeback } from './domain-habits.js';
-import { stamp, rise, reduced, MS, EASE } from './ui-motion.js';
+import { stamp, rise, reduced, spotlight, MS, EASE } from './ui-motion.js';
 
 const lastDone = id => app.strength.find(s => s.routineId === id);
 const ACTIVITIES = [['padel', 'Padel'], ['cardio', 'Cardio'], ['mobility', 'Mobility'], ['other', 'Other']];
@@ -480,6 +480,9 @@ function morphCard() {
   }
   if (chipNew) stamp(chip);
   if (moved || chipNew) rise(h.querySelectorAll(':scope > .call-why, :scope > .call-more'), { delay: 150 });
+  // Then the one line that says why it changed gets the spotlight.
+  const why = h.querySelector(':scope > .call-why');
+  if ((moved || chipNew) && why) setTimeout(() => spotlight(why, { say: why.textContent }), 480);
   if (prev.feel && h.querySelector('.feel-said')) rise([h.querySelector('.feel-said')]);
 }
 

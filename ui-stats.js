@@ -8,7 +8,7 @@ import { relDay } from './domain-calendar.js';
 import { headed } from './ui-overview.js';
 import { padelPentagon, SHOTS, TIERS } from './domain-challenges.js';
 import { challengeActions } from './ui-challenges.js';
-import { tween, lerp, scoresChanged } from './ui-motion.js';
+import { tween, lerp, scoresChanged, spotlight } from './ui-motion.js';
 
 const DAY = 86400000;
 const planned = () => Math.max(1, Object.values(S.schedule).filter(isRoutine).length);
@@ -91,6 +91,13 @@ function growPentagon() {
       poly?.setAttribute('points', vals.map((v, i) => radarPt(i, Math.max(3, v), n).map(x => x.toFixed(1)).join(',')).join(' '));
       vals.forEach((v, i) => { const [x, y] = radarPt(i, Math.max(3, v), n); dots[i]?.setAttribute('cx', x); dots[i]?.setAttribute('cy', y); if (nums[i] && !axes[i].dash) nums[i].textContent = Math.round(v); });
     });
+    // The biggest gain gets the spotlight once the shape has grown: one clear win, not five numbers at once.
+    const best = axes.map((a, i) => ({ i, gain: a.score - (seen[a.key] ?? 0) })).sort((p, q) => q.gain - p.gain)[0];
+    if (best?.gain > 0) setTimeout(() => {
+      const labels = svg.querySelectorAll('.rd-label');
+      spotlight([labels[best.i], nums[best.i]], { say: `${labels[best.i]?.textContent} up ${Math.round(best.gain)}` });
+      [...labels, ...nums].filter((el, k) => k % labels.length !== best.i).forEach(el => el.animate([{ opacity: 1 }, { opacity: .45, offset: .35 }, { opacity: 1 }], { duration: 650 }));
+    }, 760);
   }
   if (!seen || scoresChanged(seen, cur)) { S.settings.seen = { ...(S.settings.seen || {}), [view]: cur }; app.save('settings'); }
 }

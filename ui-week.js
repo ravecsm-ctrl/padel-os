@@ -12,7 +12,7 @@ import { planWeek, withPadel, suggestPadelDays, workoutsLeft } from './domain-we
 import { padelProfile } from './domain-recovery.js';
 import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 import { bestWeek, scheduleScore } from './domain-personalize.js';
-import { flip, rise, reduced } from './ui-motion.js';
+import { flip, rise, reduced, spotlight } from './ui-motion.js';
 
 const OPTS = { legs: id => id === ANCHOR_ID || isLegHeavy(id), upper: isUpperHeavy, anchor: ANCHOR_ID };
 // Your usual padel weekdays as load factors, for planning the usual week (personalize.bestWeek).
@@ -135,6 +135,17 @@ export const weekStrip = () => strip(weekWindow());
 
 // ── The Week tab: one week at a time (this week and up to 3 ahead), day by day.
 let WK_OFF = 0;
+// After a change you accepted: the Week tab shows the week it's in, and the days that changed get a spotlight once.
+function showWeekOf(iso) {
+  const off = Math.round((parseISO(monIso(iso)) - parseISO(monIso(isoDate()))) / (7 * 86400000));
+  if (off >= 0 && off <= 3) WK_OFF = off;
+}
+function spotDays(match) {
+  requestAnimationFrame(() => {
+    const rows = [...document.querySelectorAll('#app .wk-day[data-iso]')].filter(r => match(r.dataset.iso) && r.dataset.iso >= isoDate());
+    if (rows.length) spotlight(rows, { within: rows[0].parentElement, say: `${rows.length === 1 ? 'One day' : `${rows.length} days`} changed this week` });
+  });
+}
 // Coming back to the Week tab from elsewhere starts at this week again.
 export const resetWeekView = () => { WK_OFF = 0; };
 const dayNum = iso => parseISO(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -209,7 +220,7 @@ export function usualWithPadel(sched, d) {
 function usualPadelSheet(d) {
   const sched = { ...S.schedule }, was = sched[d], r = usualWithPadel(sched, d);
   if (!r.worth) return null;
-  USUAL = { d, next: r.next, plain: { ...sched, [d]: 'Padel' } };
+  USUAL = { d, next: r.next, plain: { ...sched, [d]: 'Padel' }, changed: [d, ...r.changed] };
   app.sheet(`<h2 class="sheet-title">Every ${WEEKDAY[d]}: padel</h2><p class="sheet-sub">${isRoutine(was) ? `${esc(titleOf(was))} needs a new day. Here’s your usual week with it moved.` : 'Your workouts fit better around it like this.'}</p>
     ${group(DAYS.map(x => row({ title: WEEKDAY[x], sub: x === d || r.changed.includes(x) ? '<span class="orange">Changed</span>' : '', value: esc(titleOf(r.next[x])), chevron: false })).join(''))}
     ${r.skipped.length ? `<p class="hero-note">${esc(r.skipped.map(titleOf).join(' and '))} doesn’t fit around your padel, so it’s left out.</p>` : ''}
@@ -219,10 +230,11 @@ function usualPadelSheet(d) {
   rise([...document.querySelectorAll('#sheetBody .row')].filter(el => el.querySelector('.row-sub .orange')).map(el => el.querySelector('.row-value')), { delay: 200, stagger: 90 });
   return true;
 }
-async function applyUsual(next, weekday = null) {
+async function applyUsual(next, weekday = null, changed = []) {
   const old = { ...S.schedule };
   S.schedule = next; await app.save('schedule'); followUsualWeek(weekday); await app.save('settings');
   USUAL = null; app.closeSheet(); app.render({ keepScroll: true });
+  spotDays(iso => changed.includes(DAYS[(parseISO(iso).getDay() + 6) % 7]));
   app.toast('Usual week updated', async () => { S.schedule = old; await app.save('schedule'); app.render({ keepScroll: true }); });
 }
 
@@ -341,6 +353,9 @@ function proposal(r, mark, what, lost = null, note = '', keep = null, before = n
     if (!box || PROPOSAL !== prop) return;
     const t = document.createElement('template'); t.innerHTML = strip(r.days, { mark });
     flip(box, () => { box.innerHTML = t.content.firstElementChild.innerHTML; });
+    // Once they've landed, the days that changed glow while the rest dims, so your eye goes to what matters.
+    const moved = new Set([mark, ...r.moved.map(m => m.to)]);
+    setTimeout(() => { if (PROPOSAL === prop) spotlight([...box.querySelectorAll('button[data-iso]')].filter(b => moved.has(b.dataset.iso)).map(b => b.querySelector('span')), { within: box }); }, 750);
   }, 250);
 }
 
@@ -394,12 +409,19 @@ export const weekActions = {
   'week-ask-off'() { S.settings.weekAsked = monIso(isoDate()); app.save('settings'); app.render({ keepScroll: true }); },
   'wk-day'(el) { daySheet(el.dataset.iso); },
   'wk-remove'(el) { removePadel(el.dataset.iso); },
-  async 'usual-use'() { if (USUAL) await applyUsual(USUAL.next); },
-  async 'usual-plain'() { if (USUAL) await applyUsual(USUAL.plain, USUAL.d); },
-  async 'wk-use'() { if (!PROPOSAL) return app.closeSheet(); await applyWeek(PROPOSAL.days, PROPOSAL.mark); if (PROPOSAL.keep) await PROPOSAL.keep(); PROPOSAL = null; app.closeSheet(); app.render({ keepScroll: true }); app.toast('Week updated'); },
+  async 'usual-use'() { if (USUAL) await applyUsual(USUAL.next, null, USUAL.changed); },
+  async 'usual-plain'() { if (USUAL) await applyUsual(USUAL.plain, USUAL.d, [USUAL.d]); },
+  async 'wk-use'() {
+    if (!PROPOSAL) return app.closeSheet();
+    const { days, mark } = PROPOSAL, before = weekWindow(mark);
+    const changed = days.filter((d, i) => i > 0 && i < days.length - 1 && (d.v !== before[i]?.v || d.iso === mark)).map(d => d.iso);
+    await applyWeek(days, mark); if (PROPOSAL.keep) await PROPOSAL.keep(); PROPOSAL = null; app.closeSheet();
+    showWeekOf(mark); app.render({ keepScroll: true }); app.toast('Week updated'); spotDays(iso => changed.includes(iso));
+  },
   async 'wk-keep'() {
     // Padel stays; a workout that was on that day is skipped this week.
-    const lost = PROPOSAL?.lost, keep = PROPOSAL?.keep; PROPOSAL = null; if (keep) await keep(); app.closeSheet(); app.render({ keepScroll: true });
+    const lost = PROPOSAL?.lost, keep = PROPOSAL?.keep, mark = PROPOSAL?.mark; PROPOSAL = null; if (keep) await keep(); app.closeSheet();
+    if (mark) showWeekOf(mark); app.render({ keepScroll: true }); if (mark) spotDays(iso => iso === mark);
     app.toast(lost ? `Workouts kept where they were; ${titleOf(lost)} is skipped this week` : 'Workouts kept where they were');
   },
   // Your usual weekday lives on Plan: open its sheet there.

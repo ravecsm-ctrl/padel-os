@@ -3,6 +3,7 @@
 import { app, S } from './core-app.js';
 import { esc, group, row, chips, seg } from './ui-kit.js';
 import { activitySheet } from './ui-today.js';
+import { spotlight } from './ui-motion.js';
 import { SHOTS, SHOT_IDS, VARIANTS, LEVELS, TIERS, TOP_TIER, shotResults, shotState, allShots, tierFor, firstResultNote, overheadBalls, resultText, passes, OVERHEAD_NOTE_FROM } from './domain-challenges.js';
 
 const starts = () => S.settings.shots || {};
@@ -112,3 +113,16 @@ export const challengeActions = {
   'shot-log'(el) { app.closeSheet(); activitySheet('padel', null, null, el.dataset.id); },
   async 'shot-focus'(el) { S.settings.focusShot = el.dataset.id; await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast('Focus shot set'); },
 };
+
+// Train tab: a shot that cleared a tier since you last looked gets the spotlight when its row comes into view.
+export function spotClearedTier() {
+  const all = allShots(S.sessions, starts()), now = Object.fromEntries(SHOT_IDS.map(id => [id, all[id].cleared])), seen = S.settings.seen?.tiers;
+  const save = () => { S.settings.seen = { ...(S.settings.seen || {}), tiers: now }; app.save('settings'); };
+  if (!seen) return save();
+  const id = SHOT_IDS.find(k => now[k] > (seen[k] || 0));
+  if (!id) { if (SHOT_IDS.some(k => now[k] !== (seen[k] || 0))) save(); return; }
+  const row = document.querySelector(`#app [data-action="shot-sheet"][data-id="${id}"]`);
+  if (!row || typeof IntersectionObserver !== 'function') return save();
+  const io = new IntersectionObserver(([e]) => { if (!e.isIntersecting) return; io.disconnect(); save(); spotlight(row, { within: row.parentElement, say: `${SHOTS[id]}: ${LEVELS[now[id]]}` }); }, { threshold: .8 });
+  io.observe(row);
+}

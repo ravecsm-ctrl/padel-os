@@ -32,7 +32,8 @@ export function flip(container, mutate, { ms = MS.slow, stagger = 40 } = {}) {
     const t = document.createElement('template'); t.innerHTML = o.html; const g = t.content.firstElementChild;
     Object.assign(g.style, { position: 'absolute', left: `${o.r.left - host.left}px`, top: `${o.r.top - host.top}px`, width: `${o.r.width}px`, height: `${o.r.height}px`, margin: 0, pointerEvents: 'none' });
     g.removeAttribute('data-k'); container.appendChild(g);
-    g.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }], { duration: MS.med, easing: EASE }).onfinish = () => g.remove();
+    g.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }], { duration: MS.med, easing: EASE, fill: 'forwards' }).onfinish = () => g.remove();
+    setTimeout(() => g.remove(), MS.med + 400);   // never left behind, even if the animation is delayed
   }
 }
 
@@ -52,4 +53,30 @@ export function tween(ms, step) {
   const t0 = performance.now();
   const frame = now => { const t = Math.min(1, (now - t0) / ms); step(easeOut(t)); if (t < 1) requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
+}
+
+// Spotlight: the in-app pop-out. What changed lifts a little with a lime glow while what's around it dims, for about
+// half a second, then everything settles where it was. Nothing moves away, covers anything or blocks a tap.
+// els: one element or several that changed together (one moment); within: the container whose other children dim.
+// With Reduce Motion: a still lime outline for a moment instead.
+export function spotlight(els, { within = null, ms = 650, say = '' } = {}) {
+  const list = [].concat(els || []).filter(Boolean);
+  if (say) announce(say);
+  if (!list.length) return;
+  if (reduced()) { list.forEach(el => { el.classList.add('spot-still'); setTimeout(() => el.classList.remove('spot-still'), 1200); }); return; }
+  const svg = el => el instanceof SVGElement;
+  list.forEach(el => {
+    if (svg(el)) { el.style.transformBox = 'fill-box'; el.style.transformOrigin = 'center'; }
+    el.animate(svg(el) ? [{ transform: 'none' }, { transform: 'scale(1.18)', offset: .35 }, { transform: 'none' }]
+      : [{ transform: 'none', boxShadow: '0 0 0 0 rgba(210,238,60,0)' }, { transform: 'scale(1.06)', boxShadow: '0 0 0 3px rgba(210,238,60,.9), 0 0 24px rgba(210,238,60,.5)', offset: .35 }, { transform: 'none', boxShadow: '0 0 0 0 rgba(210,238,60,0)' }],
+      { duration: ms, easing: EASE });
+  });
+  if (within) [...within.children].filter(c => !list.some(el => c === el || c.contains(el))).forEach(c =>
+    c.animate([{ opacity: 1 }, { opacity: .5, offset: .35 }, { opacity: 1 }], { duration: ms, easing: EASE }));
+}
+// Say a change out loud for screen readers (motion alone shouldn't carry the information).
+export function announce(text) {
+  let el = document.getElementById('live');
+  if (!el) { el = document.createElement('div'); el.id = 'live'; el.setAttribute('aria-live', 'polite'); el.className = 'sr-only'; document.body.appendChild(el); }
+  el.textContent = ''; setTimeout(() => { el.textContent = text; }, 50);
 }
