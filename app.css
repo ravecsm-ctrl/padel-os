@@ -748,3 +748,20 @@ a.btn { display: flex; align-items: center; justify-content: center; text-decora
 /* Spotlight with Reduce Motion on: a still lime outline instead of movement (motion.js). */
 .spot-still { outline: 3px solid var(--ball); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Plan Your Week: the tray of this week's workouts above the seven days; workouts fly between them (planweek.js). */
+.pw-card { padding: 0; overflow: hidden; margin-bottom: 10px; }
+.pw-board { position: relative; background: var(--court-2); }
+.pw-tray { padding: 12px 12px 0; min-height: 62px; }
+.pw-tray small { display: block; font-size: 11px; font-weight: 600; color: var(--court-ink-2); text-transform: uppercase; letter-spacing: .4px; }
+.pw-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-height: 30px; }
+.pw-chip { height: 30px; line-height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--court-ink); background: rgba(80, 140, 255, .32); }
+.pw-chip.off { opacity: .45; text-decoration: line-through; }
+.pw-strip { background: transparent; }
+.pw-strip button { position: relative; }
+.pw-strip span.pw-empty { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .22); color: var(--court-ink-2); font-size: 15px; }
+.pw-strip .today span.pw-empty { box-shadow: inset 0 0 0 1.5px var(--ball); }
+.pw-strip small i { font-style: normal; color: var(--ball); margin-left: 1px; }
+.pw-strip em { font-style: normal; font-size: 9px; line-height: 1; color: var(--court-ink-2); margin-top: -2px; }
+.pw-note { min-height: 40px; font-size: 14px; color: var(--label-2); margin: 0 4px 14px; }
+.pw-btn { width: 100%; margin: 16px 0 0; }
+.pw-btn + .quick-row { margin-top: 10px; }

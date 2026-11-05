@@ -55,7 +55,9 @@ export function habitSummary(list = [], now = Date.now(), days = 28) {
   const r = recent(list, days, now), logs = r.filter(s => s.k === 'log');
   return { overrides: r.filter(s => s.k.startsWith('ov-')).length, logged: logs.length,
     sameDay: logs.length ? Math.round(100 * logs.filter(s => (s.d || 0) < 1).length / logs.length) : null,
-    catchups: r.filter(s => s.k === 'catchup').length };
+    catchups: r.filter(s => s.k === 'catchup').length,
+    // Plan Your Week: weeks you planned, and weeks it asked (planned, kept your usual week, or Not now).
+    planned: r.filter(s => s.k === 'pw-done').length, planAsked: r.filter(s => s.k.startsWith('pw-')).length };
 }
 
 // ── How much a day changes

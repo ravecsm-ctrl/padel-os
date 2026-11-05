@@ -2,7 +2,7 @@
 // day for another session. Adding or removing padel proposes a re-planned week you accept or not.
 // Dates live in S.settings.dated / padelPlan / matchLevel; the usual week (S.schedule) is the fallback.
 import { app, S } from './core-app.js';
-import { esc, icon, tile, group, row, seg, chips, pageHead } from './ui-kit.js';
+import { esc, icon, tile, chev, group, row, seg, chips, pageHead } from './ui-kit.js';
 import { DAYS, isRoutine, isLegHeavy, isUpperHeavy, allRoutineIds, phaseFor } from './domain-program.js';
 import { goalLabel } from './domain-block.js';
 import { isoDate, mondayOf, parseISO } from './domain-calendar.js';
@@ -13,17 +13,19 @@ import { padelProfile } from './domain-recovery.js';
 import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 import { bestWeek, scheduleScore } from './domain-personalize.js';
 import { flip, rise, reduced, spotlight } from './ui-motion.js';
+import { planWeekActions, weekToAsk, weekUnsettled } from './ui-planweek.js';
+import { recordSignal } from './ui-habits.js';
 
-const OPTS = { legs: id => id === ANCHOR_ID || isLegHeavy(id), upper: isUpperHeavy, anchor: ANCHOR_ID };
+export const OPTS = { legs: id => id === ANCHOR_ID || isLegHeavy(id), upper: isUpperHeavy, anchor: ANCHOR_ID };
 // Your usual padel weekdays as load factors, for planning the usual week (personalize.bestWeek).
 export const usualKinds = (usual = S.settings.padelUsual || {}) => ({ upper: isUpperHeavy, kinds: Object.fromEntries(Object.entries(usual).map(([d, p]) => [d, padelProfile(p.type, p.focus)])) });
 export const isoAdd = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoDate(d); };
-const monIso = iso => isoDate(mondayOf(parseISO(iso)));
-const dayName = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'long' });
+export const monIso = iso => isoDate(mondayOf(parseISO(iso)));
+export const dayName = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'long' });
 const shortDay = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'short' });
 const fmtDay = iso => parseISO(iso).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-const titleOf = v => isRoutine(v) ? app.routine(v).title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
-const padelLabel = p => `${PADEL_TYPES[p?.type] || 'Match'}${hasFocus(p?.type) && p?.focus && p.focus !== 'mixed' ? ` · ${PADEL_FOCUS[p.focus]}` : ''}`;
+export const titleOf = v => isRoutine(v) ? app.routine(v).title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
+export const padelLabel = p => `${PADEL_TYPES[p?.type] || 'Match'}${hasFocus(p?.type) && p?.focus && p.focus !== 'mixed' ? ` · ${PADEL_FOCUS[p.focus]}` : ''}`;
 const MAX_AHEAD = 27;
 
 // The week around a date as the planner sees it (last Sunday … next Monday). Logged days are what
@@ -49,7 +51,7 @@ export function weekWindow(iso = isoDate()) {
 // The gym workouts a week still needs, and whether padel makes it busy. A busy week: Strength plus the
 // first of your usual workouts that's light on the legs, less what's already done. Back from busy: the
 // Strength session turns back into your usual leg workouts.
-const legWork = id => id === ANCHOR_ID || isLegHeavy(id);
+export const legWork = id => id === ANCHOR_ID || isLegHeavy(id);
 export function weekTargets(days) {
   const inWeek = days.slice(1, 8), { busy } = busyWeek(inWeek.filter(d => d.v === 'Padel').map(d => d.padel || {}));
   const usual = DAYS.map(d => S.schedule[d]).filter(isRoutine);
@@ -71,20 +73,20 @@ export function weekTargets(days) {
   }
   return { busy, list };
 }
-const busyNote = (from, to) => to.busy && !from.busy ? 'Busy padel week: 2 gym sessions, Strength and one that’s light on the legs, and a full rest day.'
+export const busyNote = (from, to) => to.busy && !from.busy ? 'Busy padel week: 2 gym sessions, Strength and one that’s light on the legs, and a full rest day.'
   : from.busy && !to.busy ? 'Not a busy padel week any more: your usual workouts are back.' : '';
 
 // Dates and the usual week: a date keeps its own entry only where it differs from your usual weekday, so a
 // later change to the usual week still reaches it. Padel you booked for a date always keeps its entry.
 const usualOn = iso => S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
 export const isBooked = iso => S.settings.dated?.[iso] === 'Padel' && !!S.settings.padelPlan?.[iso];
-function setDated(iso, v) {
+export function setDated(iso, v) {
   S.settings.dated = { ...(S.settings.dated || {}) };
   if (v === usualOn(iso) && !(v === 'Padel' && S.settings.padelPlan?.[iso])) delete S.settings.dated[iso];
   else S.settings.dated[iso] = v;
 }
 // Save a planned week: only the days you can still change, and only where they differ from the usual week.
-async function applyWeek(days, padelIso = null) {
+export async function applyWeek(days, padelIso = null) {
   days.forEach((d, i) => { if (i > 0 && i < days.length - 1 && (!d.fixed || d.iso === padelIso)) setDated(d.iso, d.v); });
   await app.save('settings');
 }
@@ -99,7 +101,7 @@ export function followUsualWeek(weekday = null) {
   }
   return kept;
 }
-function setPadelDetails(iso, p) {
+export function setPadelDetails(iso, p) {
   S.settings.padelPlan = { ...(S.settings.padelPlan || {}), [iso]: { type: p.type, ...(hasFocus(p.type) ? { focus: p.focus } : {}) } };
   S.settings.matchLevel = { ...(S.settings.matchLevel || {}), [iso]: p.level };
 }
@@ -127,7 +129,7 @@ function strip(days, { mark = null } = {}) {
 }
 const swapLine = r => { const at = r.days.find((d, i) => i > 0 && i < r.days.length - 1 && d.v === r.swapped.to)?.iso;
   return `Durability${at ? ` on ${dayName(at)}` : ''} instead of ${titleOf(r.swapped.from)} this week, so your shoulders are fresh for overheads`; };
-const moveLines = r => [...(r.swapped ? [swapLine(r)] : []), ...r.moved.filter(m => !r.swapped || m.id !== r.swapped.to).map(m => `${titleOf(m.id)} ${m.from ? `moves from ${dayName(m.from)} to ${dayName(m.to)}` : `goes on ${dayName(m.to)}`}`),
+export const moveLines = r => [...(r.swapped ? [swapLine(r)] : []), ...r.moved.filter(m => !r.swapped || m.id !== r.swapped.to).map(m => `${titleOf(m.id)} ${m.from ? `moves from ${dayName(m.from)} to ${dayName(m.to)}` : `goes on ${dayName(m.to)}`}`),
   ...r.dropped.map(id => id === r.restKept ? `${titleOf(id)} is skipped this week so you keep one full rest day` : `${titleOf(id)} doesn’t fit this week`)];
 
 // ── Plan tab: this week
@@ -136,11 +138,11 @@ export const weekStrip = () => strip(weekWindow());
 // ── The Week tab: one week at a time (this week and up to 3 ahead), day by day.
 let WK_OFF = 0;
 // After a change you accepted: the Week tab shows the week it's in, and the days that changed get a spotlight once.
-function showWeekOf(iso) {
+export function showWeekOf(iso) {
   const off = Math.round((parseISO(monIso(iso)) - parseISO(monIso(isoDate()))) / (7 * 86400000));
   if (off >= 0 && off <= 3) WK_OFF = off;
 }
-function spotDays(match) {
+export function spotDays(match) {
   requestAnimationFrame(() => {
     const rows = [...document.querySelectorAll('#app .wk-day[data-iso]')].filter(r => match(r.dataset.iso) && r.dataset.iso >= isoDate());
     if (rows.length) spotlight(rows, { within: rows[0].parentElement, say: `${rows.length === 1 ? 'One day' : `${rows.length} days`} changed this week` });
@@ -175,11 +177,15 @@ export function weekView() {
       <span class="wk-st">${logged.length ? icon('check') : ''}</span></button>
       ${sug?.iso === d.iso ? `<button class="wk-sug" data-action="week-add" data-iso="${d.iso}" data-type="match">+ Best day for another padel session${sug.moved.length ? ` · ${sug.moved.length} workout${sug.moved.length > 1 ? 's' : ''} would move` : ''}</button>` : ''}`;
   }).join('');
-  return `${pageHead('Week')}
+  // The weekly question: plan the week you're looking at (or next week, on a Sunday).
+  const ask = weekUnsettled(mon) ? WK_OFF : WK_OFF === 0 && weekToAsk() === isoAdd(mon, 7) ? 1 : null;
+  const askCard = ask == null ? '' : `<button class="banner pw-ask" data-action="pw-open" data-off="${ask}">${tile('racket', 'teal')}<span><b>What’s your padel ${ask === 0 ? 'this week' : 'next week'}?</b><small>Tap the days you’re playing and your workouts fit around them.</small></span>${chev}</button>`;
+  return `${pageHead('Week')}${askCard}
     <div class="wk-nav"><button data-action="wk-nav" data-d="-1" ${WK_OFF <= 0 ? 'disabled' : ''} aria-label="Previous week">‹</button><h2>${weekTitle(WK_OFF)}</h2><button data-action="wk-nav" data-d="1" ${WK_OFF >= 3 ? 'disabled' : ''} aria-label="Next week">›</button></div>
     <button class="wk-ctx" data-action="${ctx.action}">${esc(ctx.text)}</button>
     <div class="card wk-list">${rows}</div>
-    <div class="quick-row"><button class="btn filled" data-action="week-add">${icon('plus')}Add Padel</button><button class="btn tinted" data-action="usual-week">Your Usual Week</button></div>`;
+    <button class="btn filled pw-btn" data-action="pw-open" data-off="${WK_OFF}">Plan My Week</button>
+    <div class="quick-row"><button class="btn tinted" data-action="week-add">${icon('plus')}Add Padel</button><button class="btn tinted" data-action="usual-week">Your Usual Week</button></div>`;
 }
 
 // Change one date: the day becomes what you picked, and the workouts still to do this week are re-placed
@@ -280,13 +286,12 @@ function dayEditSheet(iso) {
 
 // ── Today: once a week, ask what's booked.
 export function weekAskCard() {
-  const today = isoDate(), mon = monIso(today), dow = (parseISO(today).getDay() + 6) % 7;
-  if (dow > 3 || S.settings.weekAsked === mon) return '';
-  const booked = Object.keys(S.settings.padelPlan || {}).some(iso => iso >= mon && iso <= isoAdd(mon, 6));
-  if (booked) return '';
+  const today = isoDate(), mon = weekToAsk();
+  if (!mon) return '';
+  const off = mon === monIso(today) ? 0 : 1;
   const usual = DAYS.filter(d => S.schedule[d] === 'Padel');
   const list = usual.length > 1 ? `${usual.slice(0, -1).join(', ')} and ${usual[usual.length - 1]}` : usual[0];
-  return `<div class="banner">${tile('racket', 'teal')}<span><b>Any padel booked this week?</b><small>${usual.length ? `Your usual week has padel on ${list}. ` : ''}Add what’s confirmed and your workouts fit around it.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="week-add" style="font-size:15px;white-space:nowrap">Add Padel</button><button class="link" data-action="week-ask-off" style="font-size:13px;white-space:nowrap">Usual week</button></span></div>`;
+  return `<div class="banner">${tile('racket', 'teal')}<span><b>Any padel booked ${off ? 'next week' : 'this week'}?</b><small>${usual.length ? `Your usual week has padel on ${list}. ` : ''}Add what’s confirmed and your workouts fit around it.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="pw-open" data-off="${off}" style="font-size:15px;white-space:nowrap">Plan Week</button><button class="link" data-action="week-ask-off" data-mon="${mon}" style="font-size:13px;white-space:nowrap">Usual week</button></span></div>`;
 }
 
 // ── Add or change a padel session
@@ -389,6 +394,7 @@ function daySheet(iso) {
 
 export const removeBooking = iso => removePadel(iso);
 export const weekActions = {
+  ...planWeekActions,
   'wk-nav'(el) { WK_OFF = Math.max(0, Math.min(3, WK_OFF + +el.dataset.d)); app.render(); },
   'day-edit'(el) { dayEditSheet(el.dataset.iso); },
   async 'day-set'(el) {
@@ -406,7 +412,7 @@ export const weekActions = {
     await app.save('settings'); app.closeSheet(); app.render({ keepScroll: true }); app.toast(`${dayName(iso)} is back to your usual week`);
   },
   'week-add'(el) { addPadelSheet(el.dataset.iso || null, el.dataset.type || null); },
-  'week-ask-off'() { S.settings.weekAsked = monIso(isoDate()); app.save('settings'); app.render({ keepScroll: true }); },
+  'week-ask-off'(el) { S.settings.weekAsked = el.dataset.mon || monIso(isoDate()); recordSignal('pw-usual'); app.render({ keepScroll: true }); },
   'wk-day'(el) { daySheet(el.dataset.iso); },
   'wk-remove'(el) { removePadel(el.dataset.iso); },
   async 'usual-use'() { if (USUAL) await applyUsual(USUAL.next, null, USUAL.changed); },
