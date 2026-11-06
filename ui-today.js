@@ -21,6 +21,8 @@ import { getExercise } from './domain-catalog.js';
 import { MUSCLES } from './domain-taxonomy.js';
 import { saveBackup } from './ui-backup.js';
 import * as cloud from './core-cloud.js';
+import * as account from './core-account.js';
+import { openSignIn } from './ui-accountui.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { blockBanner, goalActions } from './ui-goal.js';
@@ -68,16 +70,20 @@ export function headsUps() {
   // With the online copy working, no backup nudge; if it stops, say so (a broken key is the one thing to fix).
   const cs = cloud.status();
   if (cs.on && ['key', 'access'].includes(cs.error)) add(2, `<button class="banner warn" data-action="go" data-to="settings">${tile('shield', 'orange')}<span><b>Online copy stopped</b><small>${cs.error === 'key' ? 'Your GitHub key no longer works. Add a new one in Settings.' : 'The key can’t reach your repository any more. Check it in Settings.'}</small></span>${chev}</button>`);
-  const cloudOk = cs.on && cs.lastOk && Date.now() - cs.lastOk < 7 * 86400000;
+  const as = account.status();
+  if (as.on && ['signedout', 'other', 'setup', 'access'].includes(as.error)) add(2, `<button class="banner warn" data-action="go" data-to="settings">${tile('shield', 'orange')}<span><b>Your account isn’t saving</b><small>${as.error === 'signedout' ? 'You were signed out. Sign in again in Settings.' : as.error === 'other' ? 'Another phone saves to your account now. Choose which one in Settings.' : 'Something’s wrong with the account database. See Settings.'}</small></span>${chev}</button>`);
+  const recent7 = st => st.on && st.lastOk && Date.now() - st.lastOk < 7 * 86400000;
+  const cloudOk = recent7(cs) || recent7(as);
   if (S.sessions.length && !cloudOk) {
     const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 86400000) : null;
     const snoozed = Date.now() - (S.settings.backupSnooze || 0) < 7 * 86400000;
     // A slim strip, not a card: it matters, but it shouldn't compete with today's workout.
-    if ((days == null || days >= 7) && !snoozed && cs.on) add(2, `<div class="strip">${icon('download')}<span>${cs.on ? `Online copy hasn’t saved for ${cs.lastOk ? Math.floor((Date.now() - cs.lastOk) / 86400000) : 'several'} days.` : days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`);
+    const on = as.on ? as : cs;
+    if ((days == null || days >= 7) && !snoozed && on.on) add(2, `<div class="strip">${icon('download')}<span>${on.on ? `${as.on ? 'Your account' : 'Online copy'} hasn’t saved for ${on.lastOk ? Math.floor((Date.now() - on.lastOk) / 86400000) : 'several'} days.` : days == null ? 'Your workouts are only on this phone.' : `Last backup ${days} days ago.`}</span><button data-action="quick-backup">Back Up</button><button class="later" data-action="backup-later">Later</button></div>`);
   }
   // Not connected at all: your training is only on this phone (a reset or a full phone can lose it).
-  if (!cs.on && S.sessions.length && Date.now() - (S.settings.cloudNudge || 0) > 7 * 86400000)
-    add(2, `<div class="banner warn">${tile('shield', 'orange')}<span><b>Your training is only on this phone</b><small>${db.persistent ? '' : 'This phone may clear it to free up space. '}Set up the online copy (about 3 minutes) so nothing gets lost.</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right"><button class="link" data-action="go" data-to="settings" style="font-size:15px;white-space:nowrap">Set Up</button><button class="link" data-action="cloud-nudge-later" style="font-size:13px">Later</button></span></div>`);
+  if (!cs.on && !as.on && S.sessions.length && Date.now() - (S.settings.cloudNudge || 0) > 7 * 86400000)
+    add(2, `<div class="banner warn">${tile('shield', 'orange')}<span><b>Your training is only on this phone</b><small>${db.persistent ? '' : 'This phone may clear it to free up space. '}${account.available() ? 'Sign in or make an account (under a minute) so nothing gets lost.' : 'Set up the online copy (about 3 minutes) so nothing gets lost.'}</small></span><span style="display:grid;gap:4px;margin-left:auto;text-align:right">${account.available() ? '<button class="link" data-action="acct-sign" style="font-size:15px;white-space:nowrap">Sign In</button>' : '<button class="link" data-action="go" data-to="settings" style="font-size:15px;white-space:nowrap">Set Up</button>'}<button class="link" data-action="cloud-nudge-later" style="font-size:13px">Later</button></span></div>`);
   // Pain you logged after a workout: the most important thing to know before training.
   const pre = prehabFor(S.profile, S.sessions, Date.now(), { cleared: S.painClear });
   for (const [a] of Object.entries(recentPain(S.sessions, { cleared: S.painClear })).filter(([, v]) => v.from === 'workout').slice(0, 1)) {
@@ -532,6 +538,7 @@ export const today = {
     'nav-back'() { history.length > 1 ? history.back() : app.go('today'); },
     'heads-more'() { app.sheet(`<h2 class="sheet-title">Heads-up</h2><p class="sheet-sub">Most important first.</p><div class="heads-list">${headsList()}</div><button class="btn gray" data-action="close-sheet">Close</button>`); },
     async 'pain-ok'(el) { S.painClear = { ...S.painClear, [el.dataset.a]: Date.now() }; await app.save('painClear'); app.render({ keepScroll: true }); app.toast('Good to hear. Flags for it are cleared until it hurts again.'); },
+    'acct-sign'() { openSignIn(); },
     async 'cloud-nudge-later'() { S.settings.cloudNudge = Date.now(); await app.save('settings'); app.render({ keepScroll: true }); },
     // Everything that isn't today's plan: your other workouts, a quick workout, warm-up and routines.
     'other-train'() {

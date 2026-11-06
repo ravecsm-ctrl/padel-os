@@ -208,8 +208,10 @@ export function weekView() {
   const rows = days.slice(1, 8).map((d, i) => {
     const role = roles[i + 1];
     const logged = S.sessions.filter(s => isoDate(new Date(s.startedAt)) === d.iso), planned = app.planOn(d.iso);
-    const missed = d.iso < today && !logged.length && isRoutine(planned), unplayed = d.iso < today && !logged.length && planned === 'Padel';
-    const label = logged.length ? logged.map(s => s.title).join(' + ') : missed ? `${titleOf(planned)} · missed` : unplayed ? 'Padel · not logged'
+    // Days before you started using the app are never 'missed'.
+    const before = d.iso < (S.settings.startedOn || ''), past = d.iso < today && !before;
+    const missed = past && !logged.length && isRoutine(planned), unplayed = past && !logged.length && planned === 'Padel';
+    const label = logged.length ? logged.map(s => s.title).join(' + ') : before ? 'Before you started' : missed ? `${titleOf(planned)} · missed` : unplayed ? 'Padel · not logged'
       : d.v === 'Padel' ? `${padelLabel(d.padel)} · ${MATCH_LEVELS[d.padel?.level || 'normal']}` : titleOf(shownAs(d, role));
     const why = logged.length || d.iso < today ? '' : roleLine(role, days, i + 1);
     const eve = !logged.length && role?.role === 'eve';

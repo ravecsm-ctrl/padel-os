@@ -1,6 +1,7 @@
 import { app, S, DEFAULT_SETTINGS, parseHash, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as cloud from './core-cloud.js';
+import * as account from './core-account.js';
 import * as timer from './core-timer.js';
 import { DEFAULT_SCHEDULE } from './domain-program.js';
 import { today } from './ui-today.js';
@@ -135,10 +136,17 @@ async function boot() {
   // A workout in progress always opens first.
   if (S.active && S.route !== 'workout') { S.route = 'workout'; S.params = []; window.history.replaceState(null, "", "#/workout"); }
   // Online copy: save after every change, and catch up on anything that waited for signal.
+  // Your account works the same way, alongside (or instead of) the GitHub copy.
   try { await cloud.load(); } catch {}
-  db.onChange(() => cloud.markChanged());
-  cloud.onStatus(() => { if (S.route === 'settings') app.render({ keepScroll: true }); });
-  const catchUp = () => { if (cloud.status().waiting || cloud.status().error === 'offline') cloud.save(); };
+  try { await account.load(); } catch {}
+  db.onChange(() => { cloud.markChanged(); account.markChanged(); });
+  const redraw = () => { if (S.route === 'settings') app.render({ keepScroll: true }); };
+  cloud.onStatus(redraw); account.onStatus(redraw);
+  const catchUp = () => {
+    if (cloud.status().waiting || cloud.status().error === 'offline') cloud.save();
+    const a = account.status();
+    if (a.on && (a.waiting || a.error === 'offline' || a.error === 'server')) account.save();
+  };
   addEventListener('online', catchUp);
   // A goal block with new workouts that was waiting to start puts them on your week on its first day.
   const blockDay = async () => { if (await startPendingBlock()) app.render({ keepScroll: true }); };

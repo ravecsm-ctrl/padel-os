@@ -7,6 +7,8 @@ import { toCSV } from './domain-backup.js';
 import { saveBackup, saveFile, restoreFromData, contents } from './ui-backup.js';
 import * as cloud from './core-cloud.js';
 import { cloudRows, cloudActions } from './ui-cloudui.js';
+import * as account from './core-account.js';
+import { accountRows, accountFooter, accountActions } from './ui-accountui.js';
 import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
 import { bodySummary } from './ui-body.js';
@@ -42,12 +44,13 @@ export const settings = {
         + (notif === 'default' ? row({ title: 'Allow notifications', sub: 'Get told when rest is over', icon: 'bell', color: 'red', action: 'notif' }) : ''), { header: 'While training' })}
       <section class="grp"><h2 class="grp-h">Weight unit</h2>${seg('unit', [['kg', 'Kilograms'], ['lb', 'Pounds']], S.settings.unit)}</section>
       <section class="grp"><h2 class="grp-h">Appearance</h2>${seg('appearance', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.settings.appearance || 'system')}</section>
-      ${group(cloudRows(), { header: 'Online copy', footer: cloud.configured() ? 'Saved after every change while the app is open. Changes made without signal go up next time you’re online.' : 'Never lose a workout if this phone is reset, lost or replaced.' })}
+      ${account.available() ? group(accountRows(), { header: 'Your account', footer: accountFooter() }) : ''}
+      ${cloud.configured() || !account.available() ? group(cloudRows(), { header: account.available() ? 'GitHub copy' : 'Online copy', footer: cloud.configured() ? 'Saved after every change while the app is open. Changes made without signal go up next time you’re online.' : 'Never lose a workout if this phone is reset, lost or replaced.' }) : ''}
       ${group(row({ title: 'Back up now', sub: `${esc(contents(S.sessions))}, plus your plan, goals, exercises and settings · last: ${esc(lb)}`, icon: 'download', color: 'blue', action: 'export-json' })
         + row({ title: 'Export for spreadsheets', sub: 'CSV file of every set', icon: 'share', color: 'green', action: 'export-csv' })
         + `<label class="row has-icon" style="cursor:pointer"><span class="tile teal">${icon('plus')}</span><span class="row-main"><span class="row-title">Restore from backup</span></span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg><input id="importIn" type="file" accept="application/json,.json" hidden></label>`
         + row({ title: 'Storage on this phone', sub: persist === 'granted' ? '' : 'Tap to ask iPhone to keep it', value: persist === 'granted' ? 'Protected' : persist === '…' ? '…' : 'Not protected', icon: 'shield', color: 'indigo', action: persist === 'granted' ? '' : 'persist', chevron: persist !== 'granted' }),
-        { header: 'Your data', footer: `${cloud.configured() ? 'Your data is on this phone, with a copy in your private GitHub repository.' : 'Everything stays on this device. Nothing is uploaded.'}${db.persistent ? '' : ' <b class="red">Storage is unavailable, so data won’t be kept.</b>'}` })}
+        { header: 'Your data', footer: `${account.signedIn() ? 'Your data is on this phone, with a copy in your account.' : cloud.configured() ? 'Your data is on this phone, with a copy in your private GitHub repository.' : 'Everything stays on this device. Nothing is uploaded.'}${db.persistent ? '' : ' <b class="red">Storage is unavailable, so data won’t be kept.</b>'}` })}
       ${group(row({ title: 'Feedback notes', sub: S.feedback.length ? `${S.feedback.length} note${S.feedback.length > 1 ? 's' : ''} · share to get the app tuned` : 'Things that felt off while training', icon: 'note', color: 'orange', to: 'feedback' })
         + row({ title: 'Add to Home Screen', sub: 'In Safari, tap Share, then Add to Home Screen. It then works offline.', icon: 'phone', color: 'gray' })
         + row({ title: 'Health notice', sub: 'General training guidance, not medical advice. Stop if you feel sharp or worsening pain.', icon: 'heart', color: 'red' }), { header: 'About' })}
@@ -70,6 +73,7 @@ export const settings = {
   },
   actions: {
     ...cloudActions,
+    ...accountActions,
     async notif() { try { await Notification.requestPermission(); } catch {} app.render({ keepScroll: true }); },
     async persist() { persist = await db.requestPersistence(); app.toast(persist === 'granted' ? 'Your data is protected' : 'Not allowed. Add to Home Screen and back up regularly.'); app.render({ keepScroll: true }); },
     'export-json'() { saveBackup(); },

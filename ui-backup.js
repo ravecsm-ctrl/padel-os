@@ -3,6 +3,7 @@
 import { app, S, DEFAULT_SETTINGS, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as cloud from './core-cloud.js';
+import * as account from './core-account.js';
 import { buildBackup, validateBackup, normalizeBackup, restoreMeta, backupSummary } from './domain-backup.js';
 import { esc, group, row } from './ui-kit.js';
 import { setCustomExercises, setStartWeights, applyExerciseEdits } from './domain-catalog.js';
@@ -25,7 +26,7 @@ export async function saveFile(name, text, type) {
 }
 
 export async function saveBackup() {
-  const meta = await db.allMeta(); delete meta.timer; delete meta.cloud;   // the GitHub key never goes into a file
+  const meta = await db.allMeta(); delete meta.timer; delete meta.cloud; delete meta.account;   // the GitHub key and the sign-in never go into a file
   const ok = await saveFile(`padel-os-backup-${isoDate()}.json`, JSON.stringify(buildBackup(meta, S.sessions)), 'application/json');
   if (!ok) return;
   S.lastBackup = Date.now(); await app.save('lastBackup'); app.render({ keepScroll: true });
@@ -43,7 +44,7 @@ export function summaryText(b) {
 const day = ts => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 // Restore from a backup (a file, or the online copy). Shows what's in it, then adds to or replaces this phone.
-export async function restoreFromData(data, { online = false } = {}) {
+export async function restoreFromData(data, { online = false, after = null } = {}) {
   const v = validateBackup(data);
   if (!v.ok) return app.toast(v.errors.join(' '));
   const norm = normalizeBackup(data);
@@ -65,15 +66,19 @@ export async function restoreFromData(data, { online = false } = {}) {
         const why = [lost ? `${lost} session${lost === 1 ? '' : 's'} on this phone ${lost === 1 ? 'isn’t' : 'aren’t'} in the backup` : '', v.incomplete ? 'the file looks incomplete' : ''].filter(Boolean).join(' and ');
         if (!(await app.confirm(`Replace everything? ${esc(why[0].toUpperCase() + why.slice(1))}. Back up this phone first if you’re not sure.`, { ok: 'Replace Anyway', danger: true }))) return;
       }
-      // Replacing wipes this phone first; the online copy's key is kept so it carries on.
-      if (b.dataset.mode === 'replace') { await db.clearAll(); await cloud.keep(); }
+      // Replacing wipes this phone first; the online copy's key and your sign-in are kept so they carry on.
+      if (b.dataset.mode === 'replace') { await db.clearAll(); await cloud.keep(); await account.keep(); }
       const keep = b.dataset.mode === 'merge' ? new Set(S.sessions.map(s => s.id)) : new Set();
       await db.putSessions(norm.sessions.filter(s => !keep.has(s.id)));
       for (const [k, v] of Object.entries(restoreMeta(S, norm.meta, b.dataset.mode, DEFAULT_SETTINGS))) { S[k] = v; await app.save(k); }
       if (b.dataset.mode === 'replace' && S.active) await app.saveActive(true);
       for (const k of upgradeSaved(S)) await app.save(k);
       applyTheme(); setCustomExercises(S.customExercises); applyExerciseEdits(S.exerciseEdits); setCustomRoutines(S.customRoutines); setStartWeights(S.startWeights);
-      await app.reloadSessions(); app.closeSheet(); app.toast(online ? 'Online copy restored' : 'Backup restored'); app.render();
+      await app.reloadSessions(); app.closeSheet(); app.toast(online ? 'Online copy restored' : 'Backup restored');
+      await after?.();
+      // Restored during first-run setup (signed in on a new phone): your plan is back, so go straight to Today.
+      if (S.route === 'welcome' && S.profile.onboarded) { S.form = {}; return app.go('today'); }
+      app.render();
     });
   });
 }

@@ -12,6 +12,9 @@ import { MATCH_LEVELS } from './domain-matchlevel.js';
 import { openGoal } from './ui-goal.js';
 import { usualKinds, followUsualWeek } from './ui-week.js';
 import { busyWeek, ANCHOR_ID } from './domain-busy.js';
+import { isoDate } from './domain-calendar.js';
+import * as account from './core-account.js';
+import { openSignIn } from './ui-accountui.js';
 
 let step = 0;
 const STEPS = 8;   // questions 1–7, then your plan
@@ -87,7 +90,8 @@ function body() {
 function startForm() {
   const p = structuredClone(S.profile), first = !p.onboarded;
   const place = S.locations.find(l => l.id === (p.equipment === 'gym' ? 'gym' : 'home')) || app.location();
-  return { _wizard: true, ...p, ...(first ? { minutes: 40, days: 2 } : {}),
+  // A new person starts with no fixed padel days (the built-in example week's Tue/Sat are not theirs).
+  return { _wizard: true, ...p, ...(first ? { minutes: 40, days: 2, padelDays: [] } : {}),
     goalBlock: p.goalBlock || (S.settings.block?.goal && app.blockPos()?.state !== 'done' ? S.settings.block.goal : 'none'),
     trainDays: p.trainDays?.length ? p.trainDays : [...DAYS],
     gear: first || !place ? [...PRESET_GEAR[p.equipment || 'gym']] : [...place.equipment],
@@ -102,6 +106,7 @@ export const welcome = {
     return `<div class="wiz-top">${left}<div class="dots">${step ? Array.from({ length: STEPS }, (_, i) => `<i class="${i < step ? 'on' : ''}"></i>`).join('') : ''}</div><span></span></div>
       ${body()}
       <div class="wiz-bottom"><div class="inner"><button class="btn filled" data-action="w-next">${step === 0 ? 'Get Started' : step === STEPS ? 'Start Training' : 'Continue'}</button>
+      ${step === 0 && account.available() && !account.signedIn() ? '<button class="btn plain" data-action="w-account">I Have an Account</button>' : ''}
       ${step === 0 ? '<button class="btn plain" data-action="w-skip">Skip for now</button>' : ''}</div></div>`;
   },
   // Chips and segments (padel answers) set S.form themselves; just redraw.
@@ -116,9 +121,10 @@ export const welcome = {
     'w-gear-open'() { F()._gearOpen = !F()._gearOpen; app.render({ keepScroll: true }); },
     'w-gear'(el) { const g = el.dataset.gear, f = F(); f.gear = f.gear.includes(g) ? f.gear.filter(x => x !== g) : [...f.gear, g]; app.render({ keepScroll: true }); },
     'w-toggle'(el) { const arr = F()[el.dataset.name], v = el.dataset.value; F()[el.dataset.name] = arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]; app.render({ keepScroll: true }); },
+    'w-account'() { openSignIn(); },
     'w-back'() { step = Math.max(0, step - 1); app.render(); },
     'w-cancel'() { S.form = {}; app.go('settings'); },
-    async 'w-skip'() { S.profile = { ...S.profile, onboarded: true, simple: true }; await app.save('profile'); S.form = {}; app.go('today'); },
+    async 'w-skip'() { S.profile = { ...S.profile, onboarded: true, simple: true }; await app.save('profile'); S.settings.startedOn = isoDate(); await app.save('settings'); S.form = {}; app.go('today'); },
     async 'w-next'() {
       const f = F();
       if (step === 5 && f.trainDays.length < f.days) return app.toast(`Pick at least ${f.days} days`);
@@ -129,6 +135,7 @@ export const welcome = {
       const goalChanged = answers.goalBlock !== (S.profile.goalBlock || 'none');
       S.profile = { ...answers, simple: document.querySelector('#wSimple').checked, onboarded: true };
       await app.save('profile');
+      if (firstTime) S.settings.startedOn = isoDate();
       // The equipment answers set up where you train; edit them any time in Settings → Locations.
       const home = S.locations.find(l => l.id === 'home'), gym = S.locations.find(l => l.id === 'gym');
       const place = answers.equipment === 'gym' ? gym : home;

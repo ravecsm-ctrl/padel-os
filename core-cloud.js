@@ -44,10 +44,10 @@ function gh(path, { method = 'GET', body, raw = false, token = state?.token } = 
 const errorFor = status => status === 401 ? 'key' : status === 403 || status === 404 ? 'access' : 'server';
 const contents = (repo, ref) => `/repos/${repo}/contents/${FILE}${ref ? `?ref=${encodeURIComponent(ref)}` : ''}`;
 
-// What goes online: everything a backup file has. Never the GitHub key, never a workout still in progress.
+// What goes online: everything a backup file has. Never the GitHub key or the account sign-in, never a workout still in progress.
 export async function snapshot() {
   const meta = await db.allMeta();
-  delete meta.timer; delete meta[KEY]; delete meta.active;
+  delete meta.timer; delete meta[KEY]; delete meta.account; delete meta.active;
   return buildBackup(meta, await db.allSessions());
 }
 

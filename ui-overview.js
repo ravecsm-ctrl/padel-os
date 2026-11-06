@@ -26,7 +26,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 // ── What happened
 function calendar() {
   const now = new Date(), view = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-  const weeks = monthGrid(view.getFullYear(), view.getMonth(), S.sessions, app.usualWeek(), { isRoutine, since: trackingSince(S.sessions, S.settings.programStart), now });
+  const weeks = monthGrid(view.getFullYear(), view.getMonth(), S.sessions, app.usualWeek(), { isRoutine, since: [trackingSince(S.sessions, S.settings.programStart), S.settings.startedOn || ''].sort().pop(), now });
   const st = monthStats(weeks), streak = weekStreak(S.sessions);
   const cell = d => {
     const dots = d.done.map(k => `<i class="cd ${k}"></i>`).join('') || (d.missed ? '<i class="cd missed"></i>' : d.future && d.plan ? `<i class="cd plan ${d.plan}"></i>` : '');

@@ -6,7 +6,7 @@ let dbp = null;
 const mem = { sessions: new Map(), meta: new Map() };
 export let persistent = true;
 // Told about every saved change except the ones that aren't your data (the online copy listens).
-const QUIET = new Set(['active', 'timer', 'cloud', 'lastBackup']);
+const QUIET = new Set(['active', 'timer', 'cloud', 'account', 'lastBackup']);
 let changed = null;
 export const onChange = fn => { changed = fn; };
 const notify = key => { if (!QUIET.has(key)) changed?.(key); };
