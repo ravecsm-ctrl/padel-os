@@ -14,12 +14,13 @@ import { bodySummary } from './ui-body.js';
 import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
 import { weekView, usualKinds, followUsualWeek, setUsualDay } from './ui-week.js';
 import { PADEL_TYPES } from './domain-padel.js';
+import { dayTitle } from './ui-days.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const usual = d => S.settings.padelLevel?.[d] || 'normal';
 // "Padel · Hard" in the schedule; a normal day just says Padel.
 const dayLabel = d => S.schedule[d] === 'Padel' && usual(d) !== 'normal' ? `Padel · ${MATCH_LEVELS[usual(d)]}` : optLabel(S.schedule[d]);
-const optLabel = v => getRoutine(v) ? getRoutine(v).title : v === 'Padel' ? 'Padel' : v === 'Recovery' ? 'Recovery' : 'Rest';
+const optLabel = dayTitle;
 
 // ── A better week for the schedule you have: same workouts and padel days, days moved so legs aren't
 // the day before (or after) a match. Shown when it's clearly better, until you use it or say Not now.

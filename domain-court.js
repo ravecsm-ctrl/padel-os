@@ -74,6 +74,23 @@ export const COURT_ROUTINES = {
       s('Pogo hops + 3 jumps', 30, '10 quick, small hops on the balls of your feet, then 3 tall jumps landing softly. Rest fully after.'),
       s('2 short sprints', 30, 'Net to back glass twice at full speed, decelerate under control.'),
     ] },
+  eve: {
+    id: 'eve', title: 'Match Eve', kind: 'court', tag: 'The day before a match', areas: [],
+    blurb: 'Easy movement the day before you play: get the blood flowing and the feet quick without making anything sore. Keep every step easy.',
+    steps: [
+      s('Easy bike or jog', 480, 'A pace where you could hold a conversation. This is not training.'),
+      s('Split steps, half speed', 60, 'Small hop, land softly on the balls of your feet, reset. Two sets of 30 seconds.'),
+      s('Side shuffles, half speed', 60, 'Stay low and relaxed, feet never cross. Two sets of 30 seconds.'),
+      s('Crossover steps, half speed', 30, 'Turn the hips, cross over, settle. Smooth, not fast.', true),
+      s('Relaxed first-step starts', 90, 'Six easy starts toward the net or a corner, then walk back. Quick feet, no strain.'),
+      s('Arm circles + band pull-aparts', 45, 'Small to big circles both ways, then pull a band or imaginary band apart.'),
+      s('Wrist & forearm prep', 30, 'Circle the wrists, then gently stretch palm-up and palm-down.'),
+      s('World’s greatest stretch', 50, 'Lunge, hand down inside the front foot, rotate the other arm to the sky.', true),
+      s('90/90 hip switches', 45, 'Sit with both knees at 90°, rotate the knees side to side, tall chest.'),
+      s('Ankle rocks', 30, 'Half kneel, drive the front knee over the toes, heel down.', true),
+      s('Open book', 40, 'Lie on your side, knees bent, rotate the top arm open and follow it with your eyes.', true),
+      s('Easy walk + slow breathing', 60, 'Breathe in for 4, out for 6. Done: you’re ready for tomorrow.'),
+    ] },
   between: {
     id: 'between', title: 'Between matches', kind: 'court', tag: 'Tournament days', areas: [],
     blurb: 'Four minutes to stay warm and loose between matches. Keep it easy: this is not a workout.',

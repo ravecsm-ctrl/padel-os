@@ -1,6 +1,7 @@
 import { app, S } from './core-app.js';
 import * as db from './core-db.js';
 import { esc, icon, chev, tile, pageHead, group, row, chips, seg, routineLook, ringStat } from './ui-kit.js';
+import { dayTitle } from './ui-days.js';
 import { readinessScore, isRoutine, allRoutineIds, isLegHeavy } from './domain-program.js';
 import { dayKey, weekDates, isoDate, relDay, parseISO, mondayOf, breakInfo, startForWeek } from './domain-calendar.js';
 import { weeklySeries, loadTrend, trainingDays, weekStreak } from './domain-analytics.js';
@@ -23,12 +24,12 @@ import * as cloud from './core-cloud.js';
 import { reviewBanner } from './ui-review.js';
 import { taperFor, taperText, tournamentSummary } from './domain-goals.js';
 import { blockBanner, goalActions } from './ui-goal.js';
-import { weekActions, weekAskCard, weekTargets, weekWindow } from './ui-week.js';
+import { weekActions, weekAskCard, weekTargets, weekWindow, rolesOf } from './ui-week.js';
 import { matchTips } from './domain-matchday.js';
 import { recentPain, painWithProfile, painHits, areaName, loadsAreas } from './domain-pain.js';
 import { applyPainHolds } from './ui-workout.js';
 import { challengeForm, challengeSection, bindChallenge, afterSave, focusForShot, onChallengePick } from './ui-challenges.js';
-import { catchupBanner, welcomeBanner, habitActions, recordSignal, recordLog } from './ui-habits.js';
+import { catchupBanner, welcomeBanner, habitActions, recordSignal, recordLog, dropSignal } from './ui-habits.js';
 import { shapeCall, adjustOf, tuned, isComeback } from './domain-habits.js';
 import { stamp, rise, reduced, spotlight, MS, EASE } from './ui-motion.js';
 
@@ -380,6 +381,10 @@ function hero() {
       <button class="btn tinted" data-action="log-activity" data-kind="padel">Log ${app.padelOn()?.type === 'match' ? 'Match' : 'Padel'}</button></div></section>`;
   }
   const rec = plan === 'Recovery', sw = S.settings.swap;
+  // Match Eve (DAY-ROLES.md): the day before a Medium or Hard match. After Match prep moved a workout it's the
+  // same card, with the move and Undo; a Recovery day you took because you're tired stays a Recovery day.
+  const tiredRec = rec && sw?.date === isoDate() && isRoutine(sw.from);
+  if (!tiredRec && eveToday()) return eveCard(plan === 'Rest' && sw?.date === isoDate() && isRoutine(sw.from) ? sw : null);
   if (plan === 'Rest' && sw?.date === isoDate() && isRoutine(sw.from)) {
     return `<section class="card hero"><span class="call-chip prep">${icon('racket')}Match prep</span>
       <div class="hero-top">${tile('racket', 'teal', true)}<div><h2>Rest before your match</h2><p class="t-sub">Legs fresh for tomorrow</p></div></div>
@@ -401,6 +406,21 @@ function hero() {
   return `<section class="card hero">${cardContext()}<div class="hero-top">${tile(rec ? 'heart' : 'snow', rec ? 'pink' : 'gray', true)}<div><p class="t-foot">${recent ? (rec ? 'Recovery day' : 'Rest day') : 'Today'}</p><h2>${esc(head)}</h2><p class="t-sub">${recent ? esc(parts.map(x => `${x.l} ${x.p}%`).join(' · ')) : rec ? 'Light movement only' : 'Take it easy'}</p></div></div>
     <p class="hero-note">${rec ? 'A walk, some mobility or an injury-prevention routine is perfect today.' : 'Full rest helps you come back stronger.'}${recent ? ` <button class="link" data-action="go" data-to="recovery">See your body map</button>` : ''}</p>
     <button class="btn filled" data-action="go" data-to="court/mobility">${icon('play')}Mobility · ${routineMinutes(COURT_ROUTINES.mobility)} min</button></section>`;
+}
+
+// Today as Match Eve: worked out from the week (never stored), so it follows tomorrow's padel.
+function eveToday() {
+  const days = weekWindow(), i = days.findIndex(d => d.iso === isoDate());
+  return i > 0 && !days[i].past && rolesOf(days)[i]?.role === 'eve';
+}
+function eveCard(sw) {
+  const min = routineMinutes(COURT_ROUTINES.eve);
+  return `<section class="card hero"><span class="call-chip prep">${icon('racket')}Match Eve</span>${cardContext()}
+    <div class="hero-top">${tile('bolt', 'teal', true)}<div><h2>Match Eve</h2><p class="t-sub">Match tomorrow · easy movement, nothing sore</p></div></div>
+    ${levelLine(isoIn(1))}
+    ${sw ? `<p class="hero-note swap-note">${esc(app.routine(sw.from).title)} ${sw.back ? `moves to ${esc(weekday(sw.back))}` : 'is skipped this week'}. <button class="link" data-action="swap-undo">Undo</button></p>` : ''}
+    <button class="btn filled" data-action="go" data-to="court/eve">${icon('play')}Start Match Eve · ${min} min</button>
+    <button class="link call-alt" data-action="eve-rest">Rest instead</button></section>`;
 }
 
 // ── Match-day essentials: the day before padel, on the day, and after playing. "Got it" hides them for the day;
@@ -450,7 +470,7 @@ function weekCard() {
   return `<section class="grp"><h2 class="grp-h big">This week</h2><div class="card"><div class="week">${weekDates().map(d => {
     const did = days.get(d.iso) || [], plan = app.planOn(d.iso);
     const cls = did.length ? `done ${did.includes('gym') ? '' : 'padel'}` : isRoutine(plan) ? 'plan-gym' : plan === 'Padel' ? 'plan-padel' : 'rest';
-    return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(plan)}">${did.length ? icon('check') : ''}</span></div>`;
+    return `<div class="${d.iso === today ? 'today' : ''}"><small>${d.key[0]}</small><span class="dot ${cls}" aria-label="${d.key}: ${did.length ? 'done' : esc(dayTitle(plan))}">${did.length ? icon('check') : ''}</span></div>`;
   }).join('')}</div>
   <p class="week-foot"><b>${done}</b> of ${plural(planned || done, 'workout')}${matches ? ` · <b>${matches}</b> ${matches === 1 ? 'match' : 'matches'}` : ''}${restDays ? ` · <b>${restDays}</b> recovery ${restDays === 1 ? 'day' : 'days'}` : ''}${busy ? ' · busy padel week' : ''}</p>
   <div class="week-key"><span><i style="background:var(--blue)"></i>Gym</span><span><i style="background:var(--teal)"></i>Padel</span><span><i class="ring"></i>Planned</span></div></div></section>`;
@@ -535,6 +555,14 @@ export const today = {
       rememberCard();
       if (S.settings.swap?.to === 'Recovery') S.settings.recoveryDays = (S.settings.recoveryDays || []).filter(d => d !== S.settings.swap.date);
       delete S.settings.swap; await app.save('settings'); app.render({ keepScroll: true }); app.toast('Back to your usual plan');
+    },
+    // Rest instead of Match Eve, today only (DAY-ROLES.md). Not an override: Match Eve is yours to skip.
+    async 'eve-rest'() {
+      const today = isoDate();
+      S.settings.eveOff = [...(S.settings.eveOff || []).filter(d => d >= today), today];
+      recordSignal('eve-rest');
+      await app.save('settings'); app.render({ keepScroll: true });
+      app.toast('Resting today', async () => { dropSignal('eve-rest'); S.settings.eveOff = (S.settings.eveOff || []).filter(d => d !== today); await app.save('settings'); app.render({ keepScroll: true }); });
     },
     async 'prep-move'(el) {
       rememberCard();

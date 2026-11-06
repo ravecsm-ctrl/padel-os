@@ -1,6 +1,6 @@
 // Busy padel weeks: when padel takes most of the week, the gym drops to two sessions plus a rest day.
 // One short Strength session (the anchor: jumps and your main leg lifts, heavy with few sets) and one
-// session that's light on the legs (the flex). Pure functions.
+// session that's light on the legs (the second session). Pure functions.
 import { getExercise } from './domain-catalog.js';
 import { padelProfile } from './domain-recovery.js';
 

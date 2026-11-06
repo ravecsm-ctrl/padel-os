@@ -15,6 +15,8 @@ const planName = (iso, v) => v === 'Padel' ? (PADEL_TYPES[app.padelOn(iso)?.type
 
 // Private signals the app learns from (kept 60 days, never uploaded beyond your own backup).
 export function recordSignal(k, extra = {}) { S.settings.signals = addSignal(S.settings.signals, k, extra); app.save('settings'); }
+// Undo takes back the signal it recorded (the latest one of this kind), so the summaries count honestly.
+export function dropSignal(k) { const l = S.settings.signals || [], i = l.map(s => s.k).lastIndexOf(k); if (i >= 0) { S.settings.signals = [...l.slice(0, i), ...l.slice(i + 1)]; app.save('settings'); } }
 // A session just saved: how long after doing it you logged it.
 export const recordLog = startedAt => recordSignal('log', { d: Math.max(0, Math.round((Date.now() - startedAt) / DAY * 10) / 10) });
 

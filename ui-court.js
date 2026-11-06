@@ -10,6 +10,7 @@ import { routineLook } from './ui-kit.js';
 import { blockHero } from './ui-goal.js';
 import { prehabFor } from './domain-padel.js';
 import { createActivity } from './domain-workout.js';
+import { recordSignal } from './ui-habits.js';
 import { AREAS } from './domain-personalize.js';
 import { challengesCard, challengeActions, spotClearedTier } from './ui-challenges.js';
 
@@ -134,10 +135,13 @@ export const court = {
     'cp-exit'() { P = null; clearInterval(tick); wake?.release?.(); app.go('court'); },
     async 'cp-log'() {
       const r = COURT_ROUTINES[P.id], dur = Math.max(1, Math.round((Date.now() - P.startedAt) / 60000));
-      const rec = { ...createActivity({ activity: 'mobility', startedAt: P.startedAt, durationMin: dur, rpe: 3, notes: '' }), title: r.title, routine: r.id,
+      // Match Eve is easy cardio: it counts towards Conditioning and your week like any session (DAY-ROLES.md).
+      const eve = r.id === 'eve';
+      const rec = { ...createActivity({ activity: eve ? 'cardio' : 'mobility', startedAt: P.startedAt, durationMin: dur, rpe: 3, notes: '' }), title: r.title, routine: r.id,
         // Mobility on a recovery day is the day's session: it keeps your weekly streak going.
-        ...(app.planOn() === 'Recovery' ? { recoveryDay: true } : {}) };
+        ...(eve ? { eveDay: true } : app.planOn() === 'Recovery' ? { recoveryDay: true } : {}) };
       await db.putSession(rec); await app.reloadSessions();
+      if (eve) recordSignal('eve-done');
       P = null; wake?.release?.(); app.go('court'); app.toast(`${r.title} saved`);
     },
   },

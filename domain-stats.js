@@ -7,7 +7,8 @@ import { mondayOf, isoDate } from './domain-calendar.js';
 import { COURT_ROUTINES } from './domain-court.js';
 import { challengeXp, anyTierCleared } from './domain-challenges.js';
 
-const isRoutineLog = s => s.kind === 'activity' && !!s.routine;
+// A logged Match Eve is a session of its own (easy cardio), not a routine.
+const isRoutineLog = s => s.kind === 'activity' && !!s.routine && !s.eveDay;
 const isPrehab = s => isRoutineLog(s) && COURT_ROUTINES[s.routine]?.kind === 'prehab';
 
 const DAY = 86400000, WINDOW = 28 * DAY;

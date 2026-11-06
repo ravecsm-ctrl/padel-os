@@ -11,6 +11,7 @@ import { isoDate } from './domain-calendar.js';
 import { EQUIPMENT } from './domain-personalize.js';
 import { bodySummary } from './ui-body.js';
 import { ADJUST, ADJUST_HINT, adjustOf, tuned, habitSummary } from './domain-habits.js';
+import { eveSummary } from './domain-matchlevel.js';
 
 let persist = '…';
 const sw = (key, checked, label) => `<input type="checkbox" class="switch" data-setting="${key}" ${checked ? 'checked' : ''} aria-label="${esc(label)}">`;
@@ -28,9 +29,10 @@ export const settings = {
         + row({ title: 'Locations & equipment', sub: `Training at ${esc(app.location()?.name || '—')} · ${S.locations.length} location${S.locations.length === 1 ? '' : 's'}`, icon: 'target', color: 'teal', to: 'locations' })
         + row({ title: 'Body weight & measurements', sub: esc(bodySummary()), icon: 'person', color: 'gray', to: 'body' })
         + row({ title: 'How your plan adapts', icon: 'info', color: 'blue', action: 'how-sheet' })
+        + row({ title: 'Match Eve before matches', sub: 'An easy 20-minute session the day before a Medium or Hard match. Off: rest that day.', icon: 'bolt', color: 'teal', right: sw('eve', S.settings.eve !== false, 'Match Eve before matches') })
         + row({ title: 'Simple mode', sub: 'Plain words instead of training terms', icon: 'info', color: 'indigo', right: `<input type="checkbox" class="switch" id="simpleIn" ${S.profile.simple !== false ? 'checked' : ''} aria-label="Simple mode">` }), { header: 'Your plan' })}
       <section class="grp"><h2 class="grp-h">How much the app changes your day</h2>${seg('adjust', Object.entries(ADJUST), adjustOf(S.settings))}<p class="grp-f">${esc(ADJUST_HINT[adjustOf(S.settings)])}${adjustOf(S.settings) === 'balanced' && (tuned(S.settings.signals).easier || tuned(S.settings.signals).reshaped) ? ` You’ve trained through ${tuned(S.settings.signals).easier ? 'Easier' : 'Reshaped'} days a few times lately, so the app suggests them less.` : ''}</p></section>
-      ${(() => { const h = habitSummary(S.settings.signals); return h.logged || h.overrides || h.catchups || h.planAsked ? group(row({ title: 'Advice you overrode', value: String(h.overrides) }) + row({ title: 'Logged the day you did it', value: h.sameDay == null ? '—' : `${h.sameDay}%` }) + row({ title: 'Catch-ups', value: String(h.catchups) }) + (h.planAsked ? row({ title: 'Planned your week', value: `${Math.min(h.planned, 4)} of 4` }) : ''), { header: 'Your last 4 weeks', footer: 'Private to this device. The app uses these to adjust less where you keep overruling it.' }) : ''; })()}
+      ${(() => { const h = habitSummary(S.settings.signals), ev = eveSummary(S.sessions); return h.logged || h.overrides || h.catchups || h.planAsked || ev.of ? group(row({ title: 'Advice you overrode', value: String(h.overrides) }) + row({ title: 'Logged the day you did it', value: h.sameDay == null ? '—' : `${h.sameDay}%` }) + row({ title: 'Catch-ups', value: String(h.catchups) }) + (h.planAsked ? row({ title: 'Planned your week', value: `${Math.min(h.planned, 4)} of 4` }) : '') + (ev.of ? row({ title: 'Match Eve done', value: `${ev.done} of ${ev.of}` }) : ''), { header: 'Your last 4 weeks', footer: 'Private to this device. The app uses these to adjust less where you keep overruling it.' }) : ''; })()}
       ${group(row({ title: 'Start rest timer automatically', icon: 'clock', color: 'orange', right: sw('autoRest', S.settings.autoRest, 'Start rest timer automatically') })
         + row({ title: 'Sounds', icon: 'speaker', color: 'pink', right: sw('sound', S.settings.sound, 'Sounds') })
         + row({ title: 'Vibration', icon: 'phone', color: 'gray', right: sw('vibrate', S.settings.vibrate, 'Vibration') })

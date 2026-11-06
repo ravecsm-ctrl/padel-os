@@ -88,9 +88,9 @@ function placeWeek(days, workouts, opts) {
   let restKept = null;
   if (opts.busy && !best.trial.slice(1, -1).some(d => d.v === 'Rest')) {
     const spare = free.filter(i => best.trial[i].v === 'Recovery').concat(days.map((d, i) => i).filter(i => i > 0 && i < days.length - 1 && !days[i].fixed && days[i].noGym && best.trial[i].v === 'Recovery'));
-    const flex = free.find(i => workouts.includes(best.trial[i].v) && best.trial[i].v !== opts.anchor);
+    const skip = free.find(i => workouts.includes(best.trial[i].v) && best.trial[i].v !== opts.anchor);
     if (spare.length) best.trial[spare[0]].v = 'Rest';
-    else if (flex != null) { restKept = best.trial[flex].v; best.dropped = [...best.dropped, restKept]; best.trial[flex].v = 'Rest'; }
+    else if (skip != null) { restKept = best.trial[skip].v; best.dropped = [...best.dropped, restKept]; best.trial[skip].v = 'Rest'; }
   }
   const moved = workouts.filter(id => !best.dropped.includes(id)).map(id => ({ id, from: was.has(id) ? days[was.get(id)].iso : null, to: best.trial.find((d, i) => free.includes(i) && d.v === id)?.iso }))
     .filter(m => m.from !== m.to);
@@ -124,4 +124,68 @@ export function suggestPadelDays(days, padel, targets, opts, max = 3) {
   out.sort((a, b) => a.score - b.score || a.iso.localeCompare(b.iso));
   const top = out[0]?.score ?? 0;
   return out.slice(0, max).map(s => ({ ...s, rank: s.score - top < 0.5 ? 'best' : s.score - top < 2 ? 'good' : 'ok' }));
+}
+
+// ── Day roles (DAY-ROLES.md): worked out from the week every time it's shown, never stored, so a role follows
+// its match when padel moves. Per day (null for the two edge days):
+//   match     padel
+//   eve       Match Eve: a Rest or Recovery day before padel that's Medium or Hard and tough on the legs. Not on a
+//             day you can't train or said Rest instead, and never a busy week's last empty day. A past day is
+//             Match Eve only if you logged one (d.eveDone).
+//   flex      a gym day with no padel the day before or after (gap: days to the nearest padel in the window)
+//   gym       a gym day next to padel (after / before say which side)
+//   rest, recovery
+const isGym = d => !!d && d.v != null && d.v !== 'Padel' && d.v !== 'Rest' && d.v !== 'Recovery' && d.v !== '';
+export const eveBefore = p => !!p && p.level !== 'easy' && padelProfile(p.type, p.focus).legs >= 0.9;
+export function dayRoles(days, { eve = true, eveOff = [], busy = false } = {}) {
+  const pads = days.map((d, i) => isPadel(d) ? i : -1).filter(i => i >= 0);
+  const roles = days.map((d, i) => {
+    if (i === 0 || i === days.length - 1) return null;
+    if (isPadel(d)) return { role: 'match' };
+    if (d.past) return d.eveDone ? { role: 'eve', done: true } : null;
+    const pv = days[i - 1], nx = days[i + 1];
+    if (isGym(d)) {
+      if (isPadel(pv) || isPadel(nx)) return { role: 'gym', after: isPadel(pv), before: isPadel(nx) };
+      return { role: 'flex', gap: pads.length ? Math.min(...pads.map(j => Math.abs(j - i))) : null };
+    }
+    if (eve && !d.noGym && isPadel(nx) && eveBefore(nx.padel) && !eveOff.includes(d.iso)) return { role: 'eve', level: nx.padel.level || 'normal' };
+    return { role: d.v === 'Recovery' ? 'recovery' : 'rest' };
+  });
+  // A busy week keeps one day with nothing at all: if Match Eve took the last one, the latest such day stays Rest.
+  if (busy) {
+    const empty = i => days[i].v === 'Rest' && (roles[i] ? roles[i].role === 'rest' : !days[i].eveDone);
+    if (!days.some((_, i) => i > 0 && i < days.length - 1 && empty(i))) {
+      const k = days.map((_, i) => i).reverse().find(i => roles[i]?.role === 'eve' && !roles[i].done && days[i].v === 'Rest');
+      if (k != null) roles[k] = { role: 'rest', kept: true };
+    }
+  }
+  return roles;
+}
+
+// The choices on a Flex day, best first: [{ id, reason, rank }]. The planned workout (cur) isn't in the list.
+//   ids       every workout you could do
+//   need      workouts this week wants that aren't on any day (the planner dropped them, or you left them out)
+//   owed      a workout a Flex choice left out last week: it comes first
+//   lastDone  { id: iso } · scores { strength, power, resilience } (the pentagon) · today: iso
+// Two leg-heavy workouts wanting the same day put the short Strength session (combo) first: legs and power in one.
+export const AXIS = { A: 'strength', B: 'strength', C: 'power', D: 'resilience', S: 'strength' };
+const AXIS_LABEL = { strength: 'Strength', power: 'Power', resilience: 'Resilience' };
+export function flexOptions({ cur, ids, need = [], owed = null, lastDone = {}, scores = {}, today, legs = () => false, combo = null, custom = () => false, title = id => id }) {
+  const daysAgo = id => lastDone[id] ? Math.round((new Date(today + 'T12:00') - new Date(lastDone[id] + 'T12:00')) / 86400000) : null;
+  const axes = Object.keys(AXIS_LABEL).filter(a => scores[a] != null), low = axes.length ? axes.reduce((a, b) => scores[b] < scores[a] ? b : a) : null;
+  const legsWanted = [...new Set([cur, ...need])].filter(id => id && legs(id) && id !== combo);
+  const out = [];
+  for (const id of new Set(ids)) {
+    if (id === cur) continue;
+    const ago = daysAgo(id), ax = AXIS[id];
+    let rank, reason;
+    if (owed && id === owed) { rank = 0; reason = `${title(id)} was left out last week`; }
+    else if (combo && id === combo && legsWanted.length >= 2) { rank = 1; reason = legsWanted.includes('C') ? 'Legs + Power in one' : 'Both leg workouts in one'; }
+    else if (need.includes(id)) { rank = 2; reason = 'Doesn’t fit anywhere else this week'; }
+    else if (custom(id)) { rank = 4; reason = 'Your own workout'; }
+    else { rank = 3; reason = ago == null ? 'Not done yet' : `Last done ${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : `${ago} days ago`}`; }
+    if (rank >= 2 && rank <= 3 && ax && ax === low) reason += ` · ${AXIS_LABEL[ax]} is your lowest score`;
+    out.push({ id, reason, rank, ago: ago ?? 1e9, score: ax ? scores[ax] ?? 100 : 100 });
+  }
+  return out.sort((a, b) => a.rank - b.rank || b.ago - a.ago || a.score - b.score || String(a.id).localeCompare(String(b.id))).map(({ id, reason, rank }) => ({ id, reason, rank }));
 }

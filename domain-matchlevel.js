@@ -5,7 +5,8 @@
 //   normal  a regular match
 //   hard    competitive, league, Americano or a long session: keep legs fresh before, give them time after
 import { legsLikeMatch } from './domain-recovery.js';
-export const MATCH_LEVELS = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+// The stored value stays 'normal'; it's shown as Medium (DAY-ROLES.md).
+export const MATCH_LEVELS = { easy: 'Easy', normal: 'Medium', hard: 'Hard' };
 export const LEVEL_HINT = { easy: 'Social game, lesson, drilling', normal: 'A regular match', hard: 'Competitive, league, Americano or long' };
 const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY = 86400000;
@@ -21,6 +22,14 @@ export function loggedLevel(s) {
 }
 // Only a match (or a session as tough on the legs) that turned out hard when it wasn't planned that way changes the days after it.
 // A ball-machine or overheads session doesn't count: it barely loads the legs (see recovery.legsLikeMatch).
+// Match Eve over the last 4 weeks: the days that could have been one (the day before a logged match that went Medium
+// or Hard on the legs, with no gym session that day) and how many had one logged. { done, of }.
+export function eveSummary(sessions = [], now = Date.now(), days = 28) {
+  const key = t => new Date(t).toDateString(), dayBefore = t => { const d = new Date(t); d.setDate(d.getDate() - 1); return d.toDateString(); };
+  const gym = new Set(sessions.filter(s => s.kind === 'strength').map(s => key(s.startedAt))), eve = new Set(sessions.filter(s => s.eveDay).map(s => key(s.startedAt)));
+  const could = new Set(sessions.filter(s => s.activity === 'padel' && legsLikeMatch(s) && loggedLevel(s) !== 'easy' && now - s.startedAt < days * DAY && !gym.has(dayBefore(s.startedAt))).map(s => dayBefore(s.startedAt)));
+  return { done: [...could].filter(d => eve.has(d)).length, of: could.size };
+}
 export const harderThanPlanned = (s, expected) => legsLikeMatch(s) && loggedLevel(s) === 'hard' && expected !== 'hard';
 
 // Your last three matches on this weekday (within 6 weeks) all went one way that isn't the setting:
