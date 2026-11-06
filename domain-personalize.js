@@ -4,6 +4,7 @@ import { getExercise, EXERCISES, PATTERN_FALLBACK, targetField } from './domain-
 import { canDoWith } from './domain-taxonomy.js';
 import { DAYS } from './domain-program.js';
 import { NEXT_TO } from './domain-matchlevel.js';
+import { busyWeek, ANCHOR_ID } from './domain-busy.js';
 
 export const DEFAULT_PROFILE = {
   onboarded: false, goal: 'perform', level: 'intermediate', equipment: 'gym', minutes: 70,
@@ -141,6 +142,25 @@ export function bestWeek(ids, padelDays = [], legs = defaultLegs, levels = {}, c
     if (!best || score < best.score - 1e-9) best = { days: set.map(i => DAYS[i]), ids: order, score };
   }
   return best || { days: [], ids: [], score: 0 };
+}
+
+// Your usual week as it actually runs. When your usual padel makes every week busy (busyWeek: 4 sessions, or 3
+// with 2 as tough on the legs as a match), the week runs the busy-week rules instead of your full set of workouts:
+// Strength (built from your leg workouts) plus your first workout that's light on the legs, placed around the
+// padel with the same scoring as any usual week. Match Eve and the full rest day come from the day roles.
+// The stored schedule keeps your full set, so they come back by themselves when your padel drops.
+//   sched     { Mon: 'A' | 'Padel' | 'Rest' | 'Recovery' ... } · padelUsual { Mon: { type, focus } }
+//   isGym     id → is it a workout · legWork id → is it hard on the legs (Strength is)
+export function runningWeek(sched, { padelUsual = {}, levels = {}, canTrain = null, opts = {}, isGym, legWork } = {}) {
+  const padelDays = DAYS.filter(d => sched[d] === 'Padel');
+  if (!busyWeek(padelDays.map(d => ({ type: 'match', ...(padelUsual[d] || {}) }))).busy) return sched;
+  const gym = DAYS.map(d => sched[d]).filter(isGym), second = gym.find(id => !legWork(id));
+  const list = [ANCHOR_ID, ...(second ? [second] : [])];
+  if (gym.length === list.length && list.every(id => gym.includes(id))) return sched;
+  const w = bestWeek(list, padelDays, legWork, levels, canTrain, opts);
+  const out = Object.fromEntries(DAYS.map(d => [d, sched[d] === 'Padel' ? 'Padel' : sched[d] === 'Recovery' ? 'Recovery' : 'Rest']));
+  w.days.forEach((d, i) => { out[d] = w.ids[i]; });
+  return out;
 }
 
 // How a schedule you already have scores, on the same scale.

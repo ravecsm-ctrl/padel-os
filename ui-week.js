@@ -84,7 +84,7 @@ export const busyNote = (from, to) => to.busy && !from.busy ? 'Busy padel week: 
 
 // Dates and the usual week: a date keeps its own entry only where it differs from your usual weekday, so a
 // later change to the usual week still reaches it. Padel you booked for a date always keeps its entry.
-const usualOn = iso => S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
+const usualOn = iso => app.usualWeek()[DAYS[(parseISO(iso).getDay() + 6) % 7]];
 export const isBooked = iso => S.settings.dated?.[iso] === 'Padel' && !!S.settings.padelPlan?.[iso];
 export function setDated(iso, v) {
   S.settings.dated = { ...(S.settings.dated || {}) };

@@ -26,7 +26,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 // ── What happened
 function calendar() {
   const now = new Date(), view = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-  const weeks = monthGrid(view.getFullYear(), view.getMonth(), S.sessions, S.schedule, { isRoutine, since: trackingSince(S.sessions, S.settings.programStart), now });
+  const weeks = monthGrid(view.getFullYear(), view.getMonth(), S.sessions, app.usualWeek(), { isRoutine, since: trackingSince(S.sessions, S.settings.programStart), now });
   const st = monthStats(weeks), streak = weekStreak(S.sessions);
   const cell = d => {
     const dots = d.done.map(k => `<i class="cd ${k}"></i>`).join('') || (d.missed ? '<i class="cd missed"></i>' : d.future && d.plan ? `<i class="cd plan ${d.plan}"></i>` : '');
@@ -142,7 +142,7 @@ function highlightCard() {
 export function headed() {
   if (app.strength.length < SCORES_AFTER) return gettingStarted();
   const { axes, before, level } = currentStats();
-  const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} });
+  const xp = xpEvents(S.sessions, { plannedIds: [...new Set([...Object.values(S.schedule), ...Object.values(app.usualWeek())])].filter(isRoutine), shotStarts: S.settings.shots || {} });
   const eta = levelEta(xp, level), proj = liftProjections(app.strength), wi = whatIf(app.strength, xp, level, proj);
   const unit = S.settings.unit, by = ts => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   const val = (p, v) => p.metric.load ? fmtNum(toDisplay(v, unit)) : fmtNum(v);

@@ -13,7 +13,7 @@ const delta = (a, b, fmt = String) => b == null || a === b ? '' : ` <span class=
 
 export const currentReview = (off = 0) => {
   const start = reviewWeekStart(); start.setDate(start.getDate() - 7 * off);
-  return weekReview(S.sessions, { weekStart: start, schedule: S.schedule, body: S.body, week: app.position(start).week, painClear: S.painClear, name: mname });
+  return weekReview(S.sessions, { weekStart: start, schedule: app.usualWeek(), body: S.body, week: app.position(start).week, painClear: S.painClear, name: mname });
 };
 
 // For Today: a nudge on Sunday and Monday until you've opened the latest review.

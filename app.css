@@ -3,7 +3,7 @@
 :root {
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --bg: #F2F2F7; --cell: #FFFFFF; --cell-2: #F2F2F7; --elev: #FFFFFF;
+  --bg: #F2F2F7; --cell: #FFFFFF; --cell-2: #F2F2F7; --elev: #FFFFFF; --sheet: #F2F2F7; --sheet-cell: #FFFFFF;
   --label: #000000; --label-2: rgba(60, 60, 67, .6); --label-3: rgba(60, 60, 67, .3);
   --sep: rgba(60, 60, 67, .2); --fill: rgba(120, 120, 128, .12); --fill-2: rgba(120, 120, 128, .2);
   --blue: #007AFF; --blue-tint: rgba(0, 122, 255, .12); --on-blue: #FFFFFF;
@@ -14,7 +14,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000; --cell: #1C1C1E; --cell-2: #2C2C2E; --elev: #1C1C1E;
+    --bg: #000000; --cell: #1C1C1E; --cell-2: #2C2C2E; --elev: #1C1C1E; --sheet: #1C1C1E; --sheet-cell: #2C2C2E;
     --label: #FFFFFF; --label-2: rgba(235, 235, 245, .6); --label-3: rgba(235, 235, 245, .3);
     --sep: rgba(84, 84, 88, .55); --fill: rgba(120, 120, 128, .24); --fill-2: rgba(120, 120, 128, .32);
     --blue: #0A84FF; --blue-tint: rgba(10, 132, 255, .18);
@@ -23,7 +23,7 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #000000; --cell: #1C1C1E; --cell-2: #2C2C2E; --elev: #1C1C1E;
+  --bg: #000000; --cell: #1C1C1E; --cell-2: #2C2C2E; --elev: #1C1C1E; --sheet: #1C1C1E; --sheet-cell: #2C2C2E;
   --label: #FFFFFF; --label-2: rgba(235, 235, 245, .6); --label-3: rgba(235, 235, 245, .3);
   --sep: rgba(84, 84, 88, .55); --fill: rgba(120, 120, 128, .24); --fill-2: rgba(120, 120, 128, .32);
   --blue: #0A84FF; --blue-tint: rgba(10, 132, 255, .18);
@@ -322,18 +322,21 @@ body[data-route="welcome"] main, body[data-route="builder"] main { padding-top: 
 .plan-week b { display: block; font-size: 13px; color: var(--label); margin-top: 2px; font-weight: 600; }
 
 /* Sheets, alerts, toast */
-.sheet { color: var(--label); background: var(--bg); border: 0; border-radius: 14px 14px 0 0; width: 100%; max-width: 560px; max-height: 90dvh; margin: auto auto 0; padding: 6px 16px calc(20px + var(--safe-b)); overflow: auto; }
-.sheet::backdrop { background: rgba(0, 0, 0, .4); }
-.sheet[open] { animation: up .28s cubic-bezier(.2, .9, .3, 1); }
-.grip { width: 36px; height: 5px; border-radius: 3px; background: var(--fill-2); margin: 0 auto 12px; position: relative; }
+/* Every pop-up: a card in the middle of the screen, where the eye is, over a blurred background. */
+.sheet { color: var(--label); background: var(--sheet); border: 0; width: calc(100% - 24px); max-width: 480px; max-height: calc(100dvh - 48px - var(--safe-t, 0px) - var(--safe-b)); margin: auto; border-radius: 22px; padding: 18px 14px 16px; overflow: auto; box-shadow: 0 24px 64px rgba(0, 0, 0, .45), inset 0 0 0 .5px rgba(255, 255, 255, .1); }
+.sheet::backdrop { background: rgba(0, 0, 0, .3); -webkit-backdrop-filter: blur(16px) saturate(130%); backdrop-filter: blur(16px) saturate(130%); }
+.sheet[open] { animation: pop .32s cubic-bezier(.2, .9, .3, 1); }
+.sheet .btns { margin-bottom: 0; }
+.grip { display: none; width: 36px; height: 5px; border-radius: 3px; background: var(--fill-2); margin: 0 auto 12px; position: relative; }
 /* A bigger invisible target around the grip, so it's easy to grab and swipe down. */
 .grip::before { content: ''; position: absolute; inset: -14px -60px; }
 .sheet-title { font-size: 20px; font-weight: 700; margin: 4px 4px 4px; }
 .sheet-sub { font-size: 15px; color: var(--label-2); margin: 0 4px 16px; line-height: 20px; }
-.sheet .grp-b { background: var(--cell); }
+.sheet .grp-b, .sheet .card { background: var(--sheet-cell); }
 .alert-text { text-align: center; padding: 8px 8px 18px; }
 .alert-text b { display: block; font-size: 17px; font-weight: 600; margin-bottom: 4px; }
 @keyframes up { from { transform: translateY(60px); opacity: .6; } }
+@keyframes pop { from { transform: scale(.94) translateY(12px); opacity: 0; } }
 .toast { position: fixed; z-index: 20; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translate(-50%, -16px); background: var(--elev); color: var(--label); padding: 10px 12px 10px 18px; border-radius: 22px; opacity: 0; pointer-events: none; transition: .25s cubic-bezier(.2,.9,.3,1); width: max-content; max-width: 92vw; font-size: 15px; font-weight: 600; display: flex; gap: 12px; align-items: center; box-shadow: 0 8px 30px rgba(0,0,0,.18), 0 0 0 .5px var(--sep); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .toast button { color: var(--blue); font-weight: 600; min-height: 32px; padding: 0 6px; }
@@ -692,7 +695,7 @@ dl.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
 :root[data-theme="dark"] .ea-court, :root[data-theme="dark"] .ea-net, :root[data-theme="dark"] .ea-line { stroke: #64D2FF; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ea-court, :root:not([data-theme="light"]) .ea-net, :root:not([data-theme="light"]) .ea-line { stroke: #64D2FF; } }
 /* Celebration: a card that pops in, a ball that bounces, confetti that bursts out. */
-.celebrate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0, 0, 0, .25); animation: cb-fade .2s ease-out; }
+.celebrate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0, 0, 0, .25); -webkit-backdrop-filter: blur(16px) saturate(130%); backdrop-filter: blur(16px) saturate(130%); animation: cb-fade .2s ease-out; }
 .celebrate.out { opacity: 0; transition: opacity .4s; }
 .cb-card { position: relative; display: grid; justify-items: center; gap: 6px; min-width: 220px; max-width: 80vw; padding: 26px 24px 22px; border-radius: 24px; background: var(--court); color: #fff; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); animation: cb-pop .45s cubic-bezier(.2, 1.4, .4, 1); }
 .cb-card b { font-size: 22px; font-weight: 700; font-family: var(--font-round); }

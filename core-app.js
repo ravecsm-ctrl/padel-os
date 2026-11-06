@@ -1,14 +1,14 @@
 // Application state, persistence wiring, hash router, toasts and sheets.
 // Views import `app` and `S`; main.js registers views and boots.
 import * as db from './core-db.js';
-import { DEFAULT_SCHEDULE, resolveRoutine, DAYS, setPhaseSource, setDerivedRoutine, isLegHeavy, getRoutine } from './domain-program.js';
+import { DEFAULT_SCHEDULE, resolveRoutine, DAYS, setPhaseSource, setDerivedRoutine, isLegHeavy, isUpperHeavy, isRoutine, getRoutine } from './domain-program.js';
 import { buildAnchor, ANCHOR_ID } from './domain-busy.js';
-import { DEFAULT_PROFILE } from './domain-personalize.js';
+import { DEFAULT_PROFILE, runningWeek } from './domain-personalize.js';
 import { isoDate, mondayOf, programPosition, parseISO } from './domain-calendar.js';
 import { levelOn } from './domain-matchlevel.js';
 import { blockPosition, BLOCK_PHASES } from './domain-block.js';
 import { recentPain } from './domain-pain.js';
-import { legsLikeMatch } from './domain-recovery.js';
+import { legsLikeMatch, padelProfile } from './domain-recovery.js';
 
 export const DEFAULT_SETTINGS = { unit: 'kg', name: '', sound: true, vibrate: true, autoRest: true, readinessPrompt: true, adaptive: true, appearance: 'system', programStart: isoDate(mondayOf()) };
 
@@ -55,6 +55,7 @@ setPhaseSource(week => {
 const $ = s => document.querySelector(s);
 let saveTimer = null;
 
+let usualMemo = { key: null, week: null };
 export const app = {
   register(name, view) { views[name] = view; },
   view: () => views[S.route] || views.today,
@@ -75,8 +76,19 @@ export const app = {
   // What's planned on a date: the weekly schedule, unless today's workout was swapped with a later day this week.
   // A date's own plan (this week's padel and where workouts moved) comes before the usual week.
   planOn(iso = isoDate()) {
-    const sw = S.settings.swap, plan = S.settings.dated?.[iso] ?? S.schedule[DAYS[(parseISO(iso).getDay() + 6) % 7]];
+    const sw = S.settings.swap, plan = S.settings.dated?.[iso] ?? app.usualWeek()[DAYS[(parseISO(iso).getDay() + 6) % 7]];
     return sw && iso === sw.date ? sw.to : sw && iso === sw.back ? sw.from : plan;
+  },
+  // Your usual week as it runs (runningWeek): the stored schedule, or the busy-week version of it when your usual
+  // padel makes every week busy. Worked out again only when something it depends on changes.
+  usualWeek() {
+    const pu = S.settings.padelUsual || {}, key = JSON.stringify([S.schedule, pu, S.settings.padelLevel, S.profile.trainDays]);
+    if (usualMemo.key !== key) {
+      const opts = { upper: isUpperHeavy, kinds: Object.fromEntries(Object.entries(pu).map(([d, p]) => [d, padelProfile(p.type, p.focus)])) };
+      usualMemo = { key, week: runningWeek(S.schedule, { padelUsual: pu, levels: S.settings.padelLevel || {}, canTrain: S.profile.trainDays, opts,
+        isGym: isRoutine, legWork: id => id === ANCHOR_ID || isLegHeavy(id) }) };
+    }
+    return usualMemo.week;
   },
   // How hard padel is expected to be on a date ('easy' | 'normal' | 'hard'); null if it isn't a padel day.
   matchLevel(iso = isoDate()) { return app.planOn(iso) === 'Padel' ? levelOn(iso, S.settings) : null; },
@@ -118,6 +130,7 @@ export const app = {
     el._t = setTimeout(() => el.classList.remove('show'), undo ? 6000 : Math.min(7000, Math.max(2600, String(msg).length * 55)));   // longer messages stay longer
   },
 
+  // Every pop-up: a card in the middle of the screen, over a blurred background.
   sheet(html, onMount) {
     const d = $('#sheet');
     $('#sheetBody').innerHTML = html;

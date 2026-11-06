@@ -119,7 +119,7 @@ const boardPick = (name, value) => {
   PW.padel = { ...PW.padel, [PW.last]: { ...PW.padel[PW.last], level: value } };
   morph('placed');
 };
-const noteOf = r => r ? [r.note, ...moveLines(r).slice(0, 2)].filter(Boolean).join(' · ') : 'Tap the days you’re playing. Your workouts fit around them.';
+const noteOf = r => r ? [r.note, ...moveLines(r).slice(0, 2)].filter(Boolean).join(' · ') || 'Your workouts fit around this padel. Tap a day to add padel or take it off.' : 'Tap the days you’re playing. Your workouts fit around them.';
 
 function draw() {
   const b = board(PW.mode, PW.padel), last = PW.start[7].iso;
@@ -151,7 +151,10 @@ export function planWeekSheet(off = 0) {
   const mon = isoAdd(monIso(isoDate()), 7 * off), start = weekWindow(mon), open = openDays(start);
   if (!open.length) return app.toast('Nothing left to plan this week');
   const init = Object.fromEntries(start.filter(d => open.includes(d.iso) && d.v === 'Padel').map(d => [d.iso, { type: d.padel?.type || 'match', focus: d.padel?.focus || null, level: d.padel?.level || 'normal' }]));
-  PW = { mon, start, open, init, padel: { ...init }, def: defaultPadel(), mode: reduced() ? 'tray' : 'days', edit: null, picks: {}, last: null };
+  // With padel already in the week (your usual days, or booked), it opens on the week planned around it, so you see
+  // the workouts on their days straight away. With no padel yet, the workouts wait in the tray for your first tap.
+  const mode = Object.keys(init).length ? 'placed' : reduced() ? 'tray' : 'days';
+  PW = { mon, start, open, init, padel: { ...init }, def: defaultPadel(), mode, edit: null, picks: {}, last: null };
   app.onPick = null;
   app.sheet(draw());
   // The workouts lift off their days into the tray, so the week looks empty and ready to plan.

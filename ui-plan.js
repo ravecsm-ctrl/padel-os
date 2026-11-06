@@ -14,19 +14,21 @@ import { bodySummary } from './ui-body.js';
 import { goalView, goalMounted, goalPick, goalActions, blockHero, blockCard } from './ui-goal.js';
 import { weekView, usualKinds, followUsualWeek, setUsualDay } from './ui-week.js';
 import { PADEL_TYPES } from './domain-padel.js';
+import { ANCHOR_ID } from './domain-busy.js';
 import { dayTitle } from './ui-days.js';
 
 const DAY_NAME = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 const usual = d => S.settings.padelLevel?.[d] || 'normal';
 // "Padel · Hard" in the schedule; a normal day just says Padel.
-const dayLabel = d => S.schedule[d] === 'Padel' && usual(d) !== 'normal' ? `Padel · ${MATCH_LEVELS[usual(d)]}` : optLabel(S.schedule[d]);
+const dayLabel = d => S.schedule[d] === 'Padel' && usual(d) !== 'normal' ? `Padel · ${MATCH_LEVELS[usual(d)]}` : optLabel(app.usualWeek()[d]);
 const optLabel = dayTitle;
 
 // ── A better week for the schedule you have: same workouts and padel days, days moved so legs aren't
 // the day before (or after) a match. Shown when it's clearly better, until you use it or say Not now.
 function betterWeek() {
   const sched = S.schedule, gym = DAYS.filter(d => isRoutine(sched[d]));
-  if (!gym.length || S.settings.weekTipOff === JSON.stringify(sched)) return null;
+  // A busy usual week is already placed by the busy-week rules (app.usualWeek).
+  if (!gym.length || S.settings.weekTipOff === JSON.stringify(sched) || app.usualWeek() !== sched) return null;
   const padel = DAYS.filter(d => sched[d] === 'Padel');
   const levels = S.settings.padelLevel || {};
   const kinds = usualKinds();
@@ -84,7 +86,7 @@ function usualWeekSheet() {
   const today = dayKey(), mon = isoDate(mondayOf()), now = isoDate();
   const diff = Object.keys(S.settings.dated || {}).filter(iso => iso >= now && iso <= isoAdd7(mon)).sort().map(iso => DAY_NAME[DAYS[(parseISO(iso).getDay() + 6) % 7]]);
   app.sheet(`<h2 class="sheet-title">Your usual week</h2><p class="sheet-sub">Used for any week you don’t change.${diff.length ? ` This week differs on ${esc(diff.join(', '))}.` : ''}</p>
-    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { footer: 'Tap a day to change it, and how hard padel usually is that day.' })}
+    ${group(DAYS.map(d => row({ title: DAY_NAME[d], value: esc(dayLabel(d)), action: 'day-sheet', data: { day: d }, cls: d === today ? 'is-today' : '' })).join(''), { footer: app.usualWeek() !== S.schedule ? `Busy padel week: ${optLabel(ANCHOR_ID)} (your leg workouts in one) and ${[...new Set(Object.values(app.usualWeek()))].filter(v => isRoutine(v) && v !== ANCHOR_ID).map(optLabel).join(', ') || 'one lighter session'}, placed around your padel, plus a full rest day. Your other workouts come back in a week with less padel.` : 'Tap a day to change it, and how hard padel usually is that day.' })}
     ${betterWeekCard()}${levelTipCard()}
     <button class="btn plain" data-action="close-sheet">Close</button>`);
 }

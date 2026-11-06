@@ -11,14 +11,14 @@ import { challengeActions } from './ui-challenges.js';
 import { tween, lerp, scoresChanged, spotlight } from './ui-motion.js';
 
 const DAY = 86400000;
-const planned = () => Math.max(1, Object.values(S.schedule).filter(isRoutine).length);
+const planned = () => Math.max(1, Object.values(app.usualWeek()).filter(isRoutine).length);
 // Power needs jumps and throws. If none of your scheduled workouts has any and you haven't
 // done any, the score isn't a judgement: it's just not part of your plan (shown as "—").
 const powerInPlan = () => Object.values(S.schedule).filter(isRoutine).some(id => app.routine(id)?.blocks.some(b => getExercise(b.ex)?.category === 'power'));
 const markPlan = axes => axes.map(a => a.key === 'power' && a.score === 0 && !powerInPlan() ? { ...a, notInPlan: true } : a);
 export const currentStats = () => {
   const now = Date.now();
-  return { axes: markPlan(pentagon(S.sessions, { plannedPerWeek: planned(), now })), before: pentagon(S.sessions, { plannedPerWeek: planned(), now: now - 28 * DAY }), level: levelFor(xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} }).reduce((n, e) => n + e.xp, 0)) };
+  return { axes: markPlan(pentagon(S.sessions, { plannedPerWeek: planned(), now })), before: pentagon(S.sessions, { plannedPerWeek: planned(), now: now - 28 * DAY }), level: levelFor(xpEvents(S.sessions, { plannedIds: [...new Set([...Object.values(S.schedule), ...Object.values(app.usualWeek())])].filter(isRoutine), shotStarts: S.settings.shots || {} }).reduce((n, e) => n + e.xp, 0)) };
 };
 
 // Original radar chart: five axes, rings at 25/50/75/100, now vs 4 weeks ago.
@@ -108,7 +108,7 @@ export const stats = {
   onPick(name, v) { if (name === 'profileView') { VIEW = v; app.render({ keepScroll: true }); } },
   render() {
     const { axes, before, level } = currentStats();
-    const xp = xpEvents(S.sessions, { plannedIds: Object.values(S.schedule).filter(isRoutine), shotStarts: S.settings.shots || {} }).slice(0, 8);
+    const xp = xpEvents(S.sessions, { plannedIds: [...new Set([...Object.values(S.schedule), ...Object.values(app.usualWeek())])].filter(isRoutine), shotStarts: S.settings.shots || {} }).slice(0, 8);
     const badges = achievements(S.sessions);
     const gym = `<div class="card" style="margin-top:12px"><div style="max-width:320px;margin:0 auto">${radar(axes, before)}</div>${legend}</div>
       <div style="height:24px"></div>
