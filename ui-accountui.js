@@ -11,8 +11,7 @@ export const ERRORS = {
   exists: 'There’s already an account with this email. Sign in instead.',
   weak: 'Pick a longer password: at least 6 characters.',
   email: 'That doesn’t look like an email address.',
-  confirm: 'Account made. Tap the link in the email we just sent, then sign in here.',
-  unconfirmed: 'Confirm your email first (tap the link we sent), then sign in.',
+  unconfirmed: 'Your email isn’t confirmed yet. We’ve sent you a new code.',
   code: 'That code didn’t work. Check it, or send a new one.',
   busy: 'Too many tries. Wait a minute and try again.',
   offline: 'No connection right now. Try again when you’re online.',
@@ -95,7 +94,38 @@ function signSheet(mode = 'in', msg = '') {
       go.disabled = true; go.textContent = create ? 'Creating…' : 'Signing in…'; err.textContent = '';
       const res = await account.connect(email, pw.value, { create });
       go.disabled = false; go.textContent = create ? 'Create Account' : 'Sign In';
+      if (res.error === 'verify') return codeSheet();
+      if (res.error === 'unconfirmed') { const r = await account.resendSignup(email); return codeSheet(r.ok ? 'unconfirmed' : r.error); }
       if (!res.ok) { err.textContent = ERRORS[res.error] || ERRORS.server; return; }
+      opened(res);
+    };
+  });
+}
+
+// After Create Account (with "Confirm email" on in Supabase): the code we emailed proves the address and signs you in.
+function codeSheet(msg = '') {
+  app.sheet(`<h2 class="sheet-title">Check your email</h2>
+    <p class="sheet-sub">We sent a code to <b>${esc(email)}</b>. Type it here to finish making your account. It can take a minute; check spam too.</p>
+    ${field('acCode', 'Code from the email', 'text', 'one-time-code')}
+    <p class="t-sub ${msg === 'unconfirmed' || msg === 'sent' ? '' : 'red'}" id="acErr" style="margin:10px 4px 0">${esc(msg === 'sent' ? 'New code sent.' : ERRORS[msg] || msg)}</p>
+    <div class="btns"><button class="btn filled" id="acGo">Confirm and Sign In</button>
+      <button class="btn plain" id="acAgain">Send a new code</button>
+      <button class="btn gray" id="acBack">Back</button></div>`, body => {
+    const go = body.querySelector('#acGo'), err = body.querySelector('#acErr'), code = body.querySelector('#acCode');
+    code.setAttribute('inputmode', 'numeric');
+    code.onkeydown = e => { if (e.key === 'Enter') go.click(); };
+    body.querySelector('#acBack').onclick = () => signSheet('in');
+    body.querySelector('#acAgain').onclick = async e => {
+      e.currentTarget.disabled = true;
+      const r = await account.resendSignup(email);
+      codeSheet(r.ok ? 'sent' : r.error);
+    };
+    go.onclick = async () => {
+      if (code.value.replace(/\s/g, '').length < 6) { err.className = 't-sub red'; err.textContent = 'Type the code from the email.'; return; }
+      go.disabled = true; go.textContent = 'Checking…'; err.textContent = '';
+      const res = await account.verifySignup(email, code.value);
+      go.disabled = false; go.textContent = 'Confirm and Sign In';
+      if (!res.ok) { err.className = 't-sub red'; err.textContent = ERRORS[res.error] || ERRORS.server; return; }
       opened(res);
     };
   });

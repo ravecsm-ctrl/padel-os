@@ -75,8 +75,8 @@ export async function connect(email, password, { create = false } = {}) {
     const r = await call(create ? '/auth/v1/signup' : '/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
     if (!r.ok) return { ok: false, error: authError(r.status, await text(r)) };
     const s = await r.json();
-    // Email confirmation is on in Supabase: the account exists but can't sign in until the link is tapped.
-    if (!s.access_token) return { ok: false, error: 'confirm' };
+    // "Confirm email" is on in Supabase: the account exists, and the code emailed to it signs you in (verifySignup).
+    if (!s.access_token) return { ok: false, error: 'verify' };
     return await opened(adopt(s));
   } catch { return { ok: false, error: 'offline' }; }
 }
@@ -123,6 +123,21 @@ export async function finishGoogle(params) {
 }
 
 // Forgotten password: an email with a code, then the code and a new password sign you in.
+// New accounts prove their email with the code Supabase emails them ("Confirm signup" template, {{ .Token }}).
+export async function verifySignup(email, code) {
+  try {
+    const v = await call('/auth/v1/verify', { method: 'POST', body: { type: 'signup', email: email.trim().toLowerCase(), token: code.replace(/\s/g, '') } });
+    if (!v.ok) return { ok: false, error: authError(v.status, await text(v)) };
+    return await opened(adopt(await v.json()));
+  } catch { return { ok: false, error: 'offline' }; }
+}
+// A new code for an account that isn't confirmed yet (the old one ran out, or they signed up on another day).
+export async function resendSignup(email) {
+  try {
+    const r = await call('/auth/v1/resend', { method: 'POST', body: { type: 'signup', email: email.trim().toLowerCase() } });
+    return r.ok ? { ok: true } : { ok: false, error: authError(r.status, await text(r)) };
+  } catch { return { ok: false, error: 'offline' }; }
+}
 export async function sendReset(email) {
   try {
     const r = await call('/auth/v1/recover', { method: 'POST', body: { email: email.trim().toLowerCase() } });

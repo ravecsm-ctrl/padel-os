@@ -54,7 +54,7 @@ function logSheet(date = isoDate()) {
     <button class="btn filled" id="bSave">Save</button>
     ${e.date ? `<button class="btn plain red" id="bDel" style="margin-top:8px">Delete Entry</button>` : ''}`, body => {
     const num = id => { const v = body.querySelector(id).value.replace(',', '.'); return v === '' ? null : +v; };
-    setTimeout(() => body.querySelector('#bKg').focus(), 50);
+    setTimeout(() => body.querySelector('#bKg')?.focus(), 50);   // the sheet may already be gone
     body.querySelector('#bSave').onclick = async () => {
       const d = body.querySelector('#bDate').value || isoDate(), kg = num('#bKg'), bf = num('#bBf'), w = num('#bWaist');
       if (kg == null && bf == null && w == null) return app.toast('Add at least one number');
