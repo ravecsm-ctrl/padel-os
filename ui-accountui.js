@@ -44,7 +44,9 @@ export function accountRows() {
   const st = account.status();
   return row({ title: esc(st.email), sub: 'Your account', value: `<span class="${broken() ? 'red' : ''}">${esc(statusText())}</span>`, icon: 'person', color: broken() ? 'red' : 'blue', action: 'acct-sheet' });
 }
-export const accountFooter = () => account.signedIn() ? 'Saved to your account after every change while the app is open. Only you can see it.' : 'Optional. Without an account, everything stays on this phone.';
+// The privacy page (privacy.html, next to index.html) opens in the browser, so the app stays where it was.
+const privacyLink = (text = 'How your data is kept private') => `<a class="link" href="privacy.html" target="_blank" rel="noopener">${text}</a>`;
+export const accountFooter = () => `${account.signedIn() ? 'Saved to your account after every change while the app is open. Only you can see it.' : 'Optional. Without an account, everything stays on this phone.'} ${privacyLink()}`;
 
 const field = (id, label, type, auto, value = '') => `<label class="field-l" for="${id}">${label}</label>
   <input class="input" id="${id}" type="${type}" autocomplete="${auto}" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(value)}" aria-label="${label}">`;
@@ -78,7 +80,8 @@ function signSheet(mode = 'in', msg = '') {
     <div class="btns"><button class="btn filled" id="acGo">${create ? 'Create Account' : 'Sign In'}</button>
       <button class="btn plain" id="acMode">${create ? 'I already have an account' : 'Create an account'}</button>
       ${create ? '' : '<button class="btn plain" id="acForgot">Forgot password?</button>'}
-      <button class="btn gray" data-action="close-sheet">Cancel</button></div>`, body => {
+      <button class="btn gray" data-action="close-sheet">Cancel</button></div>
+    <p class="t-sub" style="margin:12px 4px 0;text-align:center">${privacyLink()}</p>`, body => {
     const go = body.querySelector('#acGo'), err = body.querySelector('#acErr'), em = body.querySelector('#acEmail'), pw = body.querySelector('#acPass');
     em.oninput = () => { email = em.value; };
     body.querySelector('#acMode').onclick = () => signSheet(create ? 'in' : 'new');
