@@ -47,7 +47,7 @@ const contents = (repo, ref) => `/repos/${repo}/contents/${FILE}${ref ? `?ref=${
 // What goes online: everything a backup file has. Never the GitHub key or the account sign-in, never a workout still in progress.
 export async function snapshot() {
   const meta = await db.allMeta();
-  delete meta.timer; delete meta[KEY]; delete meta.account; delete meta.active;
+  delete meta.timer; delete meta[KEY]; delete meta.account; delete meta.oauth; delete meta.active;
   return buildBackup(meta, await db.allSessions());
 }
 

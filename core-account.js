@@ -85,6 +85,43 @@ async function opened(session) {
   catch (e) { return { ok: false, error: ['signedout', 'access', 'setup', 'server'].includes(e.message) ? e.message : 'offline' }; }
 }
 
+// Continue with Google (PKCE): the app leaves for Google, Supabase sends it back here with ?code=…,
+// and the code plus the secret made before leaving (kept in storage, never sent until then) signs you in.
+const OAUTH = 'oauth';   // meta: { verifier, hash, at }, only while you're away at Google
+const b64url = bytes => { let s = ''; bytes.forEach(b => { s += String.fromCharCode(b); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+export async function challengeFor(verifier) { return b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))); }
+// Which sign-ins the project has turned on: { google, email }. Null when it can't be reached.
+let providers = null;
+export async function signInOptions() {
+  if (providers) return providers;
+  try {
+    const r = await Promise.race([call('/auth/v1/settings'), new Promise((_, no) => setTimeout(() => no(new Error('slow')), 4000))]);
+    if (!r.ok) return null;
+    const s = await r.json();
+    return (providers = { google: !!s.external?.google, email: s.external?.email !== false });
+  } catch { return null; }
+}
+// Where to send the browser to sign in with Google; back: this app's address (no hash).
+export async function googleUrl(back, hash = '') {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  await db.setMeta(OAUTH, { verifier, hash, at: Date.now() });
+  return `${net.url.replace(/\/+$/, '')}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(back)}&code_challenge=${await challengeFor(verifier)}&code_challenge_method=s256`;
+}
+// Back from Google: null if this isn't a return from Google; otherwise like connect(), plus hash (where you were).
+export async function finishGoogle(params) {
+  const code = params.get('code'), err = params.get('error_description') || params.get('error');
+  if (!code && !err) return null;
+  const pending = await db.getMeta(OAUTH, null);
+  if (!pending) return null;   // someone else's ?code=: not ours
+  await db.delMeta(OAUTH);
+  if (err) return { ok: false, hash: pending.hash, error: /cancel|denied|access_denied/i.test(err) ? 'cancelled' : 'google' };
+  try {
+    const r = await call('/auth/v1/token?grant_type=pkce', { method: 'POST', body: { auth_code: code, code_verifier: pending.verifier } });
+    if (!r.ok) return { ok: false, hash: pending.hash, error: 'google' };
+    return { ...(await opened(adopt(await r.json()))), hash: pending.hash };
+  } catch { return { ok: false, hash: pending.hash, error: 'offline' }; }
+}
+
 // Forgotten password: an email with a code, then the code and a new password sign you in.
 export async function sendReset(email) {
   try {

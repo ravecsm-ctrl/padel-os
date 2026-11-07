@@ -26,7 +26,7 @@ export async function saveFile(name, text, type) {
 }
 
 export async function saveBackup() {
-  const meta = await db.allMeta(); delete meta.timer; delete meta.cloud; delete meta.account;   // the GitHub key and the sign-in never go into a file
+  const meta = await db.allMeta(); delete meta.timer; delete meta.cloud; delete meta.account; delete meta.oauth;   // the GitHub key and the sign-in never go into a file
   const ok = await saveFile(`padel-os-backup-${isoDate()}.json`, JSON.stringify(buildBackup(meta, S.sessions)), 'application/json');
   if (!ok) return;
   S.lastBackup = Date.now(); await app.save('lastBackup'); app.render({ keepScroll: true });

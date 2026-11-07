@@ -2,6 +2,7 @@ import { app, S, DEFAULT_SETTINGS, parseHash, applyTheme } from './core-app.js';
 import * as db from './core-db.js';
 import * as cloud from './core-cloud.js';
 import * as account from './core-account.js';
+import { afterGoogle } from './ui-accountui.js';
 import * as timer from './core-timer.js';
 import { DEFAULT_SCHEDULE } from './domain-program.js';
 import { today } from './ui-today.js';
@@ -130,6 +131,12 @@ async function boot() {
   await timer.initTimer(document.querySelector('#restbar'), S.settings);
   document.querySelector('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') app.closeSheet(); });
   sheetSwipe(document.querySelector('#sheet'));
+  // Back from Google sign-in: finish it, and go back to where you were (the ?code= is removed from the address).
+  let google = null;
+  if (account.available() && /[?&](code|error)=/.test(location.search)) {
+    try { google = await account.finishGoogle(new URLSearchParams(location.search)); } catch {}
+    if (google) window.history.replaceState(null, '', location.pathname + (google.hash || ''));
+  }
   parseHash();
   // First run: onboarding. Existing users keep their data and get a prompt on Today instead.
   if (!S.profile.onboarded && !S.sessions.length && !S.active && ['today', 'overview'].includes(S.route)) { S.route = 'welcome'; S.params = []; window.history.replaceState(null, '', '#/welcome'); }
@@ -155,6 +162,7 @@ async function boot() {
   await startPendingBlock();
   pruneDated();
   app.render();
+  if (google) afterGoogle(google);
   if (!db.persistent || !S.storageOk) app.toast('Storage unavailable — data will not be kept. Avoid private browsing.');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
 }

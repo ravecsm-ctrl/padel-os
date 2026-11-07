@@ -22,6 +22,8 @@ export const ERRORS = {
   signedout: 'You were signed out. Sign in again to keep saving.',
   other: 'Your account is now saving from another phone, so saving here is paused.',
   empty: 'Nothing saved in your account yet.',
+  google: 'Google sign-in didn’t finish. Try again.',
+  cancelled: 'Google sign-in was cancelled.',
 };
 
 // One line for the row and the sheet: "Saved 2 min ago", "Waiting for signal", "Paused".
@@ -50,11 +52,25 @@ const field = (id, label, type, auto, value = '') => `<label class="field-l" for
 let email = '';
 // After restoring your account's copy, this phone has the same data, so it becomes the one that saves.
 const takeOver = () => account.save({ take: true });
-export const openSignIn = () => { email = account.status().email || email; signSheet('in'); };
+let opts = null;   // which sign-ins the project has on (Google shows only when it's turned on)
+export const openSignIn = async () => { email = account.status().email || email; opts = await account.signInOptions(); signSheet('in'); };
+const G = '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 2.9-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
+// Leave for Google; the app picks up where you were when it comes back (main.js → afterGoogle).
+async function goGoogle(btn) {
+  btn.disabled = true; btn.lastChild.textContent = 'Opening Google…';
+  try { location.href = await account.googleUrl(location.origin + location.pathname, location.hash); }
+  catch { btn.disabled = false; btn.lastChild.textContent = 'Continue with Google'; app.toast(ERRORS.google); }
+}
+// Back from Google (main.js calls this once the app has drawn).
+export function afterGoogle(res) {
+  if (res.ok) return opened(res);
+  if (res.error !== 'cancelled') signSheet('in', res.error); else app.toast(ERRORS.cancelled);
+}
 function signSheet(mode = 'in', msg = '') {
   const create = mode === 'new';
   app.sheet(`<h2 class="sheet-title">${create ? 'Create your account' : 'Sign in'}</h2>
     <p class="sheet-sub">${create ? 'Your workouts, plan and settings are saved to it after every change. Only you can see them.' : 'Sign in to save this phone’s data to your account, or to get it back on a new phone.'}</p>
+    ${opts?.google ? `<button class="btn google" id="acGoogle">${G}<span>Continue with Google</span></button><p class="or"><span>or with email</span></p>` : ''}
     ${field('acEmail', 'Email', 'email', 'email', email)}
     <div style="height:12px"></div>
     ${field('acPass', 'Password', 'password', create ? 'new-password' : 'current-password')}
@@ -67,6 +83,7 @@ function signSheet(mode = 'in', msg = '') {
     em.oninput = () => { email = em.value; };
     body.querySelector('#acMode').onclick = () => signSheet(create ? 'in' : 'new');
     body.querySelector('#acForgot')?.addEventListener('click', () => resetSheet());
+    body.querySelector('#acGoogle')?.addEventListener('click', e => goGoogle(e.currentTarget));
     pw.onkeydown = e => { if (e.key === 'Enter') go.click(); };
     go.onclick = async () => {
       email = em.value.trim();
